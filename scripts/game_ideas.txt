@@ -1,0 +1,100 @@
+Classic Snake game with neon glow effects
+Tetris clone with modern particle effects
+Breakout/Arkanoid with power-ups and levels
+Memory card matching game with flip animations
+Sliding puzzle with image tiles
+2048 number merge game
+Minesweeper with custom difficulty
+Sudoku generator and solver
+Flappy Bird clone with pixel art
+Pac-Man inspired maze chase
+Space Invaders with boss battles
+Pong with AI opponent and power-ups
+Whack-a-Mole with combo scoring
+Simon Says color memory game
+Typing speed test with WPM tracker
+Word search puzzle generator
+Hangman with category hints
+Connect Four with AI opponent
+Tic-Tac-Toe with unbeatable AI
+Tower defense with creep waves
+Sokoban box-pushing puzzle
+Cookie clicker idle game
+Merge bubbles number game
+Color flood fill puzzle
+Rhythm tap game with beat detection
+Math quiz speed challenge
+Platform runner with procedural levels
+Asteroids with ship upgrades
+Doodle jump vertical platformer
+Fruit ninja swipe slicing game
+Brick builder pixel art painter
+Solitaire card game (Klondike)
+Blackjack casino card game
+War card game with animations
+Color matching reaction game
+Maze generator and solver
+Bouncing ball physics sandbox
+Gravity puzzle with planets
+Pipe connection puzzle (Pipe Mania)
+Lights out toggle puzzle
+Crossword puzzle generator
+Jigsaw puzzle with drag and drop
+Rock Paper Scissors with streaks
+Dice rolling Yahtzee game
+Chess clock and timer tool
+Reaction time tester
+Bubble shooter with angle aiming
+Match-3 jewel swap game
+Endless runner side-scroller
+Tower stacking balance game
+Number guessing hot/cold game
+Trivia quiz with multiple categories
+Emoji memory pair matching
+Snake and Ladders board game
+Checkers with AI opponent
+Reversi/Othello strategy game
+Dots and Boxes pen and paper game
+Hexagonal minesweeper variant
+Nonogram/Picross logic puzzle
+Kakuro number crossword puzzle
+KenKen math puzzle
+Word scramble unscramble game
+Anagram finder word game
+Spelling bee word builder
+Boggle word grid search
+Morse code trainer
+Flag quiz geography game
+Capital cities quiz game
+Piano tiles rhythm tapper
+Guitar hero style note catcher
+Aim trainer with moving targets
+Dodge the falling blocks game
+Helicopter cave navigator
+Tron light cycle trail game
+Racing game with lane switching
+Fishing game with timing mechanic
+Archery target precision game
+Golf putting mini game
+Penalty shootout soccer game
+Basketball free throw shooter
+Pinball machine with flippers
+Slot machine with spinning reels
+Scratch card lottery game
+Bingo number caller game
+Concentration number memory game
+Speed math arithmetic race
+Periodic table element quiz
+Binary to decimal converter game
+Sorting algorithm visualizer game
+Conway's Game of Life simulator
+Mandelbrot fractal explorer
+Particle system fireworks show
+Kaleidoscope drawing tool
+Etch-a-Sketch digital drawing
+Magnetic poetry word arranger
+Beat maker drum machine
+Tower of Hanoi puzzle
+15 puzzle sliding numbers
+Battleship grid guessing game
+Ludo/Parcheesi board game
