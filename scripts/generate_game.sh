@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Notify on failure
+trap 'openclaw message send --channel feishu --account default --to "ou_7f9cdbd5547c580ed7c085d79998011d" --text "❌ Day $NEXT_NUM 游戏生成失败！主题：$GAME_IDEA\n查看日志：~/Documents/100_web_online_games/scripts/generate.log" 2>/dev/null || true' ERR
+
 PROJECT_DIR=~/Documents/100_web_online_games
 SCRIPTS_DIR="$PROJECT_DIR/scripts"
 GAMES_DIR="$PROJECT_DIR/games"
@@ -58,3 +61,10 @@ git commit -m "Day $NEXT_NUM: $GAME_IDEA"
 git push origin main
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Successfully pushed $GAME_DIR_NAME" >> "$LOG_FILE"
+
+# Notify via Feishu
+/opt/homebrew/bin/openclaw message send \
+  --channel feishu \
+  --account default \
+  --to "ou_7f9cdbd5547c580ed7c085d79998011d" \
+  --text "🎮 Day $NEXT_NUM 游戏已生成并推送！\n游戏主题：$GAME_IDEA\nhttps://github.com/xkWeiMeng/100_web_online_games/tree/main/games/$GAME_DIR_NAME"
