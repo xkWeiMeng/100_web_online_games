@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Neon Snake</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden;color:#fff}
+#wrap{position:relative;display:flex;flex-direction:column;align-items:center}
+canvas{border:2px solid #0ff;border-radius:4px;box-shadow:0 0 20px #0ff4,0 0 60px #0ff2;display:block}
+#ui{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;pointer-events:none}
+#ui.hidden{display:none}
+#ui *{pointer-events:auto}
+h1{font-size:2.4rem;text-transform:uppercase;letter-spacing:.3em;color:#0ff;text-shadow:0 0 10px #0ff,0 0 40px #0ff8;margin-bottom:.6em}
+.btn{background:none;border:2px solid #0f0;color:#0f0;padding:.6em 2em;font-size:1.1rem;cursor:pointer;text-transform:uppercase;letter-spacing:.15em;border-radius:4px;transition:.2s;text-shadow:0 0 6px #0f0;box-shadow:0 0 10px #0f04}
+.btn:hover{background:#0f02;box-shadow:0 0 20px #0f06}
+#instructions{color:#aac;font-size:.85rem;margin-top:1em;text-align:center;line-height:1.7}
+#hud{display:flex;justify-content:space-between;width:100%;padding:.4em 0;font-size:1rem;color:#0ff;text-shadow:0 0 6px #0ff}
+#hud.hidden{visibility:hidden}
+#gameOver{display:none;flex-direction:column;align-items:center}
+#gameOver.show{display:flex}
+#gameOver h2{font-size:1.6rem;color:#f44;text-shadow:0 0 15px #f44;margin-bottom:.3em}
+#finalScore{font-size:1.2rem;color:#ff0;margin-bottom:1em}
+#touchControls{display:none;position:absolute;bottom:10px;left:50%;transform:translateX(-50%);gap:4px}
+@media(pointer:coarse){#touchControls{display:grid;grid-template-columns:60px 60px 60px;grid-template-rows:60px 60px 60px}
+.tc{background:#fff1;border:1px solid #fff3;border-radius:8px;font-size:1.5rem;color:#fff8;display:flex;justify-content:center;align-items:center;user-select:none;-webkit-user-select:none}
+.tc:active{background:#fff3}}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud" class="hidden"><span>Score: <b id="score">0</b></span><span>Best: <b id="best">0</b></span></div>
+  <canvas id="c"></canvas>
+  <div id="ui">
+    <h1>Neon Snake</h1>
+    <button class="btn" id="startBtn">Start Game</button>
+    <div id="instructions">Arrow keys / WASD / Swipe to move<br>Eat the food to grow longer<br>Don't hit yourself!</div>
+    <div id="gameOver">
+      <h2>Game Over</h2>
+      <div id="finalScore"></div>
+      <button class="btn" id="restartBtn">Play Again</button>
+    </div>
+  </div>
+  <div id="touchControls">
+    <div></div><div class="tc" data-d="up">▲</div><div></div>
+    <div class="tc" data-d="left">◀</div><div></div><div class="tc" data-d="right">▶</div>
+    <div></div><div class="tc" data-d="down">▼</div><div></div>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const canvas = $('c'), ctx = canvas.getContext('2d');
+const CELL = 20;
+let cols, rows, snake, dir, nextDir, food, score, bestScore = +localStorage.getItem('nsBest')||0, alive, loopId, speed;
+
+function resize(){
+  const max = Math.min(innerWidth - 20, 600);
+  const maxH = Math.min(innerHeight - 120, 600);
+  const s = Math.min(max, maxH);
+  cols = Math.floor(s / CELL);
+  rows = cols;
+  canvas.width = cols * CELL;
+  canvas.height = rows * CELL;
+}
+resize();
+
+function init(){
+  const cx = Math.floor(cols/2), cy = Math.floor(rows/2);
+  snake = [{x:cx,y:cy},{x:cx-1,y:cy},{x:cx-2,y:cy}];
+  dir = {x:1,y:0}; nextDir = {x:1,y:0};
+  score = 0; speed = 120; alive = true;
+  placeFood();
+  $('score').textContent = 0;
+  $('best').textContent = bestScore;
+}
+
+function placeFood(){
+  const set = new Set(snake.map(s=>s.x+','+s.y));
+  let p;
+  do { p = {x:Math.floor(Math.random()*cols), y:Math.floor(Math.random()*rows)}; } while(set.has(p.x+','+p.y));
+  food = p;
+}
+
+function tick(){
+  if(!alive) return;
+  dir = nextDir;
+  const head = {x:snake[0].x+dir.x, y:snake[0].y+dir.y};
+  if(head.x<0||head.x>=cols||head.y<0||head.y>=rows||snake.some(s=>s.x===head.x&&s.y===head.y)){
+    gameOver(); return;
+  }
+  snake.unshift(head);
+  if(head.x===food.x&&head.y===food.y){
+    score++; $('score').textContent=score;
+    if(score>bestScore){bestScore=score;localStorage.setItem('nsBest',bestScore);$('best').textContent=bestScore;}
+    placeFood();
+    if(speed>60) speed-=2;
+  } else snake.pop();
+  draw();
+  loopId = setTimeout(tick, speed);
+}
+
+function draw(){
+  ctx.fillStyle='#0a0a1a'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  // grid
+  ctx.strokeStyle='#ffffff08'; ctx.lineWidth=.5;
+  for(let i=0;i<=cols;i++){ctx.beginPath();ctx.moveTo(i*CELL,0);ctx.lineTo(i*CELL,rows*CELL);ctx.stroke();}
+  for(let i=0;i<=rows;i++){ctx.beginPath();ctx.moveTo(0,i*CELL);ctx.lineTo(cols*CELL,i*CELL);ctx.stroke();}
+  // food glow
+  const fx=food.x*CELL+CELL/2, fy=food.y*CELL+CELL/2;
+  const gf=ctx.createRadialGradient(fx,fy,2,fx,fy,CELL);
+  gf.addColorStop(0,'#ff06');gf.addColorStop(1,'transparent');
+  ctx.fillStyle=gf;ctx.fillRect(food.x*CELL-CELL,food.y*CELL-CELL,CELL*3,CELL*3);
+  ctx.fillStyle='#ff0';ctx.shadowColor='#ff0';ctx.shadowBlur=12;
+  ctx.beginPath();ctx.arc(fx,fy,CELL/2-2,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
+  // snake
+  snake.forEach((s,i)=>{
+    const t=1-i/snake.length;
+    const r=Math.floor(0+t*0), g=Math.floor(255*t), b=Math.floor(100+155*(1-t));
+    const col=`rgb(${r},${g},${b})`;
+    ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=i===0?16:8;
+    const p=2;
+    ctx.beginPath();ctx.roundRect(s.x*CELL+p,s.y*CELL+p,CELL-p*2,CELL-p*2,4);ctx.fill();
+  });
+  ctx.shadowBlur=0;
+}
+
+function gameOver(){
+  alive=false;clearTimeout(loopId);
+  $('gameOver').classList.add('show');
+  $('finalScore').textContent='Score: '+score;
+  $('ui').classList.remove('hidden');
+  $('startBtn').style.display='none';
+  $('instructions').style.display='none';
+}
+
+function startGame(){
+  $('ui').classList.add('hidden');
+  $('hud').classList.remove('hidden');
+  $('gameOver').classList.remove('show');
+  $('startBtn').style.display='';
+  $('instructions').style.display='';
+  init(); draw(); loopId=setTimeout(tick,speed);
+}
+
+$('startBtn').onclick=startGame;
+$('restartBtn').onclick=startGame;
+
+const dirMap={ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0},
+  w:{x:0,y:-1},s:{x:0,y:1},a:{x:-1,y:0},d:{x:1,y:0}};
+document.addEventListener('keydown',e=>{
+  const d=dirMap[e.key];
+  if(d&&(d.x+dir.x!==0||d.y+dir.y!==0)){nextDir=d;e.preventDefault();}
+});
+
+// touch / swipe
+let tx,ty;
+canvas.addEventListener('touchstart',e=>{const t=e.touches[0];tx=t.clientX;ty=t.clientY;},{passive:true});
+canvas.addEventListener('touchend',e=>{
+  const t=e.changedTouches[0];const dx=t.clientX-tx,dy=t.clientY-ty;
+  if(Math.abs(dx)+Math.abs(dy)<30)return;
+  let d;
+  if(Math.abs(dx)>Math.abs(dy)) d=dx>0?{x:1,y:0}:{x:-1,y:0}; else d=dy>0?{x:0,y:1}:{x:0,y:-1};
+  if(d.x+dir.x!==0||d.y+dir.y!==0) nextDir=d;
+},{passive:true});
+
+// on-screen buttons
+document.querySelectorAll('.tc').forEach(b=>{
+  const map={up:{x:0,y:-1},down:{x:0,y:1},left:{x:-1,y:0},right:{x:1,y:0}};
+  b.addEventListener('touchstart',e=>{e.preventDefault();const d=map[b.dataset.d];if(d&&(d.x+dir.x!==0||d.y+dir.y!==0))nextDir=d;});
+});
+
+$('best').textContent=bestScore;
+draw();init();draw();
+</script>
+</body>
+</html>
