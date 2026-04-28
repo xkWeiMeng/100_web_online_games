@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memory Match</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
+h1{font-size:2rem;margin-bottom:.5rem;background:linear-gradient(135deg,#818cf8,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.screen{display:none;flex-direction:column;align-items:center;gap:1rem;text-align:center;padding:1rem}
+.screen.active{display:flex}
+.instructions{max-width:400px;line-height:1.6;color:#94a3b8;font-size:.95rem}
+button{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;padding:.75rem 2rem;border-radius:12px;font-size:1.1rem;cursor:pointer;transition:transform .15s,box-shadow .15s}
+button:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(99,102,241,.4)}
+.top-bar{display:flex;gap:2rem;margin-bottom:.75rem;font-size:1rem}
+.top-bar span{background:#1e293b;padding:.4rem 1rem;border-radius:8px}
+#board{display:grid;gap:10px;perspective:800px;max-width:min(90vw,520px)}
+.card{position:relative;aspect-ratio:1;cursor:pointer;transform-style:preserve-3d;transition:transform .45s cubic-bezier(.4,.2,.2,1)}
+.card.flipped,.card.matched{transform:rotateY(180deg)}
+.card .face{position:absolute;inset:0;border-radius:14px;display:flex;align-items:center;justify-content:center;backface-visibility:hidden;font-size:2.2rem}
+.card .back{background:linear-gradient(145deg,#334155,#1e293b);border:2px solid #475569;box-shadow:inset 0 0 20px rgba(0,0,0,.3)}
+.card .back::after{content:'?';font-size:1.8rem;color:#64748b}
+.card .front{background:linear-gradient(145deg,#1e293b,#0f172a);border:2px solid #6366f1;transform:rotateY(180deg)}
+.card.matched .front{border-color:#34d399;box-shadow:0 0 16px rgba(52,211,153,.25)}
+.card:not(.flipped):not(.matched):hover .back{border-color:#818cf8}
+#win-screen h2{font-size:1.8rem;color:#34d399}
+#win-screen .stats{font-size:1.1rem;color:#94a3b8;line-height:2}
+select{background:#1e293b;color:#e2e8f0;border:1px solid #475569;padding:.5rem 1rem;border-radius:8px;font-size:1rem}
+</style>
+</head>
+<body>
+
+<div id="start-screen" class="screen active">
+  <h1>Memory Match</h1>
+  <p class="instructions">Flip cards to find matching pairs. Match all pairs in the fewest moves and fastest time to win!</p>
+  <label>Difficulty
+    <select id="difficulty">
+      <option value="4">Easy (4×4)</option>
+      <option value="6">Medium (6×6)</option>
+    </select>
+  </label>
+  <button onclick="startGame()">Play</button>
+</div>
+
+<div id="game-screen" class="screen">
+  <div class="top-bar">
+    <span>Moves: <b id="moves">0</b></span>
+    <span>Pairs: <b id="pairs">0</b>/<b id="total"></b></span>
+    <span>⏱ <b id="timer">0:00</b></span>
+  </div>
+  <div id="board"></div>
+</div>
+
+<div id="win-screen" class="screen">
+  <h2>You Win!</h2>
+  <div class="stats">
+    <div>Moves: <b id="final-moves"></b></div>
+    <div>Time: <b id="final-time"></b></div>
+  </div>
+  <button onclick="startGame()">Play Again</button>
+  <button onclick="showStart()">Menu</button>
+</div>
+
+<script>
+const emojis=['🐶','🐱','🦊','🐻','🐼','🐸','🐵','🦁','🐯','🐮','🐷','🐲','🦄','🐙','🦋','🐢','🦀','🐬'];
+let size,cards,flipped=[],locked=false,moves,matched,totalPairs,timerInterval,seconds;
+
+function showStart(){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('start-screen').classList.add('active')}
+
+function startGame(){
+  size=+document.getElementById('difficulty').value;
+  totalPairs=(size*size)/2;
+  moves=0;matched=0;seconds=0;flipped=[];locked=false;
+  clearInterval(timerInterval);
+  document.getElementById('moves').textContent=0;
+  document.getElementById('pairs').textContent=0;
+  document.getElementById('total').textContent=totalPairs;
+  document.getElementById('timer').textContent='0:00';
+
+  const picked=emojis.slice(0,totalPairs);
+  cards=[...picked,...picked].sort(()=>Math.random()-.5);
+
+  const board=document.getElementById('board');
+  board.style.gridTemplateColumns=`repeat(${size},1fr)`;
+  board.innerHTML=cards.map((e,i)=>`<div class="card" data-i="${i}" onclick="flip(this)"><div class="face back"></div><div class="face front">${e}</div></div>`).join('');
+
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('game-screen').classList.add('active');
+
+  timerInterval=setInterval(()=>{seconds++;const m=Math.floor(seconds/60);const s=seconds%60;document.getElementById('timer').textContent=`${m}:${s.toString().padStart(2,'0')}`},1000);
+}
+
+function flip(el){
+  if(locked||el.classList.contains('flipped')||el.classList.contains('matched'))return;
+  el.classList.add('flipped');
+  flipped.push(el);
+  if(flipped.length===2){
+    moves++;document.getElementById('moves').textContent=moves;
+    locked=true;
+    const[a,b]=flipped;
+    if(cards[a.dataset.i]===cards[b.dataset.i]){
+      a.classList.add('matched');b.classList.add('matched');
+      matched++;document.getElementById('pairs').textContent=matched;
+      flipped=[];locked=false;
+      if(matched===totalPairs)win();
+    }else{
+      setTimeout(()=>{a.classList.remove('flipped');b.classList.remove('flipped');flipped=[];locked=false},700);
+    }
+  }
+}
+
+function win(){
+  clearInterval(timerInterval);
+  const m=Math.floor(seconds/60);const s=seconds%60;
+  document.getElementById('final-moves').textContent=moves;
+  document.getElementById('final-time').textContent=`${m}:${s.toString().padStart(2,'0')}`;
+  setTimeout(()=>{document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('win-screen').classList.add('active')},600);
+}
+</script>
+</body>
+</html>
