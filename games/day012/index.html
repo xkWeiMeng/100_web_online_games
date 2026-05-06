@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Pong — AI & Power-Ups</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0a1a;font-family:'Segoe UI',system-ui,sans-serif;color:#e0e0e0;touch-action:none;user-select:none}
+canvas{display:block;margin:0 auto}
+#ui{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+#ui.active{pointer-events:auto}
+.overlay{background:rgba(6,6,26,.92);border-radius:18px;padding:40px 48px;max-width:420px;text-align:center;border:1px solid rgba(100,140,255,.25);box-shadow:0 0 60px rgba(80,120,255,.15)}
+h1{font-size:2.4rem;margin-bottom:8px;background:linear-gradient(135deg,#64b5f6,#ce93d8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{font-size:.85rem;color:#888;margin-bottom:22px}
+.instructions{font-size:.82rem;color:#aaa;line-height:1.6;margin-bottom:24px;text-align:left}
+.instructions b{color:#90caf9}
+button{background:linear-gradient(135deg,#5c6bc0,#7e57c2);color:#fff;border:none;padding:12px 36px;border-radius:10px;font-size:1rem;cursor:pointer;transition:transform .15s,box-shadow .15s}
+button:hover{transform:scale(1.05);box-shadow:0 0 20px rgba(126,87,194,.5)}
+#hud{position:absolute;top:12px;left:0;width:100%;display:flex;justify-content:center;gap:40px;font-size:1.1rem;pointer-events:none}
+.score{font-variant-numeric:tabular-nums}
+.score span{font-size:1.6rem;font-weight:700}
+#powerup-info{position:absolute;top:50px;left:50%;transform:translateX(-50%);font-size:.8rem;color:#ffd54f;opacity:0;transition:opacity .3s;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud" style="display:none">
+  <div class="score" style="color:#64b5f6">You: <span id="s1">0</span></div>
+  <div class="score" style="color:#ef5350">AI: <span id="s2">0</span></div>
+</div>
+<div id="powerup-info"></div>
+<div id="ui" class="active">
+  <div class="overlay" id="menu">
+    <h1>PONG</h1>
+    <div class="sub">AI Opponent & Power-Ups</div>
+    <div class="instructions">
+      <b>Mouse / Touch</b> — move your paddle<br>
+      <b>Power-ups</b> spawn randomly:<br>
+      🟢 <b>Big Paddle</b> — grow your paddle<br>
+      🔵 <b>Slow Ball</b> — slow the ball down<br>
+      🟡 <b>Multi-Ball</b> — split into 3 balls<br>
+      🔴 <b>Shrink AI</b> — shrink opponent<br><br>
+      First to <b>7</b> wins!
+    </div>
+    <button id="start">Play</button>
+  </div>
+</div>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+const ui=document.getElementById('ui'),menu=document.getElementById('menu');
+const s1El=document.getElementById('s1'),s2El=document.getElementById('s2');
+const hud=document.getElementById('hud'),puInfo=document.getElementById('powerup-info');
+
+let W,H,dpr;
+const WIN=7;
+let state='menu'; // menu | play | over
+
+/* sizing */
+function resize(){
+  dpr=window.devicePixelRatio||1;
+  W=window.innerWidth;H=window.innerHeight;
+  C.width=W*dpr;C.height=H*dpr;
+  C.style.width=W+'px';C.style.height=H+'px';
+  X.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize',resize);resize();
+
+/* game objects */
+const PW=14,PH_BASE=90,BALL_R=8,BALL_SPEED_BASE=6,AI_SPEED=5.5;
+let player,ai,balls,powerups,score,paddleSizes,activeEffects;
+
+function initGame(){
+  score=[0,0];
+  paddleSizes={player:PH_BASE,ai:PH_BASE};
+  activeEffects=[];
+  resetRound();
+  s1El.textContent=0;s2El.textContent=0;
+}
+
+function resetRound(){
+  player={x:30,y:H/2,w:PW,h:paddleSizes.player};
+  ai={x:W-30-PW,y:H/2,w:PW,h:paddleSizes.ai};
+  balls=[makeBall()];
+  powerups=[];
+  paddleSizes.player=PH_BASE;paddleSizes.ai=PH_BASE;
+  activeEffects=[];
+}
+
+function makeBall(x,y,dx,dy){
+  const sp=BALL_SPEED_BASE;
+  const angle=(Math.random()*.5-.25)*Math.PI;
+  return{x:x||W/2,y:y||H/2,r:BALL_R,
+    dx:dx||(Math.random()>.5?1:-1)*sp*Math.cos(angle),
+    dy:dy||sp*Math.sin(angle),speed:sp};
+}
+
+/* input */
+let mouseY=H/2;
+window.addEventListener('mousemove',e=>{mouseY=e.clientY});
+window.addEventListener('touchmove',e=>{mouseY=e.touches[0].clientY;e.preventDefault()},{passive:false});
+window.addEventListener('touchstart',e=>{mouseY=e.touches[0].clientY});
+
+document.getElementById('start').addEventListener('click',()=>{
+  state='play';ui.classList.remove('active');hud.style.display='flex';initGame();
+});
+
+/* power-up system */
+const PU_TYPES=[
+  {id:'big',color:'#66bb6a',label:'Big Paddle',apply:()=>{paddleSizes.player=140;player.h=140},dur:8000},
+  {id:'slow',color:'#42a5f5',label:'Slow Ball',apply:()=>{balls.forEach(b=>{b.dx*=.6;b.dy*=.6})},dur:5000},
+  {id:'multi',color:'#ffca28',label:'Multi-Ball',apply:()=>{
+    const b=balls[0];if(b)balls.push(makeBall(b.x,b.y,b.dx,-b.dy),makeBall(b.x,b.y,-b.dx,b.dy));
+  },dur:0},
+  {id:'shrink',color:'#ef5350',label:'Shrink AI',apply:()=>{paddleSizes.ai=50;ai.h=50},dur:8000},
+];
+let puTimer=0;
+
+function spawnPowerup(){
+  const t=PU_TYPES[Math.random()*PU_TYPES.length|0];
+  powerups.push({x:W*.25+Math.random()*W*.5,y:40+Math.random()*(H-80),r:14,type:t,age:0});
+}
+
+function showPuInfo(label){
+  puInfo.textContent=label+'!';puInfo.style.opacity=1;
+  setTimeout(()=>puInfo.style.opacity=0,1500);
+}
+
+/* particles */
+let particles=[];
+function burst(x,y,color,n=12){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2,sp=1+Math.random()*3;
+    particles.push({x,y,dx:Math.cos(a)*sp,dy:Math.sin(a)*sp,life:1,color});
+  }
+}
+
+/* update */
+function update(){
+  if(state!=='play')return;
+
+  // player paddle
+  player.y+=(mouseY-player.y)*.18;
+  player.y=Math.max(player.h/2,Math.min(H-player.h/2,player.y));
+
+  // AI paddle
+  const target=balls.reduce((best,b)=>b.dx>0&&b.x>best.x?b:best,{x:-1,y:H/2});
+  const diff=target.y-ai.y;
+  ai.y+=Math.sign(diff)*Math.min(Math.abs(diff),AI_SPEED);
+  ai.y=Math.max(ai.h/2,Math.min(H-ai.h/2,ai.y));
+
+  // balls
+  for(let i=balls.length-1;i>=0;i--){
+    const b=balls[i];
+    b.x+=b.dx;b.y+=b.dy;
+
+    // top/bottom
+    if(b.y-b.r<0){b.y=b.r;b.dy=Math.abs(b.dy)}
+    if(b.y+b.r>H){b.y=H-b.r;b.dy=-Math.abs(b.dy)}
+
+    // paddle collision
+    [player,ai].forEach(p=>{
+      if(b.x-b.r<p.x+p.w&&b.x+b.r>p.x&&b.y>p.y-p.h/2&&b.y<p.y+p.h/2){
+        const isPlayer=p===player;
+        b.dx=Math.abs(b.dx)*(isPlayer?1:-1);
+        const rel=(b.y-p.y)/(p.h/2);
+        b.dy=rel*5;
+        // slight speedup
+        const sp=Math.sqrt(b.dx*b.dx+b.dy*b.dy)*1.03;
+        const ang=Math.atan2(b.dy,b.dx);
+        b.dx=Math.cos(ang)*Math.min(sp,14);
+        b.dy=Math.sin(ang)*Math.min(sp,14);
+        burst(isPlayer?p.x+p.w:p.x,b.y,isPlayer?'#64b5f6':'#ef5350');
+      }
+    });
+
+    // score
+    if(b.x<-30){score[1]++;s2El.textContent=score[1];balls.splice(i,1);burst(0,b.y,'#ef5350',20);continue}
+    if(b.x>W+30){score[0]++;s1El.textContent=score[0];balls.splice(i,1);burst(W,b.y,'#64b5f6',20);continue}
+
+    // powerup collision
+    for(let j=powerups.length-1;j>=0;j--){
+      const p=powerups[j];
+      if(Math.hypot(b.x-p.x,b.y-p.y)<b.r+p.r){
+        p.type.apply();
+        showPuInfo(p.type.label);
+        burst(p.x,p.y,p.type.color,16);
+        if(p.type.dur)activeEffects.push({type:p.type,end:Date.now()+p.type.dur});
+        powerups.splice(j,1);
+      }
+    }
+  }
+
+  if(balls.length===0)resetRound();
+
+  // check win
+  if(score[0]>=WIN||score[1]>=WIN){
+    state='over';
+    menu.querySelector('h1').textContent=score[0]>=WIN?'YOU WIN':'AI WINS';
+    menu.querySelector('.sub').textContent=score[0]+' — '+score[1];
+    menu.querySelector('.instructions').textContent='';
+    menu.querySelector('button').textContent='Play Again';
+    ui.classList.add('active');hud.style.display='none';
+  }
+
+  // effects expiry
+  const now=Date.now();
+  activeEffects=activeEffects.filter(e=>{
+    if(now>e.end){
+      if(e.type.id==='big'){paddleSizes.player=PH_BASE;player.h=PH_BASE}
+      if(e.type.id==='shrink'){paddleSizes.ai=PH_BASE;ai.h=PH_BASE}
+      return false;
+    }return true;
+  });
+
+  // spawn timer
+  puTimer++;
+  if(puTimer>360&&powerups.length<2){puTimer=0;spawnPowerup()}
+
+  // particles
+  particles.forEach(p=>{p.x+=p.dx;p.y+=p.dy;p.life-=.025});
+  particles=particles.filter(p=>p.life>0);
+}
+
+/* draw */
+function draw(){
+  X.fillStyle='#0a0a1a';X.fillRect(0,0,W,H);
+
+  if(state!=='play'&&state!=='over'){requestAnimationFrame(loop);return}
+
+  // centre line
+  X.setLineDash([8,10]);X.strokeStyle='rgba(255,255,255,.08)';X.lineWidth=2;
+  X.beginPath();X.moveTo(W/2,0);X.lineTo(W/2,H);X.stroke();X.setLineDash([]);
+
+  // paddles
+  const drawPaddle=(p,col)=>{
+    X.fillStyle=col;
+    const r=6;const x=p.x,y=p.y-p.h/2,w=p.w,h=p.h;
+    X.beginPath();X.moveTo(x+r,y);X.lineTo(x+w-r,y);X.quadraticCurveTo(x+w,y,x+w,y+r);
+    X.lineTo(x+w,y+h-r);X.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    X.lineTo(x+r,y+h);X.quadraticCurveTo(x,y+h,x,y+h-r);
+    X.lineTo(x,y+r);X.quadraticCurveTo(x,y,x+r,y);X.fill();
+    X.shadowColor=col;X.shadowBlur=18;X.fill();X.shadowBlur=0;
+  };
+  drawPaddle(player,'#64b5f6');drawPaddle(ai,'#ef5350');
+
+  // balls
+  balls.forEach(b=>{
+    X.beginPath();X.arc(b.x,b.y,b.r,0,Math.PI*2);
+    X.fillStyle='#fff';X.shadowColor='#fff';X.shadowBlur=14;X.fill();X.shadowBlur=0;
+  });
+
+  // powerups
+  powerups.forEach(p=>{
+    p.age++;
+    const pulse=1+.15*Math.sin(p.age*.08);
+    X.beginPath();X.arc(p.x,p.y,p.r*pulse,0,Math.PI*2);
+    X.fillStyle=p.type.color+'66';X.fill();
+    X.strokeStyle=p.type.color;X.lineWidth=2;X.stroke();
+    X.fillStyle='#fff';X.font='bold 11px sans-serif';X.textAlign='center';X.textBaseline='middle';
+    X.fillText(p.type.id==='big'?'B':p.type.id==='slow'?'S':p.type.id==='multi'?'M':'R',p.x,p.y);
+  });
+
+  // particles
+  particles.forEach(p=>{
+    X.globalAlpha=p.life;
+    X.fillStyle=p.color;
+    X.fillRect(p.x-2,p.y-2,4,4);
+  });
+  X.globalAlpha=1;
+}
+
+function loop(){update();draw();requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
