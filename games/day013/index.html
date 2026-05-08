@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Whack-a-Mole</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a1a2e;color:#eee;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden;user-select:none}
+#game-container{text-align:center;width:100%;max-width:500px;padding:16px}
+h1{font-size:2rem;margin-bottom:4px;background:linear-gradient(90deg,#e94560,#f5a623);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{font-size:.85rem;color:#888;margin-bottom:16px}
+#hud{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:1rem}
+#hud span{background:#16213e;padding:6px 14px;border-radius:8px;min-width:80px}
+#combo-display{color:#f5a623;font-weight:700;transition:transform .1s}
+#combo-display.pop{transform:scale(1.4)}
+#timer-bar-wrap{height:6px;background:#16213e;border-radius:3px;margin-bottom:14px;overflow:hidden}
+#timer-bar{height:100%;width:100%;background:linear-gradient(90deg,#e94560,#f5a623);transition:width .25s linear;border-radius:3px}
+#board{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.hole{position:relative;width:100%;aspect-ratio:1;background:radial-gradient(ellipse at 50% 80%,#3d2b1f 0%,#2a1a0e 100%);border-radius:50%;overflow:hidden;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:inset 0 8px 16px rgba(0,0,0,.5)}
+.hole::after{content:'';position:absolute;bottom:0;left:10%;width:80%;height:35%;background:radial-gradient(ellipse,#2a1a0e,transparent);border-radius:50%;z-index:3}
+.mole{position:absolute;bottom:-70%;left:50%;transform:translateX(-50%);width:65%;height:65%;background:radial-gradient(circle at 40% 35%,#b87a4b,#8b5e3c);border-radius:50% 50% 45% 45%;transition:bottom .15s ease-out;z-index:2;display:flex;align-items:center;justify-content:center}
+.mole.up{bottom:18%}
+.mole.bonk{bottom:18%;background:radial-gradient(circle at 40% 35%,#e94560,#c0392b)}
+.mole-eyes{position:absolute;top:30%;width:60%;display:flex;justify-content:space-around}
+.mole-eyes span{display:block;width:10px;height:10px;background:#1a1a2e;border-radius:50%}
+.mole.bonk .mole-eyes span{height:3px;border-radius:2px;margin-top:4px}
+.mole-nose{position:absolute;top:50%;width:8px;height:6px;background:#d4956b;border-radius:50%}
+.score-pop{position:absolute;top:20%;left:50%;transform:translateX(-50%);font-size:1.2rem;font-weight:700;color:#f5a623;z-index:10;pointer-events:none;animation:popUp .6s ease-out forwards}
+@keyframes popUp{0%{opacity:1;transform:translateX(-50%) translateY(0)}100%{opacity:0;transform:translateX(-50%) translateY(-40px)}}
+#overlay{position:fixed;inset:0;background:rgba(10,10,30,.92);display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:100;gap:12px}
+#overlay h2{font-size:1.8rem;color:#e94560}
+#overlay p{max-width:340px;line-height:1.5;color:#bbb;font-size:.9rem}
+#overlay .final{font-size:2.2rem;color:#f5a623;font-weight:700;margin:8px 0}
+button{background:linear-gradient(135deg,#e94560,#c0392b);border:none;color:#fff;padding:12px 36px;border-radius:10px;font-size:1.1rem;cursor:pointer;transition:transform .1s}
+button:hover{transform:scale(1.05)}
+button:active{transform:scale(.97)}
+</style>
+</head>
+<body>
+<div id="game-container">
+  <h1>Whack-a-Mole</h1>
+  <p class="subtitle">Combo Scoring Edition</p>
+  <div id="hud">
+    <span>Score: <b id="score">0</b></span>
+    <span id="combo-display">Combo: x1</span>
+    <span>Time: <b id="timer">30</b>s</span>
+  </div>
+  <div id="timer-bar-wrap"><div id="timer-bar"></div></div>
+  <div id="board"></div>
+</div>
+
+<div id="overlay">
+  <h2>Whack-a-Mole</h2>
+  <p>Tap or click moles as they pop up! Hit consecutive moles to build your <b style="color:#f5a623">combo multiplier</b> — miss one and it resets. How high can you score in 30 seconds?</p>
+  <button id="start-btn">Start Game</button>
+</div>
+
+<script>
+const HOLES=9,GAME_TIME=30,BASE_POINTS=10;
+const board=document.getElementById('board'),scoreEl=document.getElementById('score'),timerEl=document.getElementById('timer'),timerBar=document.getElementById('timer-bar'),comboEl=document.getElementById('combo-display'),overlay=document.getElementById('overlay'),startBtn=document.getElementById('start-btn');
+let score=0,combo=0,timeLeft=0,gameInterval=null,moleTimers=[],running=false;
+
+// Build board
+for(let i=0;i<HOLES;i++){
+  const hole=document.createElement('div');hole.className='hole';hole.dataset.i=i;
+  hole.innerHTML='<div class="mole" data-i="'+i+'"><div class="mole-eyes"><span></span><span></span></div><div class="mole-nose"></div></div>';
+  hole.addEventListener('pointerdown',whack);
+  board.appendChild(hole);
+}
+
+function whack(e){
+  if(!running)return;
+  const mole=this.querySelector('.mole');
+  if(!mole.classList.contains('up')||mole.classList.contains('bonk'))return;
+  combo++;
+  const mult=Math.min(combo,10);
+  const pts=BASE_POINTS*mult;
+  score+=pts;
+  scoreEl.textContent=score;
+  comboEl.textContent='Combo: x'+mult;
+  comboEl.classList.add('pop');setTimeout(()=>comboEl.classList.remove('pop'),120);
+  mole.classList.add('bonk');
+  // score popup
+  const pop=document.createElement('div');pop.className='score-pop';pop.textContent='+'+pts;
+  this.appendChild(pop);setTimeout(()=>pop.remove(),600);
+  setTimeout(()=>{mole.classList.remove('up','bonk')},250);
+}
+
+function popMole(){
+  if(!running)return;
+  const moles=[...document.querySelectorAll('.mole')];
+  const down=moles.filter(m=>!m.classList.contains('up'));
+  if(!down.length)return;
+  const m=down[Math.floor(Math.random()*down.length)];
+  m.classList.add('up');
+  const stayTime=600+Math.random()*800-Math.min(score,300);
+  const t=setTimeout(()=>{
+    if(m.classList.contains('up')&&!m.classList.contains('bonk')){combo=0;comboEl.textContent='Combo: x1';}
+    m.classList.remove('up','bonk');
+  },Math.max(stayTime,350));
+  moleTimers.push(t);
+}
+
+function tick(){
+  timeLeft--;
+  timerEl.textContent=timeLeft;
+  timerBar.style.width=(timeLeft/GAME_TIME*100)+'%';
+  if(timeLeft<=0)endGame();
+}
+
+function startGame(){
+  score=0;combo=0;timeLeft=GAME_TIME;
+  scoreEl.textContent=0;timerEl.textContent=timeLeft;timerBar.style.width='100%';
+  comboEl.textContent='Combo: x1';
+  document.querySelectorAll('.mole').forEach(m=>m.classList.remove('up','bonk'));
+  overlay.style.display='none';
+  running=true;
+  gameInterval=setInterval(tick,1000);
+  // spawn loop
+  (function spawn(){if(!running)return;popMole();setTimeout(spawn,400+Math.random()*500)})();
+}
+
+function endGame(){
+  running=false;
+  clearInterval(gameInterval);
+  moleTimers.forEach(clearTimeout);moleTimers=[];
+  document.querySelectorAll('.mole').forEach(m=>m.classList.remove('up','bonk'));
+  overlay.innerHTML='<h2>Time\'s Up!</h2><div class="final">'+score+'</div><p>Best combo multiplier reached: x'+Math.min(combo||1,10)+'</p><button id="start-btn">Play Again</button>';
+  overlay.style.display='flex';
+  overlay.querySelector('button').addEventListener('click',startGame);
+}
+
+startBtn.addEventListener('click',startGame);
+</script>
+</body>
+</html>
