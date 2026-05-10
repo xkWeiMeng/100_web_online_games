@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Typing Speed Test</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f172a;--card:#1e293b;--accent:#6366f1;--accent2:#818cf8;--green:#22c55e;--red:#ef4444;--yellow:#eab308;--text:#e2e8f0;--muted:#64748b;--correct:#34d399;--wrong:#f87171}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+.container{max-width:800px;width:100%;text-align:center}
+h1{font-size:2.2rem;margin-bottom:8px;background:linear-gradient(135deg,var(--accent),var(--correct));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{color:var(--muted);margin-bottom:32px;font-size:.95rem}
+.stats{display:flex;gap:16px;justify-content:center;margin-bottom:24px;flex-wrap:wrap}
+.stat{background:var(--card);border-radius:12px;padding:16px 24px;min-width:120px}
+.stat-value{font-size:2rem;font-weight:700;color:var(--accent2)}
+.stat-label{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+.text-display{background:var(--card);border-radius:16px;padding:28px;margin-bottom:20px;font-size:1.25rem;line-height:2;text-align:left;min-height:140px;position:relative;user-select:none}
+.text-display .char{color:var(--muted);transition:color .05s}
+.text-display .char.correct{color:var(--correct)}
+.text-display .char.wrong{color:var(--wrong);text-decoration:underline}
+.text-display .char.current{background:var(--accent);color:#fff;border-radius:3px;padding:0 1px}
+.input-area{position:relative;margin-bottom:24px}
+#typingInput{width:100%;padding:16px 20px;font-size:1.1rem;border:2px solid var(--accent);border-radius:12px;background:var(--card);color:var(--text);outline:none;font-family:inherit}
+#typingInput:focus{border-color:var(--accent2);box-shadow:0 0 0 4px rgba(99,102,241,.2)}
+#typingInput:disabled{opacity:.5;cursor:not-allowed}
+.btn{padding:14px 36px;font-size:1.1rem;border:none;border-radius:12px;cursor:pointer;font-weight:600;transition:transform .1s,box-shadow .15s}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#8b5cf6);color:#fff;box-shadow:0 4px 20px rgba(99,102,241,.35)}
+.btn-primary:hover{box-shadow:0 4px 28px rgba(99,102,241,.5)}
+.settings{display:flex;gap:8px;justify-content:center;margin-bottom:24px;flex-wrap:wrap}
+.settings button{padding:8px 18px;border-radius:8px;border:2px solid var(--card);background:var(--card);color:var(--text);cursor:pointer;font-size:.9rem;font-weight:500;transition:border-color .15s}
+.settings button.active{border-color:var(--accent);color:var(--accent2)}
+.progress-bar{height:4px;background:var(--card);border-radius:2px;margin-bottom:20px;overflow:hidden}
+.progress-bar .fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--correct));transition:width .15s;border-radius:2px}
+.results{background:var(--card);border-radius:16px;padding:36px;margin-top:20px}
+.results h2{font-size:1.6rem;margin-bottom:20px;color:var(--accent2)}
+.result-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;margin-bottom:28px}
+.result-item{padding:16px;background:var(--bg);border-radius:12px}
+.result-item .val{font-size:1.8rem;font-weight:700}
+.result-item .lbl{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+.grade{font-size:3rem;margin-bottom:8px}
+.instructions{color:var(--muted);font-size:.85rem;margin-top:12px}
+@media(max-width:500px){h1{font-size:1.6rem}.stat{min-width:90px;padding:12px 16px}.stat-value{font-size:1.4rem}.text-display{font-size:1.05rem;padding:20px}#typingInput{font-size:1rem}}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Typing Speed Test</h1>
+<p class="subtitle">Test your typing speed and accuracy</p>
+
+<div class="settings" id="durationSettings">
+<button data-dur="15">15s</button>
+<button data-dur="30" class="active">30s</button>
+<button data-dur="60">60s</button>
+<button data-dur="120">120s</button>
+</div>
+
+<div class="stats">
+<div class="stat"><div class="stat-value" id="wpmStat">0</div><div class="stat-label">WPM</div></div>
+<div class="stat"><div class="stat-value" id="accStat">100</div><div class="stat-label">Accuracy %</div></div>
+<div class="stat"><div class="stat-value" id="timeStat">30</div><div class="stat-label">Seconds</div></div>
+</div>
+
+<div class="progress-bar"><div class="fill" id="progressFill" style="width:0%"></div></div>
+<div class="text-display" id="textDisplay"></div>
+<div class="input-area"><input type="text" id="typingInput" placeholder="Click here and start typing..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>
+<button class="btn btn-primary" id="restartBtn">Restart</button>
+<p class="instructions">Start typing to begin the timer. Tab + Enter to restart.</p>
+
+<div class="results" id="results" style="display:none">
+<div class="grade" id="grade"></div>
+<h2>Results</h2>
+<div class="result-grid">
+<div class="result-item"><div class="val" id="rWpm" style="color:var(--accent2)">0</div><div class="lbl">WPM</div></div>
+<div class="result-item"><div class="val" id="rRaw" style="color:var(--yellow)">0</div><div class="lbl">Raw WPM</div></div>
+<div class="result-item"><div class="val" id="rAcc" style="color:var(--correct)">0%</div><div class="lbl">Accuracy</div></div>
+<div class="result-item"><div class="val" id="rChars" style="color:var(--text)">0</div><div class="lbl">Characters</div></div>
+<div class="result-item"><div class="val" id="rCorrect" style="color:var(--correct)">0</div><div class="lbl">Correct</div></div>
+<div class="result-item"><div class="val" id="rWrong" style="color:var(--red)">0</div><div class="lbl">Errors</div></div>
+</div>
+<button class="btn btn-primary" id="retryBtn">Try Again</button>
+</div>
+</div>
+
+<script>
+const words="the be to of and a in that have i it for not on with he as you do at this but his by from they we say her she or an will my one all would there their what so up out if about who get which go me when make can like time no just him know take people into year your good some could them see other than then now look only come its over think also back after use two how our work first well way even new want because any these give day most us".split(" ");
+
+let duration=30,timer=null,startTime=null,running=false,done=false;
+let text="",pos=0,correct=0,wrong=0,totalKeystrokes=0;
+
+const $display=document.getElementById("textDisplay");
+const $input=document.getElementById("typingInput");
+const $wpm=document.getElementById("wpmStat");
+const $acc=document.getElementById("accStat");
+const $time=document.getElementById("timeStat");
+const $progress=document.getElementById("progressFill");
+const $results=document.getElementById("results");
+const $restart=document.getElementById("restartBtn");
+const $retry=document.getElementById("retryBtn");
+const $durBtns=document.querySelectorAll("[data-dur]");
+
+function genText(){let t=[];for(let i=0;i<200;i++)t.push(words[Math.random()*words.length|0]);return t.join(" ")}
+
+function render(){
+let h="";
+for(let i=0;i<text.length&&i<pos+200;i++){
+let cls="";
+if(i<pos)cls=text[i]===($input.value[i]||"")? "correct":"wrong";
+else if(i===pos)cls="current";
+const c=text[i]===" "?"&nbsp;":text[i];
+h+=`<span class="char ${cls}">${c}</span>`;
+}
+$display.innerHTML=h;
+}
+
+function start(){
+done=false;running=false;pos=0;correct=0;wrong=0;totalKeystrokes=0;startTime=null;
+clearInterval(timer);
+text=genText();
+$input.value="";$input.disabled=false;
+$time.textContent=duration;
+$wpm.textContent="0";$acc.textContent="100";
+$progress.style.width="0%";
+$results.style.display="none";
+$display.parentElement.style.display="";
+document.querySelector(".input-area").style.display="";
+$restart.style.display="";
+document.querySelector(".instructions").style.display="";
+render();
+$input.focus();
+}
+
+function finish(){
+done=true;running=false;clearInterval(timer);
+$input.disabled=true;
+const elapsed=duration;
+const netWpm=Math.max(0,Math.round(((correct/5)/elapsed)*60));
+const rawWpm=Math.round(((totalKeystrokes/5)/elapsed)*60);
+const acc=totalKeystrokes?Math.round((correct/totalKeystrokes)*100):100;
+
+let grade="";
+if(netWpm>=120)grade="S+ 👑";else if(netWpm>=100)grade="S";else if(netWpm>=80)grade="A";else if(netWpm>=60)grade="B";else if(netWpm>=40)grade="C";else if(netWpm>=20)grade="D";else grade="F";
+
+document.getElementById("rWpm").textContent=netWpm;
+document.getElementById("rRaw").textContent=rawWpm;
+document.getElementById("rAcc").textContent=acc+"%";
+document.getElementById("rChars").textContent=totalKeystrokes;
+document.getElementById("rCorrect").textContent=correct;
+document.getElementById("rWrong").textContent=wrong;
+document.getElementById("grade").textContent=grade;
+
+$display.parentElement.style.display="none";
+document.querySelector(".input-area").style.display="none";
+$restart.style.display="none";
+document.querySelector(".instructions").style.display="none";
+$results.style.display="";
+}
+
+function tick(){
+const elapsed=(Date.now()-startTime)/1000;
+const remaining=Math.max(0,Math.ceil(duration-elapsed));
+$time.textContent=remaining;
+$progress.style.width=((elapsed/duration)*100)+"%";
+const wpm=Math.round(((correct/5)/elapsed)*60)||0;
+$wpm.textContent=wpm;
+const acc=totalKeystrokes?Math.round((correct/totalKeystrokes)*100):100;
+$acc.textContent=acc;
+if(remaining<=0)finish();
+}
+
+$input.addEventListener("input",()=>{
+if(done)return;
+if(!running){running=true;startTime=Date.now();timer=setInterval(tick,100);}
+const val=$input.value;
+pos=val.length;
+totalKeystrokes=val.length;
+correct=0;wrong=0;
+for(let i=0;i<val.length;i++){
+if(val[i]===text[i])correct++;else wrong++;
+}
+render();
+});
+
+$durBtns.forEach(b=>b.addEventListener("click",()=>{
+$durBtns.forEach(x=>x.classList.remove("active"));
+b.classList.add("active");
+duration=parseInt(b.dataset.dur);
+start();
+}));
+
+$restart.addEventListener("click",start);
+$retry.addEventListener("click",start);
+document.addEventListener("keydown",e=>{if(e.key==="Tab"){e.preventDefault();start();}});
+
+start();
+</script>
+</body>
+</html>
