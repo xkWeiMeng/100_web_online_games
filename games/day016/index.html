@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Search Puzzle</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f172a;--surface:#1e293b;--surface2:#334155;--primary:#6366f1;--primary-light:#818cf8;--accent:#22d3ee;--success:#34d399;--text:#f1f5f9;--text-dim:#94a3b8;--gold:#fbbf24;--danger:#f87171}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center;user-select:none;-webkit-user-select:none}
+h1{font-size:2rem;background:linear-gradient(135deg,var(--primary-light),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:.5rem 0}
+.screen{display:none;flex-direction:column;align-items:center;width:100%;max-width:600px;padding:1rem}
+.screen.active{display:flex}
+.btn{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;border:none;padding:.75rem 2rem;border-radius:12px;font-size:1.1rem;cursor:pointer;transition:transform .15s,box-shadow .15s;font-weight:600}
+.btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(99,102,241,.4)}
+.btn:active{transform:scale(.97)}
+.btn-sm{padding:.5rem 1.2rem;font-size:.9rem;border-radius:8px}
+.instructions{background:var(--surface);border-radius:16px;padding:1.2rem;margin:1rem 0;line-height:1.6;color:var(--text-dim);font-size:.95rem;text-align:left;width:100%}
+.instructions b{color:var(--text)}
+.difficulty{display:flex;gap:.75rem;margin:1rem 0;flex-wrap:wrap;justify-content:center}
+.diff-btn{background:var(--surface);border:2px solid var(--surface2);color:var(--text-dim);padding:.6rem 1.4rem;border-radius:10px;cursor:pointer;font-size:.95rem;transition:all .2s}
+.diff-btn.selected{border-color:var(--primary);color:var(--primary-light);background:rgba(99,102,241,.15)}
+.category-select{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;margin:.75rem 0}
+.cat-btn{background:var(--surface);border:2px solid var(--surface2);color:var(--text-dim);padding:.4rem 1rem;border-radius:8px;cursor:pointer;font-size:.85rem;transition:all .2s}
+.cat-btn.selected{border-color:var(--accent);color:var(--accent);background:rgba(34,211,238,.1)}
+#game-header{display:flex;justify-content:space-between;align-items:center;width:100%;padding:.5rem 0;flex-wrap:wrap;gap:.5rem}
+.stat{background:var(--surface);padding:.4rem .8rem;border-radius:8px;font-size:.9rem;display:flex;align-items:center;gap:.4rem}
+.stat .val{color:var(--accent);font-weight:700}
+#grid-container{position:relative;margin:.75rem 0;touch-action:none}
+#grid-canvas{border-radius:12px;background:var(--surface)}
+#overlay-canvas{position:absolute;top:0;left:0;border-radius:12px;pointer-events:none}
+#word-list{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center;width:100%;margin:.5rem 0}
+.word-chip{background:var(--surface);padding:.35rem .8rem;border-radius:8px;font-size:.85rem;font-weight:600;letter-spacing:.5px;transition:all .3s;border:1px solid var(--surface2)}
+.word-chip.found{background:rgba(52,211,153,.15);border-color:var(--success);color:var(--success);text-decoration:line-through;opacity:.7}
+.word-chip.hint{border-color:var(--gold);color:var(--gold)}
+#win-screen .trophy{font-size:4rem;margin:1rem 0}
+#win-screen .final-score{font-size:2.5rem;font-weight:800;color:var(--gold);margin:.5rem 0}
+.stars{font-size:2rem;margin:.5rem 0;letter-spacing:.3rem}
+#hint-btn{background:linear-gradient(135deg,#d97706,var(--gold));font-size:.85rem;padding:.4rem 1rem}
+.timer-warn{color:var(--danger)!important}
+</style>
+</head>
+<body>
+
+<!-- TITLE SCREEN -->
+<div id="title-screen" class="screen active">
+<h1>Word Search Puzzle</h1>
+<div class="instructions">
+<b>How to Play</b><br>
+Find all hidden words in the grid! Words can go horizontally, vertically, or diagonally (forwards and backwards).<br><br>
+<b>Swipe or click-drag</b> across letters to select a word. Find all words before time runs out to earn bonus points!<br><br>
+<b>Scoring:</b> +100 per word found, time bonus at completion. Hints cost 50 points.
+</div>
+<p style="color:var(--text-dim);margin:.5rem 0;font-size:.9rem">Select Difficulty</p>
+<div class="difficulty">
+<button class="diff-btn selected" data-diff="easy">Easy (8×8)</button>
+<button class="diff-btn" data-diff="medium">Medium (12×12)</button>
+<button class="diff-btn" data-diff="hard">Hard (15×15)</button>
+</div>
+<p style="color:var(--text-dim);margin:.5rem 0;font-size:.9rem">Category</p>
+<div class="category-select" id="cat-select"></div>
+<br>
+<button class="btn" id="start-btn">Start Game</button>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="game-screen" class="screen">
+<div id="game-header">
+<div class="stat">Score: <span class="val" id="score">0</span></div>
+<div class="stat">Time: <span class="val" id="timer">0:00</span></div>
+<div class="stat">Found: <span class="val" id="found-count">0/0</span></div>
+<button class="btn btn-sm" id="hint-btn">Hint (-50)</button>
+</div>
+<div id="grid-container">
+<canvas id="grid-canvas"></canvas>
+<canvas id="overlay-canvas"></canvas>
+</div>
+<div id="word-list"></div>
+<button class="btn btn-sm" id="back-btn" style="margin-top:.5rem;background:var(--surface2)">Back to Menu</button>
+</div>
+
+<!-- WIN SCREEN -->
+<div id="win-screen" class="screen">
+<div class="trophy">🏆</div>
+<h1>Puzzle Complete!</h1>
+<div class="final-score" id="final-score">0</div>
+<div class="stars" id="stars"></div>
+<p id="win-msg" style="color:var(--text-dim);margin:.5rem 0"></p>
+<br>
+<button class="btn" id="play-again-btn">Play Again</button>
+<button class="btn btn-sm" style="margin-top:.5rem;background:var(--surface2)" id="menu-btn">Menu</button>
+</div>
+
+<script>
+const WORDS={
+animals:["ELEPHANT","GIRAFFE","DOLPHIN","PENGUIN","CHEETAH","PANTHER","BUFFALO","HAMSTER","PELICAN","SPARROW","FALCON","TURTLE","SALMON","PARROT","JAGUAR","LIZARD","MONKEY","RABBIT","BEAVER","BADGER"],
+science:["GRAVITY","NUCLEUS","NEUTRON","QUANTUM","PROTON","PHOTON","PLASMA","GENOME","ENZYME","CARBON","OXYGEN","HELIUM","FUSION","ATOMIC","ENERGY","PLANET","GALAXY","QUASAR","NEBULA","METEOR"],
+food:["AVOCADO","BURRITO","PANCAKE","SAUSAGE","LASAGNA","BISCUIT","PRETZEL","POPCORN","BROWNIE","MUFFIN","WAFFLE","CHEESE","BUTTER","CELERY","PEPPER","GINGER","TOMATO","GARLIC","ALMOND","CASHEW"],
+sports:["CRICKET","BASEBALL","TENNIS","SOCCER","HOCKEY","BOXING","ROWING","KARATE","DIVING","CYCLING","SKIING","FENCING","SPRINT","JAVELIN","DISCUS","HAMMER","SQUASH","ARCHERY","CURLING","BOBSLED"],
+tech:["SILICON","BROWSER","NETWORK","BITCOIN","PYTHON","CODING","SERVER","LAPTOP","WIDGET","KERNEL","ROUTER","MEMORY","BINARY","SCRIPT","HACKER","DOCKER","GITHUB","CURSOR","NEURAL","CLOUD"],
+};
+const CATEGORIES=Object.keys(WORDS);
+const DIFFS={easy:{size:8,words:5,time:180},medium:{size:12,words:8,time:240},hard:{size:15,words:12,time:300}};
+const DIRS=[[0,1],[1,0],[1,1],[1,-1],[0,-1],[-1,0],[-1,-1],[-1,1]];
+const FOUND_COLORS=["#6366f1","#22d3ee","#34d399","#f472b6","#fbbf24","#a78bfa","#fb923c","#38bdf8","#4ade80","#e879f9","#f87171","#facc15"];
+
+let diff="easy",category="animals",grid=[],words=[],placements=[],foundWords=new Set(),score=0,timerVal=0,timerInt=null,gameActive=false;
+let cellSize,canvas,ctx,overlay,octx,selecting=false,selStart=null,selEnd=null,gridW,gridH;
+
+// UI
+const $=id=>document.getElementById(id);
+const screens=document.querySelectorAll('.screen');
+function showScreen(id){screens.forEach(s=>s.classList.remove('active'));$(id).classList.add('active')}
+
+// Category buttons
+const catDiv=$('cat-select');
+CATEGORIES.forEach((c,i)=>{const b=document.createElement('button');b.className='cat-btn'+(i===0?' selected':'');b.textContent=c.charAt(0).toUpperCase()+c.slice(1);b.onclick=()=>{document.querySelectorAll('.cat-btn').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');category=c};catDiv.appendChild(b)});
+
+// Difficulty buttons
+document.querySelectorAll('.diff-btn').forEach(b=>b.onclick=()=>{document.querySelectorAll('.diff-btn').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');diff=b.dataset.diff});
+
+$('start-btn').onclick=startGame;
+$('play-again-btn').onclick=startGame;
+$('menu-btn').onclick=()=>showScreen('title-screen');
+$('back-btn').onclick=()=>{clearInterval(timerInt);gameActive=false;showScreen('title-screen')};
+$('hint-btn').onclick=giveHint;
+
+function startGame(){
+  const cfg=DIFFS[diff];
+  gridW=gridH=cfg.size;
+  score=0;timerVal=cfg.time;foundWords=new Set();
+  pickWords(cfg.words);
+  generateGrid();
+  showScreen('game-screen');
+  setupCanvas();
+  drawGrid();
+  renderWordList();
+  updateUI();
+  clearInterval(timerInt);
+  gameActive=true;
+  timerInt=setInterval(tick,1000);
+}
+
+function pickWords(n){
+  const pool=WORDS[category].filter(w=>w.length<=gridW);
+  const shuffled=[...pool].sort(()=>Math.random()-.5);
+  words=shuffled.slice(0,n);
+}
+
+function generateGrid(){
+  placements=[];
+  for(let attempt=0;attempt<50;attempt++){
+    grid=Array.from({length:gridH},()=>Array(gridW).fill(''));
+    placements=[];
+    let ok=true;
+    for(const word of words){
+      if(!placeWord(word)){ok=false;break}
+    }
+    if(ok)break;
+  }
+  for(let r=0;r<gridH;r++)for(let c=0;c<gridW;c++)if(!grid[r][c])grid[r][c]=String.fromCharCode(65+Math.floor(Math.random()*26));
+}
+
+function placeWord(word){
+  const dirs=[...DIRS].sort(()=>Math.random()-.5);
+  for(let t=0;t<100;t++){
+    const d=dirs[t%8];
+    const r=Math.floor(Math.random()*gridH);
+    const c=Math.floor(Math.random()*gridW);
+    if(canPlace(word,r,c,d)){
+      for(let i=0;i<word.length;i++)grid[r+d[0]*i][c+d[1]*i]=word[i];
+      placements.push({word,r,c,dr:d[0],dc:d[1]});
+      return true;
+    }
+  }
+  return false;
+}
+
+function canPlace(word,r,c,d){
+  for(let i=0;i<word.length;i++){
+    const nr=r+d[0]*i,nc=c+d[1]*i;
+    if(nr<0||nr>=gridH||nc<0||nc>=gridW)return false;
+    if(grid[nr][nc]&&grid[nr][nc]!==word[i])return false;
+  }
+  return true;
+}
+
+function setupCanvas(){
+  const container=$('grid-container');
+  const maxW=Math.min(window.innerWidth-32,560);
+  cellSize=Math.floor(maxW/gridW);
+  const w=cellSize*gridW,h=cellSize*gridH;
+  canvas=$('grid-canvas');overlay=$('overlay-canvas');
+  canvas.width=overlay.width=w;canvas.height=overlay.height=h;
+  canvas.style.width=overlay.style.width=w+'px';
+  canvas.style.height=overlay.style.height=h+'px';
+  ctx=canvas.getContext('2d');octx=overlay.getContext('2d');
+  // events
+  canvas.onpointerdown=onDown;canvas.onpointermove=onMove;canvas.onpointerup=onUp;canvas.onpointerleave=onUp;
+}
+
+function drawGrid(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#1e293b';ctx.fillRect(0,0,canvas.width,canvas.height);
+  const fs=Math.max(12,cellSize*.55);
+  ctx.font=`700 ${fs}px 'Segoe UI',system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+  for(let r=0;r<gridH;r++)for(let c=0;c<gridW;c++){
+    ctx.fillStyle='#334155';
+    ctx.fillRect(c*cellSize,r*cellSize,cellSize-1,cellSize-1);
+    ctx.fillStyle='#e2e8f0';
+    ctx.fillText(grid[r][c],c*cellSize+cellSize/2,r*cellSize+cellSize/2+1);
+  }
+}
+
+function drawOverlay(){
+  octx.clearRect(0,0,overlay.width,overlay.height);
+  // draw found words
+  placements.forEach((p,i)=>{
+    if(!foundWords.has(p.word))return;
+    drawLine(p.r,p.c,p.r+p.dr*(p.word.length-1),p.c+p.dc*(p.word.length-1),FOUND_COLORS[i%FOUND_COLORS.length],.35);
+  });
+  // current selection
+  if(selecting&&selStart&&selEnd){
+    drawLine(selStart.r,selStart.c,selEnd.r,selEnd.c,'#6366f1',.4);
+  }
+}
+
+function drawLine(r1,c1,r2,c2,color,alpha){
+  octx.save();octx.globalAlpha=alpha;octx.strokeStyle=color;octx.lineCap='round';
+  octx.lineWidth=cellSize*.7;
+  octx.beginPath();
+  octx.moveTo(c1*cellSize+cellSize/2,r1*cellSize+cellSize/2);
+  octx.lineTo(c2*cellSize+cellSize/2,r2*cellSize+cellSize/2);
+  octx.stroke();octx.restore();
+}
+
+function cellFromEvent(e){
+  const rect=canvas.getBoundingClientRect();
+  const c=Math.floor((e.clientX-rect.left)/cellSize);
+  const r=Math.floor((e.clientY-rect.top)/cellSize);
+  if(r>=0&&r<gridH&&c>=0&&c<gridW)return{r,c};return null;
+}
+
+function snapToLine(start,cell){
+  if(!start||!cell)return null;
+  const dr=cell.r-start.r,dc=cell.c-start.c;
+  if(dr===0&&dc===0)return{r:start.r,c:start.c};
+  const adr=Math.abs(dr),adc=Math.abs(dc);
+  let sr=Math.sign(dr),sc=Math.sign(dc);
+  // snap to closest 8-dir
+  if(adr>=adc*2){sc=0}else if(adc>=adr*2){sr=0}
+  const dist=Math.max(Math.abs(sr?dr:0),Math.abs(sc?dc:0))||Math.max(adr,adc);
+  const len=sr?Math.abs(dr):Math.abs(dc);
+  return{r:start.r+sr*len,c:start.c+sc*len};
+}
+
+function onDown(e){
+  if(!gameActive)return;
+  e.preventDefault();canvas.setPointerCapture(e.pointerId);
+  const cell=cellFromEvent(e);if(!cell)return;
+  selecting=true;selStart=cell;selEnd=cell;drawOverlay();
+}
+function onMove(e){
+  if(!selecting||!gameActive)return;
+  e.preventDefault();
+  const cell=cellFromEvent(e);if(!cell)return;
+  const snapped=snapToLine(selStart,cell);
+  if(snapped&&snapped.r>=0&&snapped.r<gridH&&snapped.c>=0&&snapped.c<gridW){selEnd=snapped;drawOverlay()}
+}
+function onUp(e){
+  if(!selecting||!gameActive)return;
+  selecting=false;
+  checkSelection();selStart=selEnd=null;drawOverlay();
+}
+
+function getSelectedWord(){
+  if(!selStart||!selEnd)return'';
+  const dr=Math.sign(selEnd.r-selStart.r),dc=Math.sign(selEnd.c-selStart.c);
+  const len=Math.max(Math.abs(selEnd.r-selStart.r),Math.abs(selEnd.c-selStart.c))+1;
+  let w='';
+  for(let i=0;i<len;i++)w+=grid[selStart.r+dr*i][selStart.c+dc*i];
+  return w;
+}
+
+function checkSelection(){
+  const sel=getSelectedWord();
+  const rev=[...sel].reverse().join('');
+  for(const w of words){
+    if(!foundWords.has(w)&&(sel===w||rev===w)){
+      foundWords.add(w);score+=100;
+      updateUI();drawOverlay();
+      if(foundWords.size===words.length)winGame();
+      return;
+    }
+  }
+}
+
+function giveHint(){
+  if(!gameActive||score<50)return;
+  const remaining=words.filter(w=>!foundWords.has(w));
+  if(!remaining.length)return;
+  score-=50;
+  const hw=remaining[0];
+  const chip=document.querySelector(`.word-chip[data-word="${hw}"]`);
+  if(chip)chip.classList.add('hint');
+  // flash first letter
+  const p=placements.find(x=>x.word===hw);
+  if(p){
+    octx.save();octx.fillStyle='rgba(251,191,36,.5)';
+    octx.beginPath();octx.arc(p.c*cellSize+cellSize/2,p.r*cellSize+cellSize/2,cellSize/2.5,0,Math.PI*2);
+    octx.fill();octx.restore();
+    setTimeout(drawOverlay,1500);
+  }
+  updateUI();
+}
+
+function tick(){
+  if(!gameActive)return;
+  timerVal--;
+  if(timerVal<=0){timerVal=0;gameActive=false;clearInterval(timerInt);winGame()}
+  updateUI();
+}
+
+function updateUI(){
+  $('score').textContent=score;
+  const m=Math.floor(timerVal/60),s=timerVal%60;
+  const tEl=$('timer');tEl.textContent=m+':'+(s<10?'0':'')+s;
+  tEl.className=timerVal<30?'val timer-warn':'val';
+  $('found-count').textContent=foundWords.size+'/'+words.length;
+}
+
+function renderWordList(){
+  const wl=$('word-list');wl.innerHTML='';
+  words.forEach(w=>{const c=document.createElement('span');c.className='word-chip';c.dataset.word=w;c.textContent=w;wl.appendChild(c)});
+}
+
+function markFoundChip(w){document.querySelector(`.word-chip[data-word="${w}"]`)?.classList.add('found')}
+
+// override drawOverlay to also update chips
+const _origDraw=drawOverlay;
+drawOverlay=function(){_origDraw();foundWords.forEach(markFoundChip)};
+
+function winGame(){
+  gameActive=false;clearInterval(timerInt);
+  const timeBonus=timerVal*2;
+  const allFound=foundWords.size===words.length;
+  const finalScore=score+timeBonus;
+  $('final-score').textContent=finalScore;
+  const pct=foundWords.size/words.length;
+  const starCount=pct>=1?3:pct>=.7?2:pct>=.4?1:0;
+  $('stars').textContent='★'.repeat(starCount)+'☆'.repeat(3-starCount);
+  $('win-msg').textContent=allFound?`All words found! Time bonus: +${timeBonus}`:`Found ${foundWords.size}/${words.length} words. Time's up!`;
+  showScreen('win-screen');
+}
+
+// Resize handling
+window.addEventListener('resize',()=>{if($('game-screen').classList.contains('active')&&gameActive){setupCanvas();drawGrid();drawOverlay()}});
+</script>
+</body>
+</html>
