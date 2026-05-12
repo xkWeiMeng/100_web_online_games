@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hangman - Category Hints</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;justify-content:center;align-items:center;overflow:hidden}
+#app{width:100%;max-width:520px;padding:16px;text-align:center}
+
+/* Title Screen */
+#title-screen{animation:fadeIn .5s}
+#title-screen h1{font-size:2.4rem;background:linear-gradient(135deg,#38bdf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+#title-screen p.sub{color:#94a3b8;margin-bottom:24px;font-size:.95rem;line-height:1.5}
+#title-screen .instructions{background:#1e293b;border-radius:12px;padding:16px;margin-bottom:24px;text-align:left;font-size:.85rem;line-height:1.7;color:#cbd5e1}
+#title-screen .instructions span{color:#38bdf8;font-weight:600}
+.btn{background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;color:#fff;padding:14px 48px;border-radius:10px;font-size:1.1rem;cursor:pointer;transition:transform .15s,box-shadow .15s;font-weight:600}
+.btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px #6366f140}
+.btn:active{transform:scale(.97)}
+
+/* Game Screen */
+#game-screen{display:none;animation:fadeIn .4s}
+.top-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:.85rem;color:#94a3b8}
+.top-bar .score{color:#38bdf8;font-weight:700;font-size:1rem}
+.category-badge{background:#1e293b;border:1px solid #334155;border-radius:20px;padding:6px 18px;font-size:.8rem;color:#a78bfa;font-weight:600;letter-spacing:.5px;margin-bottom:16px;display:inline-block}
+
+/* Hangman Drawing */
+.gallows{margin:0 auto 16px;width:160px;height:170px;position:relative}
+.gallows svg{width:100%;height:100%}
+.gallows svg line,.gallows svg circle{stroke:#475569;stroke-width:3;stroke-linecap:round;fill:none;transition:opacity .3s}
+.gallows svg .part{opacity:0}
+.gallows svg .part.show{opacity:1;stroke:#f87171}
+
+/* Word Display */
+.word{display:flex;justify-content:center;flex-wrap:wrap;gap:6px;margin-bottom:20px;min-height:48px}
+.letter-slot{width:32px;height:42px;border-bottom:3px solid #334155;display:flex;align-items:flex-end;justify-content:center;font-size:1.5rem;font-weight:700;padding-bottom:2px;transition:border-color .3s,color .3s}
+.letter-slot.revealed{border-color:#38bdf8;color:#38bdf8}
+.letter-slot.space{border:none;width:16px}
+
+/* Keyboard */
+.keyboard{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-bottom:16px}
+.key{width:34px;height:40px;border:none;border-radius:8px;background:#1e293b;color:#e2e8f0;font-size:.9rem;font-weight:600;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center}
+.key:hover:not(:disabled){background:#334155;transform:translateY(-1px)}
+.key:disabled{opacity:.25;cursor:default}
+.key.correct{background:#059669;color:#fff}
+.key.wrong{background:#dc2626;color:#fff}
+
+/* Hint */
+.hint-btn{background:none;border:1px solid #6366f1;color:#a78bfa;padding:8px 20px;border-radius:8px;font-size:.8rem;cursor:pointer;transition:all .15s;margin-bottom:8px}
+.hint-btn:hover:not(:disabled){background:#6366f120}
+.hint-btn:disabled{opacity:.3;cursor:default}
+.hint-text{color:#fbbf24;font-size:.82rem;min-height:20px;margin-bottom:4px}
+
+/* Modal overlay */
+.modal{display:none;position:fixed;inset:0;background:#0f172ae0;z-index:10;justify-content:center;align-items:center}
+.modal.show{display:flex}
+.modal-box{background:#1e293b;border-radius:16px;padding:32px;text-align:center;max-width:360px;width:90%;animation:pop .3s}
+.modal-box h2{font-size:1.8rem;margin-bottom:8px}
+.modal-box p{color:#94a3b8;margin-bottom:20px;font-size:.95rem}
+.modal-box .answer{color:#38bdf8;font-weight:700;font-size:1.1rem}
+.win h2{color:#34d399}
+.lose h2{color:#f87171}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- TITLE -->
+  <div id="title-screen">
+    <h1>Hangman</h1>
+    <p class="sub">Guess the word before it's too late!</p>
+    <div class="instructions">
+      Each round you get a <span>category hint</span> to narrow it down.<br>
+      You have <span>6 wrong guesses</span> before the hangman is complete.<br>
+      Use the <span>extra hint</span> button for a clue (costs 10 pts).<br>
+      Correct word = <span>+20 pts</span>, each remaining life = <span>+5 pts</span>.
+    </div>
+    <button class="btn" onclick="startGame()">Play</button>
+  </div>
+
+  <!-- GAME -->
+  <div id="game-screen">
+    <div class="top-bar">
+      <span>Round <span id="round">1</span></span>
+      <span>Score: <span class="score" id="score">0</span></span>
+    </div>
+    <div class="category-badge" id="category"></div>
+
+    <div class="gallows">
+      <svg viewBox="0 0 160 170">
+        <!-- base -->
+        <line x1="20" y1="160" x2="80" y2="160" stroke="#475569" stroke-width="3"/>
+        <line x1="50" y1="160" x2="50" y2="20" stroke="#475569" stroke-width="3"/>
+        <line x1="50" y1="20" x2="110" y2="20" stroke="#475569" stroke-width="3"/>
+        <line x1="110" y1="20" x2="110" y2="40" stroke="#475569" stroke-width="3"/>
+        <!-- parts -->
+        <circle class="part" id="p0" cx="110" cy="52" r="12"/>
+        <line class="part" id="p1" x1="110" y1="64" x2="110" y2="100"/>
+        <line class="part" id="p2" x1="110" y1="74" x2="90" y2="90"/>
+        <line class="part" id="p3" x1="110" y1="74" x2="130" y2="90"/>
+        <line class="part" id="p4" x1="110" y1="100" x2="92" y2="125"/>
+        <line class="part" id="p5" x1="110" y1="100" x2="128" y2="125"/>
+      </svg>
+    </div>
+
+    <div class="word" id="word"></div>
+
+    <button class="hint-btn" id="hint-btn" onclick="useHint()">💡 Extra Hint (−10 pts)</button>
+    <div class="hint-text" id="hint-text"></div>
+
+    <div class="keyboard" id="keyboard"></div>
+  </div>
+
+  <!-- MODAL -->
+  <div class="modal" id="modal">
+    <div class="modal-box" id="modal-box">
+      <h2 id="modal-title"></h2>
+      <p id="modal-msg"></p>
+      <button class="btn" onclick="nextRound()">Next Round</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const WORDS=[
+  {word:"ELEPHANT",category:"Animals",hint:"Largest land animal"},
+  {word:"GUITAR",category:"Music",hint:"Six-stringed instrument"},
+  {word:"JUPITER",category:"Space",hint:"Largest planet in our solar system"},
+  {word:"PYTHON",category:"Programming",hint:"Named after a comedy troupe"},
+  {word:"SUSHI",category:"Food",hint:"Japanese rice dish with fish"},
+  {word:"BASKETBALL",category:"Sports",hint:"Invented by James Naismith"},
+  {word:"BEETHOVEN",category:"Music",hint:"Composed while going deaf"},
+  {word:"VOLCANO",category:"Geography",hint:"Mountain that erupts"},
+  {word:"CHOCOLATE",category:"Food",hint:"Made from cacao beans"},
+  {word:"EINSTEIN",category:"Science",hint:"E equals mc squared"},
+  {word:"TORNADO",category:"Weather",hint:"Rotating column of air"},
+  {word:"PENGUIN",category:"Animals",hint:"Flightless bird that swims"},
+  {word:"MERCURY",category:"Space",hint:"Closest planet to the sun"},
+  {word:"ORIGAMI",category:"Art",hint:"Japanese paper folding"},
+  {word:"CINNAMON",category:"Food",hint:"Spice from tree bark"},
+  {word:"TSUNAMI",category:"Nature",hint:"Giant ocean wave"},
+  {word:"SPHINX",category:"History",hint:"Limestone statue in Egypt"},
+  {word:"OXYGEN",category:"Science",hint:"We breathe it to survive"},
+  {word:"FIBONACCI",category:"Math",hint:"Famous number sequence"},
+  {word:"KANGAROO",category:"Animals",hint:"Carries babies in a pouch"},
+  {word:"AURORA",category:"Nature",hint:"Northern lights phenomenon"},
+  {word:"TETRIS",category:"Games",hint:"Falling block puzzle from 1984"},
+  {word:"COMPASS",category:"Tools",hint:"Points to magnetic north"},
+  {word:"CATHEDRAL",category:"Architecture",hint:"Large ornate church"},
+  {word:"TITANIUM",category:"Science",hint:"Strong lightweight metal"},
+  {word:"SAMURAI",category:"History",hint:"Japanese warrior class"},
+  {word:"ALGORITHM",category:"Programming",hint:"Step-by-step problem solving"},
+  {word:"AVOCADO",category:"Food",hint:"Green fruit used in guacamole"},
+  {word:"CHAMELEON",category:"Animals",hint:"Lizard that changes color"},
+  {word:"SYMPHONY",category:"Music",hint:"Large orchestral composition"},
+];
+
+let score=0,round=0,wrong=0,currentWord=null,guessed=new Set(),hintUsed=false,gameOver=false,usedIndices=[];
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.random()*i+1|0;[a[i],a[j]]=[a[j],a[i]]}return a}
+
+function startGame(){
+  score=0;round=0;usedIndices=[];
+  document.getElementById('title-screen').style.display='none';
+  document.getElementById('game-screen').style.display='block';
+  nextRound();
+}
+
+function pickWord(){
+  if(usedIndices.length>=WORDS.length)usedIndices=[];
+  let idx;
+  do{idx=Math.random()*WORDS.length|0}while(usedIndices.includes(idx));
+  usedIndices.push(idx);
+  return WORDS[idx];
+}
+
+function nextRound(){
+  document.getElementById('modal').classList.remove('show');
+  round++;wrong=0;guessed.clear();hintUsed=false;gameOver=false;
+  currentWord=pickWord();
+  document.getElementById('round').textContent=round;
+  document.getElementById('score').textContent=score;
+  document.getElementById('category').textContent=currentWord.category;
+  document.getElementById('hint-text').textContent='';
+  document.getElementById('hint-btn').disabled=false;
+  for(let i=0;i<6;i++)document.getElementById('p'+i).classList.remove('show');
+  renderWord();renderKeyboard();
+}
+
+function renderWord(){
+  const el=document.getElementById('word');
+  el.innerHTML=currentWord.word.split('').map(c=>{
+    if(c===' ')return'<div class="letter-slot space"></div>';
+    const rev=guessed.has(c);
+    return`<div class="letter-slot${rev?' revealed':''}">${rev?c:''}</div>`;
+  }).join('');
+}
+
+function renderKeyboard(){
+  const el=document.getElementById('keyboard');
+  el.innerHTML='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(c=>{
+    const used=guessed.has(c);
+    const inWord=currentWord.word.includes(c);
+    let cls='key';
+    if(used)cls+= inWord?' correct':' wrong';
+    return`<button class="${cls}"${used?' disabled':''} onclick="guess('${c}')">${c}</button>`;
+  }).join('');
+}
+
+function guess(c){
+  if(gameOver||guessed.has(c))return;
+  guessed.add(c);
+  if(!currentWord.word.includes(c)){
+    wrong++;
+    document.getElementById('p'+(wrong-1)).classList.add('show');
+  }
+  renderWord();renderKeyboard();
+  // check win
+  if(currentWord.word.split('').every(ch=>ch===' '||guessed.has(ch))){
+    gameOver=true;
+    const bonus=(6-wrong)*5;
+    score+=20+bonus;
+    document.getElementById('score').textContent=score;
+    showModal(true,bonus);
+  }else if(wrong>=6){
+    gameOver=true;
+    showModal(false,0);
+  }
+}
+
+function useHint(){
+  if(hintUsed||gameOver)return;
+  hintUsed=true;
+  score=Math.max(0,score-10);
+  document.getElementById('score').textContent=score;
+  document.getElementById('hint-text').textContent=currentWord.hint;
+  document.getElementById('hint-btn').disabled=true;
+}
+
+function showModal(win,bonus){
+  const m=document.getElementById('modal');
+  const box=document.getElementById('modal-box');
+  box.className='modal-box '+(win?'win':'lose');
+  document.getElementById('modal-title').textContent=win?'You Got It!':'Game Over';
+  document.getElementById('modal-msg').innerHTML=win
+    ?`+20 pts + ${bonus} bonus<br>Score: <span class="answer">${score}</span>`
+    :`The word was: <span class="answer">${currentWord.word}</span><br>Score: ${score}`;
+  m.classList.add('show');
+}
+
+// keyboard support
+document.addEventListener('keydown',e=>{
+  if(document.getElementById('game-screen').style.display==='none')return;
+  const k=e.key.toUpperCase();
+  if(k.length===1&&k>='A'&&k<='Z')guess(k);
+});
+</script>
+</body>
+</html>
