@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tic-Tac-Toe — Unbeatable AI</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f172a;--card:#1e293b;--accent:#6366f1;--accent2:#818cf8;--x:#f472b6;--o:#38bdf8;--text:#e2e8f0;--dim:#64748b;--win:#22c55e}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;user-select:none;-webkit-user-select:none}
+h1{font-size:1.8rem;letter-spacing:.05em;margin-bottom:.25rem}
+.subtitle{color:var(--dim);font-size:.85rem;margin-bottom:1.5rem}
+#start-screen,#game-screen{display:flex;flex-direction:column;align-items:center;text-align:center;width:min(400px,92vw)}
+#game-screen{display:none}
+.instructions{background:var(--card);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;font-size:.85rem;line-height:1.6;color:var(--dim);text-align:left}
+.instructions b{color:var(--text)}
+button{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:.75rem 2.5rem;font-size:1rem;font-weight:600;cursor:pointer;transition:background .2s,transform .1s}
+button:hover{background:var(--accent2)}
+button:active{transform:scale(.96)}
+.scoreboard{display:flex;gap:1.5rem;margin-bottom:1rem;font-size:.9rem}
+.scoreboard div{background:var(--card);border-radius:10px;padding:.5rem 1rem;min-width:80px;text-align:center}
+.scoreboard .label{font-size:.7rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+.scoreboard .val{font-size:1.3rem;font-weight:700}
+.score-x .val{color:var(--x)}
+.score-o .val{color:var(--o)}
+#status{font-size:1rem;margin-bottom:.75rem;min-height:1.5rem;font-weight:600}
+.board{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:min(320px,80vw);aspect-ratio:1;margin-bottom:1.25rem}
+.cell{background:var(--card);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:3rem;font-weight:700;cursor:pointer;transition:background .15s,transform .1s;aspect-ratio:1}
+.cell:hover:not(.taken){background:#334155}
+.cell:active:not(.taken){transform:scale(.94)}
+.cell.x{color:var(--x)}
+.cell.o{color:var(--o)}
+.cell.win-cell{background:#16532d;animation:pop .35s ease}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.12)}100%{transform:scale(1)}}
+#restart{font-size:.85rem;padding:.55rem 1.75rem;background:#334155;margin-bottom:.5rem}
+#restart:hover{background:#475569}
+#back{font-size:.75rem;padding:.4rem 1.25rem;background:transparent;color:var(--dim);border:1px solid #334155}
+.difficulty{display:flex;gap:.5rem;margin-bottom:1.25rem}
+.difficulty button{padding:.5rem 1.25rem;font-size:.85rem;background:#334155}
+.difficulty button.active{background:var(--accent)}
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+  <h1>Tic-Tac-Toe</h1>
+  <p class="subtitle">vs Unbeatable AI</p>
+  <div class="instructions">
+    <b>How to play:</b> You are <b style="color:var(--x)">X</b>, the AI is <b style="color:var(--o)">O</b>.<br>
+    Tap a cell to place your mark. Get three in a row to win.<br>
+    <b>Warning:</b> On Hard mode the AI is unbeatable — the best you can do is a draw!
+  </div>
+  <p class="subtitle">Difficulty</p>
+  <div class="difficulty">
+    <button id="d-easy">Easy</button>
+    <button id="d-med">Medium</button>
+    <button id="d-hard" class="active">Hard</button>
+  </div>
+  <button id="play-btn">Play</button>
+</div>
+
+<div id="game-screen">
+  <div class="scoreboard">
+    <div class="score-x"><div class="label">You (X)</div><div class="val" id="sx">0</div></div>
+    <div><div class="label">Draws</div><div class="val" id="sd">0</div></div>
+    <div class="score-o"><div class="label">AI (O)</div><div class="val" id="so">0</div></div>
+  </div>
+  <div id="status">Your turn</div>
+  <div class="board" id="board"></div>
+  <button id="restart">New Round</button>
+  <button id="back">← Menu</button>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let board, turn, over, diff = 'hard', scores = {x:0,o:0,d:0};
+const WINS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+// Difficulty
+['easy','med','hard'].forEach(d => {
+  $(`#d-${d}`).onclick = () => {
+    document.querySelectorAll('.difficulty button').forEach(b=>b.classList.remove('active'));
+    $(`#d-${d}`).classList.add('active');
+    diff = d === 'med' ? 'medium' : d === 'hard' ? 'hard' : 'easy';
+  };
+});
+
+$('#play-btn').onclick = () => { $('#start-screen').style.display='none'; $('#game-screen').style.display='flex'; init(); };
+$('#back').onclick = () => { $('#start-screen').style.display='flex'; $('#game-screen').style.display='none'; scores={x:0,o:0,d:0}; updateScores(); };
+$('#restart').onclick = init;
+
+function init(){
+  board = Array(9).fill('');
+  turn = 'x'; over = false;
+  $('#status').textContent = 'Your turn';
+  $('#status').style.color = 'var(--text)';
+  const b = $('#board'); b.innerHTML = '';
+  for(let i=0;i<9;i++){
+    const c = document.createElement('div');
+    c.className = 'cell';
+    c.dataset.i = i;
+    c.onclick = () => humanMove(i);
+    b.appendChild(c);
+  }
+}
+
+function humanMove(i){
+  if(over || board[i] || turn !== 'x') return;
+  place(i,'x');
+  if(over) return;
+  turn = 'o';
+  $('#status').textContent = 'AI thinking…';
+  setTimeout(aiMove, 250);
+}
+
+function aiMove(){
+  const m = bestMove();
+  place(m,'o');
+  if(!over){ turn='x'; $('#status').textContent='Your turn'; }
+}
+
+function place(i,p){
+  board[i]=p;
+  const c = document.querySelectorAll('.cell')[i];
+  c.textContent = p.toUpperCase();
+  c.classList.add(p,'taken');
+  const w = checkWin(p);
+  if(w){ highlight(w); endGame(p); return; }
+  if(board.every(v=>v)){ endGame(null); }
+}
+
+function checkWin(p){ return WINS.find(w=>w.every(i=>board[i]===p)) || null; }
+
+function highlight(cells){
+  cells.forEach(i=> document.querySelectorAll('.cell')[i].classList.add('win-cell'));
+}
+
+function endGame(winner){
+  over = true;
+  if(winner==='x'){ scores.x++; $('#status').textContent='You win!'; $('#status').style.color='var(--win)'; }
+  else if(winner==='o'){ scores.o++; $('#status').textContent='AI wins!'; $('#status').style.color='var(--o)'; }
+  else { scores.d++; $('#status').textContent="It's a draw!"; $('#status').style.color='var(--dim)'; }
+  updateScores();
+}
+
+function updateScores(){ $('#sx').textContent=scores.x; $('#so').textContent=scores.o; $('#sd').textContent=scores.d; }
+
+// AI — minimax with difficulty control
+function bestMove(){
+  if(diff==='easy' && Math.random()<0.6) return randomEmpty();
+  if(diff==='medium' && Math.random()<0.3) return randomEmpty();
+  // Hard = perfect minimax
+  let best=-Infinity, move=0;
+  for(let i=0;i<9;i++){
+    if(board[i]) continue;
+    board[i]='o';
+    const s = minimax(false, -Infinity, Infinity);
+    board[i]='';
+    if(s>best){ best=s; move=i; }
+  }
+  return move;
+}
+
+function randomEmpty(){
+  const e = board.map((v,i)=>v?-1:i).filter(i=>i>=0);
+  return e[Math.floor(Math.random()*e.length)];
+}
+
+function minimax(isMax, a, b){
+  if(checkWin('o')) return 10;
+  if(checkWin('x')) return -10;
+  if(board.every(v=>v)) return 0;
+  if(isMax){
+    let best=-Infinity;
+    for(let i=0;i<9;i++){
+      if(board[i]) continue;
+      board[i]='o';
+      best=Math.max(best,minimax(false,a,b));
+      board[i]='';
+      a=Math.max(a,best);
+      if(b<=a) break;
+    }
+    return best;
+  } else {
+    let best=Infinity;
+    for(let i=0;i<9;i++){
+      if(board[i]) continue;
+      board[i]='x';
+      best=Math.min(best,minimax(true,a,b));
+      board[i]='';
+      b=Math.min(b,best);
+      if(b<=a) break;
+    }
+    return best;
+  }
+}
+</script>
+</body>
+</html>
