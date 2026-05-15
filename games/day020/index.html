@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Tower Defense</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0e17;font-family:'Segoe UI',system-ui,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;color:#e0e0e0;overflow:hidden}
+canvas{display:block;border-radius:8px;cursor:crosshair}
+#ui{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+#hud{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:20px;font-size:15px;background:rgba(0,0,0,.6);padding:8px 18px;border-radius:20px;pointer-events:none}
+.hud-item{display:flex;align-items:center;gap:5px}
+#toolbar{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:8px;pointer-events:auto}
+.tower-btn{width:64px;height:72px;border:2px solid #334;border-radius:10px;background:rgba(10,14,23,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:.15s;font-size:11px;color:#aaa}
+.tower-btn:hover,.tower-btn.selected{border-color:#5bf;box-shadow:0 0 12px rgba(85,187,255,.4)}
+.tower-btn .icon{font-size:24px;line-height:1}
+.tower-btn .cost{color:#ffd740;font-size:10px;margin-top:2px}
+#overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(5,8,15,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:auto;z-index:10}
+#overlay h1{font-size:42px;color:#5bf;margin-bottom:8px;text-shadow:0 0 30px rgba(85,187,255,.5)}
+#overlay h2{font-size:22px;color:#f66;margin-bottom:12px}
+#overlay p{max-width:420px;text-align:center;line-height:1.6;color:#99a;font-size:14px;margin-bottom:20px}
+#overlay button{padding:14px 40px;font-size:18px;border:none;border-radius:8px;background:linear-gradient(135deg,#2196f3,#00bcd4);color:#fff;cursor:pointer;transition:.2s;pointer-events:auto}
+#overlay button:hover{transform:scale(1.05);box-shadow:0 0 20px rgba(33,150,243,.5)}
+.wave-banner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:32px;color:#ffd740;text-shadow:0 0 20px rgba(255,215,64,.6);pointer-events:none;animation:fadeBanner 2s forwards}
+@keyframes fadeBanner{0%{opacity:0;transform:translate(-50%,-50%) scale(.8)}15%{opacity:1;transform:translate(-50%,-50%) scale(1)}85%{opacity:1}100%{opacity:0}}
+#speed-btn{position:absolute;top:10px;right:10px;padding:6px 14px;border-radius:16px;border:1px solid #445;background:rgba(0,0,0,.5);color:#aaa;font-size:13px;cursor:pointer;pointer-events:auto}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div id="hud">
+    <div class="hud-item">❤️ <span id="hp">20</span></div>
+    <div class="hud-item">💰 <span id="gold">100</span></div>
+    <div class="hud-item">🌊 <span id="wave">0/15</span></div>
+    <div class="hud-item">⭐ <span id="score">0</span></div>
+  </div>
+  <div id="toolbar"></div>
+  <button id="speed-btn">1x</button>
+  <div id="overlay">
+    <h1>Tower Defense</h1>
+    <p>Creep waves march along the path. Build towers to stop them!<br><br>
+    🔵 <b>Arrow</b> – Fast, cheap<br>
+    🟢 <b>Cannon</b> – Splash damage<br>
+    🟡 <b>Lightning</b> – Chain hits<br>
+    🔴 <b>Sniper</b> – Long range, high damage<br>
+    ❄️ <b>Ice</b> – Slows enemies<br><br>
+    Click a tower button then click the map to place. Click existing towers to upgrade.</p>
+    <button id="start-btn">Start Game</button>
+  </div>
+</div>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+const $=id=>document.getElementById(id);
+let W,H,COLS,ROWS,CELL;
+function resize(){
+  const s=Math.min(innerWidth,innerHeight,800);
+  W=C.width=s;H=C.height=s;
+  COLS=20;ROWS=20;CELL=W/COLS;
+}
+resize();
+window.addEventListener('resize',resize);
+
+// Path definition (grid coords)
+const PATH_PTS=[[0,3],[4,3],[4,7],[12,7],[12,3],[17,3],[17,10],[10,10],[10,14],[17,14],[17,18],[3,18],[3,14],[7,14],[7,10],[0,10]];
+// nah let's do a simpler winding path
+const PATH=[
+  [0,2],[5,2],[5,6],[14,6],[14,2],[19,2],[19,9],[12,9],[12,13],[19,13],[19,19]
+];
+
+function lerpPath(pts){
+  let r=[];
+  for(let i=0;i<pts.length-1;i++){
+    let[x1,y1]=pts[i],[x2,y2]=pts[i+1];
+    let dx=x2-x1,dy=y2-y1,steps=Math.max(Math.abs(dx),Math.abs(dy));
+    for(let s=0;s<steps;s++){
+      r.push([x1+dx*s/steps,y1+dy*s/steps]);
+    }
+  }
+  r.push(pts[pts.length-1]);
+  return r;
+}
+const pathCells=lerpPath(PATH);
+const pathSet=new Set(pathCells.map(([x,y])=>`${Math.round(x)},${Math.round(y)}`));
+
+// Pixel path for creep movement
+function buildPixelPath(){
+  let r=[];
+  for(let i=0;i<PATH.length-1;i++){
+    let[x1,y1]=PATH[i],[x2,y2]=PATH[i+1];
+    let px1=(x1+.5)*CELL,py1=(y1+.5)*CELL;
+    let px2=(x2+.5)*CELL,py2=(y2+.5)*CELL;
+    let d=Math.hypot(px2-px1,py2-py1),steps=Math.ceil(d/2);
+    for(let s=0;s<steps;s++){
+      r.push([px1+(px2-px1)*s/steps,py1+(py2-py1)*s/steps]);
+    }
+  }
+  let[lx,ly]=PATH[PATH.length-1];
+  r.push([(lx+.5)*CELL,(ly+.5)*CELL]);
+  return r;
+}
+let pixelPath=buildPixelPath();
+
+const TOWER_TYPES=[
+  {name:'Arrow',icon:'🏹',color:'#4fc3f7',cost:50,range:3,rate:8,dmg:8,splash:0,slow:0,chain:0},
+  {name:'Cannon',icon:'💣',color:'#66bb6a',cost:80,range:2.5,rate:4,dmg:15,splash:1.2,slow:0,chain:0},
+  {name:'Lightning',icon:'⚡',color:'#ffd740',cost:100,range:3.5,rate:5,dmg:10,splash:0,slow:0,chain:3},
+  {name:'Sniper',icon:'🎯',color:'#ef5350',cost:120,range:5,dmg:40,rate:2,splash:0,slow:0,chain:0},
+  {name:'Ice',icon:'❄️',color:'#80deea',cost:70,range:3,rate:6,dmg:5,splash:0,slow:.5,chain:0},
+];
+
+let state='menu',gold=150,hp=20,score=0,waveNum=0,maxWaves=15,gameSpeed=1;
+let towers=[],creeps=[],projectiles=[],particles=[];
+let selectedType=null,hovCell=null;
+let waveTimer=0,waveDelay=0,waveQueue=[];
+
+// Build toolbar
+const tb=$('toolbar');
+TOWER_TYPES.forEach((t,i)=>{
+  let b=document.createElement('div');
+  b.className='tower-btn';
+  b.innerHTML=`<span class="icon">${t.icon}</span><span>${t.name}</span><span class="cost">${t.cost}g</span>`;
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.tower-btn').forEach(x=>x.classList.remove('selected'));
+    if(selectedType===i){selectedType=null}else{selectedType=i;b.classList.add('selected')}
+  });
+  tb.appendChild(b);
+});
+
+$('start-btn').addEventListener('click',()=>{
+  state='play';$('overlay').style.display='none';
+  nextWave();
+});
+
+$('speed-btn').addEventListener('click',()=>{
+  gameSpeed=gameSpeed===1?2:gameSpeed===2?3:1;
+  $('speed-btn').textContent=gameSpeed+'x';
+});
+
+C.addEventListener('click',e=>{
+  if(state!=='play')return;
+  let rect=C.getBoundingClientRect();
+  let mx=(e.clientX-rect.left)*(W/rect.width);
+  let my=(e.clientY-rect.top)*(H/rect.height);
+  let cx=Math.floor(mx/CELL),cy=Math.floor(my/CELL);
+  if(cx<0||cx>=COLS||cy<0||cy>=ROWS)return;
+
+  // Check if clicking existing tower
+  let existing=towers.find(t=>t.cx===cx&&t.cy===cy);
+  if(existing){
+    let ucost=Math.floor(existing.baseCost*(1+existing.level*.6));
+    if(gold>=ucost&&existing.level<5){
+      gold-=ucost;
+      existing.level++;
+      existing.dmg=Math.floor(existing.baseDmg*(1+existing.level*.4));
+      existing.range=existing.baseRange+existing.level*.3;
+      existing.rate=existing.baseRate*(1+existing.level*.15);
+      spawnParticles(existing.x,existing.y,'#ffd740',8);
+    }
+    selectedType=null;
+    document.querySelectorAll('.tower-btn').forEach(x=>x.classList.remove('selected'));
+    return;
+  }
+
+  if(selectedType===null)return;
+  let t=TOWER_TYPES[selectedType];
+  if(gold<t.cost)return;
+  if(pathSet.has(`${cx},${cy}`))return;
+  if(towers.find(tw=>tw.cx===cx&&tw.cy===cy))return;
+
+  gold-=t.cost;
+  towers.push({
+    cx,cy,x:(cx+.5)*CELL,y:(cy+.5)*CELL,
+    type:selectedType,level:0,
+    dmg:t.dmg,baseDmg:t.dmg,
+    range:t.range,baseRange:t.range,
+    rate:t.rate,baseRate:t.rate,
+    splash:t.splash,slow:t.slow,chain:t.chain,
+    baseCost:t.cost,cooldown:0,angle:0
+  });
+  spawnParticles((cx+.5)*CELL,(cy+.5)*CELL,t.color,10);
+});
+
+C.addEventListener('mousemove',e=>{
+  let rect=C.getBoundingClientRect();
+  let mx=(e.clientX-rect.left)*(W/rect.width);
+  let my=(e.clientY-rect.top)*(H/rect.height);
+  hovCell=[Math.floor(mx/CELL),Math.floor(my/CELL)];
+});
+
+function genWave(n){
+  let q=[];
+  let types=['normal','fast','tank','swarm','boss'];
+  let count=8+n*3;
+  let hpMult=1+n*.35;
+  if(n>=maxWaves){
+    // final boss wave
+    for(let i=0;i<5;i++)q.push({hp:300*hpMult,maxHp:300*hpMult,speed:1,reward:50,size:.4,color:'#e040fb',type:'boss'});
+    for(let i=0;i<15;i++)q.push({hp:40*hpMult,maxHp:40*hpMult,speed:2.5,reward:5,size:.25,color:'#ff7043',type:'swarm'});
+    return q;
+  }
+  let primary=types[n%5];
+  for(let i=0;i<count;i++){
+    let tp=i%4===0&&n>3?'fast':primary;
+    let c;
+    switch(tp){
+      case'normal':c={hp:30*hpMult,speed:1.8,reward:10,size:.3,color:'#e57373'};break;
+      case'fast':c={hp:18*hpMult,speed:3,reward:8,size:.22,color:'#ffb74d'};break;
+      case'tank':c={hp:80*hpMult,speed:1.2,reward:20,size:.38,color:'#7e57c2'};break;
+      case'swarm':c={hp:12*hpMult,speed:2.5,reward:5,size:.2,color:'#ff7043'};break;
+      case'boss':c={hp:200*hpMult,speed:1,reward:40,size:.42,color:'#e040fb'};break;
+    }
+    c.maxHp=c.hp;c.type=tp;
+    q.push(c);
+  }
+  return q;
+}
+
+function nextWave(){
+  waveNum++;
+  if(waveNum>maxWaves){victory();return}
+  waveQueue=genWave(waveNum);
+  waveDelay=0;
+  showBanner(`Wave ${waveNum}`);
+  $('wave').textContent=`${waveNum}/${maxWaves}`;
+}
+
+function showBanner(txt){
+  let d=document.createElement('div');
+  d.className='wave-banner';d.textContent=txt;
+  $('ui').appendChild(d);
+  setTimeout(()=>d.remove(),2200);
+}
+
+function spawnCreep(template){
+  creeps.push({...template,pathIdx:0,slow:0,slowTimer:0});
+}
+
+function spawnParticles(x,y,color,n){
+  for(let i=0;i<n;i++){
+    let a=Math.random()*Math.PI*2,sp=1+Math.random()*3;
+    particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:30+Math.random()*20,maxLife:50,color,size:2+Math.random()*3});
+  }
+}
+
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+
+function update(){
+  if(state!=='play')return;
+  for(let s=0;s<gameSpeed;s++)tick();
+}
+
+function tick(){
+  // Spawn creeps from queue
+  waveDelay++;
+  if(waveQueue.length>0&&waveDelay>=15){
+    waveDelay=0;
+    spawnCreep(waveQueue.shift());
+  }
+
+  // Move creeps
+  for(let c of creeps){
+    if(c.dead)continue;
+    let spd=c.speed*(c.slowTimer>0?.5:1);
+    c.slowTimer=Math.max(0,c.slowTimer-1);
+    let steps=spd*1.5;
+    while(steps>0&&c.pathIdx<pixelPath.length-1){
+      let[nx,ny]=pixelPath[c.pathIdx+1];
+      let d=Math.hypot(nx-c.x,ny-c.y);
+      if(d<=steps){
+        c.x=nx;c.y=ny;steps-=d;c.pathIdx++;
+      }else{
+        let r=steps/d;
+        c.x+=(nx-c.x)*r;c.y+=(ny-c.y)*r;
+        steps=0;
+      }
+    }
+    if(!c.x)c.x=pixelPath[0][0];
+    if(!c.y)c.y=pixelPath[0][1];
+    if(c.pathIdx>=pixelPath.length-1){
+      c.dead=true;hp--;
+      if(hp<=0){gameOver();return}
+    }
+  }
+
+  // Tower shooting
+  for(let t of towers){
+    t.cooldown=Math.max(0,t.cooldown-1);
+    if(t.cooldown>0)continue;
+    let rng=t.range*CELL;
+    let target=null,bestD=Infinity;
+    for(let c of creeps){
+      if(c.dead)continue;
+      let d=dist(t,c);
+      if(d<rng&&c.pathIdx>((target&&target.pathIdx)||0)){target=c;bestD=d}
+    }
+    if(!target){
+      // fallback: closest
+      for(let c of creeps){
+        if(c.dead)continue;
+        let d=dist(t,c);
+        if(d<rng&&d<bestD){target=c;bestD=d}
+      }
+    }
+    if(target){
+      t.cooldown=Math.floor(60/t.rate);
+      t.angle=Math.atan2(target.y-t.y,target.x-t.x);
+      let tt=TOWER_TYPES[t.type];
+      projectiles.push({
+        x:t.x,y:t.y,tx:target.x,ty:target.y,target,
+        speed:6,dmg:t.dmg,splash:t.splash*CELL,slow:tt.slow,chain:t.chain,
+        color:tt.color,type:t.type
+      });
+    }
+  }
+
+  // Projectiles
+  for(let p of projectiles){
+    if(p.dead)continue;
+    let tx=p.target&&!p.target.dead?p.target.x:p.tx;
+    let ty=p.target&&!p.target.dead?p.target.y:p.ty;
+    let d=Math.hypot(tx-p.x,ty-p.y);
+    if(d<p.speed+4){
+      p.dead=true;
+      hitCreep(p);
+    }else{
+      let r=p.speed/d;
+      p.x+=(tx-p.x)*r;p.y+=(ty-p.y)*r;
+    }
+  }
+
+  // Particles
+  for(let p of particles)p.x+=p.vx,p.y+=p.vy,p.life--,p.vx*=.95,p.vy*=.95;
+
+  // Cleanup
+  creeps=creeps.filter(c=>!c.dead);
+  projectiles=projectiles.filter(p=>!p.dead);
+  particles=particles.filter(p=>p.life>0);
+
+  // Next wave check
+  if(waveQueue.length===0&&creeps.length===0&&state==='play'){
+    setTimeout(()=>{if(state==='play')nextWave()},1500);
+    waveQueue=['wait']; // prevent re-trigger
+  }
+
+  $('hp').textContent=hp;
+  $('gold').textContent=gold;
+  $('score').textContent=score;
+}
+
+function hitCreep(p){
+  let targets=[];
+  if(p.target&&!p.target.dead)targets.push(p.target);
+  if(p.splash>0){
+    for(let c of creeps){
+      if(c.dead||c===p.target)continue;
+      if(Math.hypot(c.x-p.tx,c.y-p.ty)<p.splash)targets.push(c);
+    }
+  }
+  if(targets.length===0){
+    // find nearest
+    let best=null,bd=Infinity;
+    for(let c of creeps){if(!c.dead){let d=Math.hypot(c.x-p.x,c.y-p.y);if(d<bd){bd=d;best=c}}}
+    if(best&&bd<CELL*2)targets.push(best);
+  }
+  for(let c of targets){
+    c.hp-=p.dmg;
+    if(p.slow>0)c.slowTimer=90;
+    if(c.hp<=0&&!c.scored){
+      c.dead=true;c.scored=true;
+      gold+=c.reward;score+=c.reward;
+      spawnParticles(c.x,c.y,c.color,6);
+    }
+  }
+  // Chain lightning
+  if(p.chain>0&&targets.length>0){
+    let last=targets[0];
+    let chained=new Set([last]);
+    for(let i=0;i<p.chain;i++){
+      let best=null,bd=Infinity;
+      for(let c of creeps){
+        if(c.dead||chained.has(c))continue;
+        let d=Math.hypot(c.x-last.x,c.y-last.y);
+        if(d<CELL*3&&d<bd){bd=d;best=c}
+      }
+      if(best){
+        best.hp-=Math.floor(p.dmg*.6);
+        if(best.hp<=0&&!best.scored){best.dead=true;best.scored=true;gold+=best.reward;score+=best.reward;spawnParticles(best.x,best.y,best.color,4)}
+        particles.push({x:last.x,y:last.y,vx:0,vy:0,life:8,maxLife:8,color:'#ffd740',size:2,lx:best.x,ly:best.y,isLightning:true});
+        chained.add(best);last=best;
+      }
+    }
+  }
+  spawnParticles(p.x,p.y,p.color,4);
+}
+
+function gameOver(){
+  state='over';
+  $('overlay').style.display='flex';
+  $('overlay').innerHTML=`<h2>Game Over</h2><p>You survived ${waveNum-1} waves<br>Score: ${score}</p><button onclick="location.reload()">Try Again</button>`;
+}
+
+function victory(){
+  state='won';
+  $('overlay').style.display='flex';
+  $('overlay').innerHTML=`<h1>Victory!</h1><p>All ${maxWaves} waves defeated!<br>Score: ${score}<br>HP remaining: ${hp}</p><button onclick="location.reload()">Play Again</button>`;
+}
+
+function draw(){
+  X.clearRect(0,0,W,H);
+
+  // Grid
+  X.fillStyle='#111827';
+  X.fillRect(0,0,W,H);
+  X.strokeStyle='#1a2030';X.lineWidth=.5;
+  for(let i=0;i<=COLS;i++){X.beginPath();X.moveTo(i*CELL,0);X.lineTo(i*CELL,H);X.stroke()}
+  for(let i=0;i<=ROWS;i++){X.beginPath();X.moveTo(0,i*CELL);X.lineTo(W,i*CELL);X.stroke()}
+
+  // Path
+  X.lineWidth=CELL*.8;X.lineCap='round';X.lineJoin='round';
+  X.strokeStyle='#2a1a0a';
+  X.beginPath();
+  PATH.forEach(([px,py],i)=>{let m=i?'lineTo':'moveTo';X[m]((px+.5)*CELL,(py+.5)*CELL)});
+  X.stroke();
+  X.lineWidth=CELL*.6;X.strokeStyle='#3e2723';X.stroke();
+
+  // Path dots
+  X.fillStyle='#4e342e';
+  for(let i=0;i<pixelPath.length;i+=20){
+    X.beginPath();X.arc(pixelPath[i][0],pixelPath[i][1],2,0,7);X.fill();
+  }
+
+  // Hover preview
+  if(hovCell&&selectedType!==null&&state==='play'){
+    let[cx,cy]=hovCell;
+    let ok=!pathSet.has(`${cx},${cy}`)&&!towers.find(t=>t.cx===cx&&t.cy===cy)&&gold>=TOWER_TYPES[selectedType].cost;
+    X.fillStyle=ok?'rgba(85,187,255,.15)':'rgba(255,80,80,.15)';
+    X.fillRect(cx*CELL,cy*CELL,CELL,CELL);
+    if(ok){
+      X.strokeStyle='rgba(85,187,255,.2)';X.lineWidth=1;
+      X.beginPath();X.arc((cx+.5)*CELL,(cy+.5)*CELL,TOWER_TYPES[selectedType].range*CELL,0,7);X.stroke();
+    }
+  }
+
+  // Towers
+  for(let t of towers){
+    let tt=TOWER_TYPES[t.type];
+    // Base
+    X.fillStyle='#1a2744';
+    X.beginPath();X.arc(t.x,t.y,CELL*.4,0,7);X.fill();
+    X.fillStyle=tt.color;
+    X.beginPath();X.arc(t.x,t.y,CELL*.28,0,7);X.fill();
+    // Turret
+    X.strokeStyle=tt.color;X.lineWidth=3;
+    X.beginPath();X.moveTo(t.x,t.y);
+    X.lineTo(t.x+Math.cos(t.angle)*CELL*.35,t.y+Math.sin(t.angle)*CELL*.35);
+    X.stroke();
+    // Level pips
+    if(t.level>0){
+      X.fillStyle='#ffd740';
+      for(let i=0;i<t.level;i++){
+        X.beginPath();X.arc(t.x-CELL*.25+i*6,t.y+CELL*.32,2,0,7);X.fill();
+      }
+    }
+  }
+
+  // Creeps
+  for(let c of creeps){
+    if(c.dead||!c.x)continue;
+    let r=c.size*CELL;
+    // Shadow
+    X.fillStyle='rgba(0,0,0,.3)';
+    X.beginPath();X.ellipse(c.x,c.y+r*.6,r*.8,r*.3,0,0,7);X.fill();
+    // Body
+    let g=X.createRadialGradient(c.x,c.y,0,c.x,c.y,r);
+    g.addColorStop(0,c.color);g.addColorStop(1,'#111');
+    X.fillStyle=g;
+    X.beginPath();X.arc(c.x,c.y,r,0,7);X.fill();
+    if(c.slowTimer>0){X.strokeStyle='#80deea';X.lineWidth=2;X.stroke()}
+    // HP bar
+    let bw=r*2,bx=c.x-r,by=c.y-r-5;
+    X.fillStyle='#333';X.fillRect(bx,by,bw,3);
+    X.fillStyle=c.hp/c.maxHp>.5?'#4caf50':c.hp/c.maxHp>.25?'#ff9800':'#f44336';
+    X.fillRect(bx,by,bw*(c.hp/c.maxHp),3);
+  }
+
+  // Projectiles
+  for(let p of projectiles){
+    if(p.dead)continue;
+    X.fillStyle=p.color;
+    X.beginPath();X.arc(p.x,p.y,3,0,7);X.fill();
+  }
+
+  // Particles
+  for(let p of particles){
+    let a=p.life/p.maxLife;
+    if(p.isLightning){
+      X.strokeStyle=`rgba(255,215,64,${a})`;X.lineWidth=2;
+      X.beginPath();X.moveTo(p.x,p.y);X.lineTo(p.lx,p.ly);X.stroke();
+    }else{
+      X.globalAlpha=a;
+      X.fillStyle=p.color;
+      X.beginPath();X.arc(p.x,p.y,p.size*a,0,7);X.fill();
+      X.globalAlpha=1;
+    }
+  }
+
+  requestAnimationFrame(draw);
+  update();
+}
+
+// Init creep positions
+for(let c of creeps){c.x=pixelPath[0][0];c.y=pixelPath[0][1]}
+
+draw();
+</script>
+</body>
+</html>
