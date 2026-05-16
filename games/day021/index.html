@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Sokoban</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;color:#e0e0e0;font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;overflow:hidden;touch-action:none}
+h1{font-size:2rem;color:#e94560;margin-bottom:.3rem;text-shadow:0 0 20px rgba(233,69,96,.4)}
+#info{font-size:.85rem;color:#aaa;margin-bottom:.5rem}
+#hud{display:flex;gap:1.5rem;margin-bottom:.5rem;font-size:.95rem}
+#hud span{background:#16213e;padding:4px 14px;border-radius:6px;border:1px solid #0f3460}
+canvas{border-radius:8px;box-shadow:0 0 30px rgba(233,69,96,.15);background:#0f3460}
+#controls{margin-top:.6rem;display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center}
+#controls button{background:#16213e;color:#e0e0e0;border:1px solid #0f3460;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:.85rem;transition:background .2s}
+#controls button:hover{background:#1a1a40}
+#dpad{display:none;margin-top:.5rem}
+#dpad table{border-spacing:4px}
+#dpad td{width:52px;height:52px;text-align:center}
+#dpad button{width:100%;height:100%;font-size:1.4rem;background:#16213e;color:#e94560;border:1px solid #0f3460;border-radius:8px;cursor:pointer}
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:10}
+#overlay .box{background:#16213e;padding:2rem;border-radius:12px;text-align:center;max-width:360px;border:1px solid #0f3460}
+#overlay .box h2{color:#e94560;margin-bottom:.8rem;font-size:1.6rem}
+#overlay .box p{margin-bottom:1rem;line-height:1.5;font-size:.9rem;color:#ccc}
+#overlay .box button{background:#e94560;color:#fff;border:none;padding:10px 28px;border-radius:6px;font-size:1rem;cursor:pointer}
+#overlay .box button:hover{background:#c73651}
+@media(pointer:coarse){#dpad{display:block}}
+</style>
+</head>
+<body>
+<div id="overlay">
+<div class="box">
+<h2>Sokoban</h2>
+<p>Push all boxes onto the targets.<br>You can only push — never pull.<br>Use arrow keys or swipe / d-pad on mobile.</p>
+<button onclick="startGame()">Play</button>
+</div>
+</div>
+<h1>Sokoban</h1>
+<div id="hud"><span>Level: <b id="lvl">1</b></span><span>Moves: <b id="mov">0</b></span><span>Pushes: <b id="psh">0</b></span></div>
+<canvas id="c"></canvas>
+<div id="controls">
+<button onclick="restart()">Restart</button>
+<button onclick="undoMove()">Undo</button>
+<button onclick="nextLevel()">Skip ▶</button>
+</div>
+<div id="dpad">
+<table><tr><td></td><td><button onclick="move(0,-1)">▲</button></td><td></td></tr>
+<tr><td><button onclick="move(-1,0)">◀</button></td><td></td><td><button onclick="move(1,0)">▶</button></td></tr>
+<tr><td></td><td><button onclick="move(0,1)">▼</button></td><td></td></tr></table>
+</div>
+<script>
+const LEVELS=[
+// 1
+["#####","#   #","# $ #","# .@#","#####"],
+// 2
+["######","#    #","# $$ #","# .*.#","#  @ #","######"],
+// 3
+["  ####","###  #","# $  #","# .# #","#  $.#","# @  #","######"],
+// 4
+["#####","# . #","# # ##","# $  #","##$ .#","#  @ #","######"],
+// 5
+[" #####"," # . #","## # ##","# $$  #","# . # #","#   @ #","#######"],
+// 6
+["########","#  . . #","# #### #","# #  $ #","# $ ## #","#   .@ #","########"],
+// 7
+["  #####","  #   #","###$# #","# $ . #","# . $ #","# #$###","#   #","#####"],
+// 8
+["########","#      #","# .**$ #","# .  # #","# $#   #","#  @ ###","######"],
+// 9
+[" ######"," #    #","## #$ #","# . $.#","# .  ##","# @ ##","#####"],
+// 10
+["#######","#  .  #","# #.# #","#  $$ #","##$ $##"," # . #"," # @ #"," #####"]
+];
+
+const W=0,F=1,T=2,B=3,P=4; // wall,floor,target,box,player
+const TILE=40;
+let canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+let grid,pw,ph,px,py,moves,pushes,level=0,history=[];
+
+function parse(lv){
+let rows=lv;ph=rows.length;pw=Math.max(...rows.map(r=>r.length));
+grid=[];
+for(let y=0;y<ph;y++){grid[y]=[];for(let x=0;x<pw;x++){
+let ch=(rows[y]||'')[x]||' ';
+if(ch==='#')grid[y][x]=W;
+else if(ch==='.')grid[y][x]=T;
+else if(ch==='$'){grid[y][x]=F;}
+else if(ch==='*'){grid[y][x]=T;}// box on target
+else if(ch==='@'){grid[y][x]=F;px=x;py=y;}
+else if(ch==='+'){grid[y][x]=T;px=x;py=y;}
+else grid[y][x]=F;
+}}
+// place boxes & player separately
+// re-parse for entities
+let boxes=[];
+for(let y=0;y<ph;y++)for(let x=0;x<pw;x++){
+let ch=(rows[y]||'')[x]||' ';
+if(ch==='$'||ch==='*')boxes.push({x,y});
+}
+return boxes;
+}
+
+let boxes=[];
+function initLevel(){
+boxes=parse(LEVELS[level]);
+moves=0;pushes=0;history=[];
+canvas.width=pw*TILE;canvas.height=ph*TILE;
+update();
+document.getElementById('lvl').textContent=level+1;
+document.getElementById('mov').textContent=0;
+document.getElementById('psh').textContent=0;
+}
+
+function draw(){
+ctx.clearRect(0,0,canvas.width,canvas.height);
+for(let y=0;y<ph;y++)for(let x=0;x<pw;x++){
+let t=grid[y][x];
+if(t===W){ctx.fillStyle='#0a1a3a';ctx.fillRect(x*TILE,y*TILE,TILE,TILE);ctx.fillStyle='#0f3460';ctx.fillRect(x*TILE+2,y*TILE+2,TILE-4,TILE-4);}
+else{ctx.fillStyle='#1a3a6a';ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
+if(t===T){ctx.fillStyle='rgba(233,69,96,.25)';ctx.beginPath();ctx.arc(x*TILE+TILE/2,y*TILE+TILE/2,TILE/4,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#e94560';ctx.lineWidth=2;ctx.stroke();}
+}}
+// boxes
+for(let b of boxes){
+let onTarget=grid[b.y][b.x]===T;
+ctx.fillStyle=onTarget?'#27ae60':'#e67e22';
+let m=4;ctx.fillRect(b.x*TILE+m,b.y*TILE+m,TILE-m*2,TILE-m*2);
+ctx.strokeStyle=onTarget?'#2ecc71':'#f39c12';ctx.lineWidth=2;
+ctx.strokeRect(b.x*TILE+m,b.y*TILE+m,TILE-m*2,TILE-m*2);
+// cross
+ctx.beginPath();ctx.moveTo(b.x*TILE+m+4,b.y*TILE+m+4);ctx.lineTo(b.x*TILE+TILE-m-4,b.y*TILE+TILE-m-4);
+ctx.moveTo(b.x*TILE+TILE-m-4,b.y*TILE+m+4);ctx.lineTo(b.x*TILE+m+4,b.y*TILE+TILE-m-4);ctx.stroke();
+}
+// player
+ctx.fillStyle='#e94560';
+ctx.beginPath();ctx.arc(px*TILE+TILE/2,py*TILE+TILE/2,TILE/2-5,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(px*TILE+TILE/2,py*TILE+TILE/2,TILE/4-2,0,Math.PI*2);ctx.fill();
+}
+
+function update(){
+draw();
+document.getElementById('mov').textContent=moves;
+document.getElementById('psh').textContent=pushes;
+if(checkWin()){
+setTimeout(()=>{
+if(level<LEVELS.length-1){level++;initLevel();}
+else showOverlay('You Win!','All levels complete!','Play Again',()=>{level=0;initLevel();});
+},400);
+}
+}
+
+function boxAt(x,y){return boxes.find(b=>b.x===x&&b.y===y);}
+function blocked(x,y){return grid[y]===undefined||grid[y][x]===undefined||grid[y][x]===W||!!boxAt(x,y);}
+
+function move(dx,dy){
+let nx=px+dx,ny=py+dy;
+if(ny<0||ny>=ph||nx<0||nx>=pw||grid[ny][nx]===W)return;
+let b=boxAt(nx,ny);
+if(b){
+let bx=nx+dx,by=ny+dy;
+if(by<0||by>=ph||bx<0||bx>=pw||grid[by][bx]===W||boxAt(bx,by))return;
+history.push({px,py,bx:nx,by:ny,bdx:dx,bdy:dy});
+b.x=bx;b.y=by;pushes++;
+}else{
+history.push({px,py,bx:-1,by:-1,bdx:0,bdy:0});
+}
+px=nx;py=ny;moves++;
+update();
+}
+
+function undoMove(){
+if(!history.length)return;
+let h=history.pop();
+px=h.px;py=h.py;moves--;
+if(h.bx>=0){let b=boxAt(h.bx+h.bdx,h.by+h.bdy);if(b){b.x=h.bx;b.y=h.by;}pushes--;}
+update();
+}
+
+function checkWin(){return boxes.every(b=>grid[b.y][b.x]===T);}
+function restart(){initLevel();}
+function nextLevel(){if(level<LEVELS.length-1){level++;initLevel();}}
+
+function showOverlay(title,msg,btn,cb){
+let o=document.getElementById('overlay');
+o.style.display='flex';
+o.innerHTML=`<div class="box"><h2>${title}</h2><p>${msg}</p><button id="obtn">${btn}</button></div>`;
+document.getElementById('obtn').onclick=()=>{o.style.display='none';cb();};
+}
+function startGame(){document.getElementById('overlay').style.display='none';initLevel();}
+
+// keyboard
+document.addEventListener('keydown',e=>{
+if(e.key==='ArrowUp')move(0,-1);else if(e.key==='ArrowDown')move(0,1);
+else if(e.key==='ArrowLeft')move(-1,0);else if(e.key==='ArrowRight')move(1,0);
+else if(e.key==='z'||e.key==='u')undoMove();else if(e.key==='r')restart();
+});
+
+// swipe
+let sx,sy;
+canvas.addEventListener('touchstart',e=>{let t=e.touches[0];sx=t.clientX;sy=t.clientY;e.preventDefault();});
+canvas.addEventListener('touchend',e=>{
+let t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;
+if(Math.abs(dx)<20&&Math.abs(dy)<20)return;
+if(Math.abs(dx)>Math.abs(dy))move(dx>0?1:-1,0);else move(0,dy>0?1:-1);
+});
+
+initLevel();
+</script>
+</body>
+</html>
