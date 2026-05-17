@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cookie Clicker Idle Game</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap');
+:root{--bg:#1a1025;--panel:#251735;--card:#2f2045;--accent:#f5a623;--accent2:#e8375a;--cookie:#c87530;--text:#f0e6ff;--dim:#9080a8}
+body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;user-select:none}
+#title-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:20px}
+#title-screen h1{font-family:'Fredoka One',sans-serif;font-size:3rem;color:var(--accent);text-shadow:0 4px 20px rgba(245,166,35,.4);margin-bottom:10px}
+#title-screen .subtitle{color:var(--dim);font-size:1.1rem;margin-bottom:30px;max-width:400px;line-height:1.6}
+#title-screen .cookie-preview{font-size:8rem;margin-bottom:20px;animation:bob 2s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-15px)}}
+.btn{background:linear-gradient(135deg,var(--accent),#e8900a);border:none;color:#1a1025;font-family:'Fredoka One',sans-serif;font-size:1.3rem;padding:14px 48px;border-radius:50px;cursor:pointer;transition:transform .15s,box-shadow .15s;box-shadow:0 4px 20px rgba(245,166,35,.3)}
+.btn:hover{transform:scale(1.05);box-shadow:0 6px 30px rgba(245,166,35,.5)}
+.btn:active{transform:scale(.96)}
+#game{display:none;max-width:900px;margin:0 auto;padding:10px}
+.top-bar{text-align:center;padding:15px 0}
+.top-bar .count{font-family:'Fredoka One',sans-serif;font-size:2.2rem;color:var(--accent)}
+.top-bar .per-sec{color:var(--dim);font-size:.95rem}
+.cookie-area{display:flex;justify-content:center;padding:20px 0}
+#cookie{font-size:9rem;cursor:pointer;transition:transform .08s;filter:drop-shadow(0 0 20px rgba(200,117,48,.4))}
+#cookie:active{transform:scale(.88)}
+.click-float{position:absolute;pointer-events:none;font-family:'Fredoka One',sans-serif;font-size:1.3rem;color:var(--accent);animation:floatUp .8s ease-out forwards}
+@keyframes floatUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-80px) scale(1.3)}}
+.section-title{font-family:'Fredoka One',sans-serif;font-size:1.1rem;color:var(--dim);margin:18px 0 8px;padding-left:4px}
+.shop{display:grid;gap:8px}
+.shop-item{background:var(--card);border:2px solid transparent;border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:border-color .2s,background .2s}
+.shop-item:hover{border-color:var(--accent);background:#382850}
+.shop-item.locked{opacity:.45;pointer-events:none}
+.shop-item .icon{font-size:2rem;flex-shrink:0;width:44px;text-align:center}
+.shop-item .info{flex:1;min-width:0}
+.shop-item .name{font-weight:700;font-size:.95rem}
+.shop-item .desc{color:var(--dim);font-size:.78rem;margin-top:2px}
+.shop-item .cost{font-family:'Fredoka One',sans-serif;color:var(--accent);white-space:nowrap;font-size:.95rem}
+.shop-item .owned{color:var(--dim);font-size:.8rem;margin-left:6px}
+.upgrades{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px}
+.upgrade{background:var(--card);border:2px solid transparent;border-radius:12px;padding:10px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative}
+.upgrade:hover{border-color:var(--accent2);background:#382850}
+.upgrade.locked{opacity:.35;pointer-events:none}
+.upgrade.bought{opacity:.5;pointer-events:none;border-color:#4a4a4a}
+.upgrade .u-icon{font-size:1.6rem}
+.upgrade .u-cost{font-size:.7rem;color:var(--accent);margin-top:4px;font-weight:700}
+.tooltip{display:none;position:fixed;background:#1a1025;border:1px solid var(--accent);border-radius:10px;padding:10px 14px;font-size:.82rem;max-width:220px;z-index:100;pointer-events:none;line-height:1.5}
+.tooltip .tt-name{font-weight:700;color:var(--accent);margin-bottom:4px}
+.stats-bar{display:flex;justify-content:space-between;padding:10px 4px;color:var(--dim);font-size:.78rem;margin-top:20px;border-top:1px solid #2f2045}
+.milestone{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--accent2),#c32a4a);padding:12px 28px;border-radius:50px;font-family:'Fredoka One',sans-serif;font-size:1rem;z-index:200;animation:popIn .4s ease-out;box-shadow:0 4px 25px rgba(232,55,90,.4)}
+@keyframes popIn{0%{opacity:0;transform:translateX(-50%) scale(.5)}100%{opacity:1;transform:translateX(-50%) scale(1)}}
+.prestige-panel{background:var(--panel);border:2px solid var(--accent2);border-radius:16px;padding:16px;margin-top:16px;text-align:center}
+.prestige-panel h3{font-family:'Fredoka One',sans-serif;color:var(--accent2);margin-bottom:8px}
+.prestige-panel p{color:var(--dim);font-size:.85rem;margin-bottom:12px}
+.btn-prestige{background:linear-gradient(135deg,var(--accent2),#c32a4a);color:white;border:none;font-family:'Fredoka One',sans-serif;font-size:1rem;padding:10px 32px;border-radius:50px;cursor:pointer;transition:transform .15s}
+.btn-prestige:hover{transform:scale(1.05)}
+.btn-prestige:disabled{opacity:.4;cursor:default;transform:none}
+</style>
+</head>
+<body>
+
+<div id="title-screen">
+  <div class="cookie-preview">🍪</div>
+  <h1>Cookie Clicker</h1>
+  <p class="subtitle">Click the cookie to earn cookies. Buy buildings to automate production. Unlock upgrades to multiply your output. How many can you bake?</p>
+  <button class="btn" onclick="startGame()">Start Baking!</button>
+</div>
+
+<div id="game">
+  <div class="top-bar">
+    <div class="count" id="count">0 cookies</div>
+    <div class="per-sec" id="cps">per second: 0</div>
+  </div>
+  <div class="cookie-area">
+    <div id="cookie" onclick="clickCookie(event)">🍪</div>
+  </div>
+
+  <div class="section-title">⬆ Upgrades</div>
+  <div class="upgrades" id="upgrades"></div>
+
+  <div class="section-title">🏪 Buildings</div>
+  <div class="shop" id="shop"></div>
+
+  <div class="prestige-panel" id="prestige-panel" style="display:none">
+    <h3>✨ Prestige</h3>
+    <p id="prestige-info">Reset everything for a permanent CPS multiplier.</p>
+    <button class="btn-prestige" id="prestige-btn" onclick="doPrestige()">Prestige (+0 chips)</button>
+  </div>
+
+  <div class="stats-bar">
+    <span id="stat-total">Total baked: 0</span>
+    <span id="stat-clicks">Clicks: 0</span>
+    <span id="stat-prestige">Prestige: x1</span>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const buildings=[
+  {name:"Cursor",icon:"👆",baseCost:15,baseCps:.1,desc:"Auto-clicks once every 10 seconds.",owned:0},
+  {name:"Grandma",icon:"👵",baseCost:100,baseCps:1,desc:"A nice grandma to bake cookies.",owned:0},
+  {name:"Farm",icon:"🌾",baseCost:1100,baseCps:8,desc:"Grows cookie plants.",owned:0},
+  {name:"Mine",icon:"⛏️",baseCost:12000,baseCps:47,desc:"Mines cookie dough from the earth.",owned:0},
+  {name:"Factory",icon:"🏭",baseCost:130000,baseCps:260,desc:"Mass-produces cookies.",owned:0},
+  {name:"Bank",icon:"🏦",baseCost:1400000,baseCps:1400,desc:"Generates cookies from interest.",owned:0},
+  {name:"Temple",icon:"🛕",baseCost:20000000,baseCps:7800,desc:"Prays cookies into existence.",owned:0},
+  {name:"Wizard Tower",icon:"🧙",baseCost:330000000,baseCps:44000,desc:"Conjures cookies with magic.",owned:0},
+];
+
+const upgrades=[
+  {name:"Reinforced Index Finger",icon:"👆",cost:100,desc:"Clicking gains +1 cookie.",type:"click",val:1,req:()=>state.clicks>=10,bought:false},
+  {name:"Carpal Tunnel",icon:"🖱️",cost:500,desc:"Clicking gains +2 cookies.",type:"click",val:2,req:()=>state.clicks>=50,bought:false},
+  {name:"Ambidextrous",icon:"🤲",cost:10000,desc:"Clicking gains +5 cookies.",type:"click",val:5,req:()=>state.clicks>=200,bought:false},
+  {name:"Thousand Fingers",icon:"🖐️",cost:100000,desc:"Clicking gains +25 cookies.",type:"click",val:25,req:()=>state.clicks>=500,bought:false},
+  {name:"Forwards from Grandma",icon:"📧",cost:1000,desc:"Grandmas are 2x as efficient.",type:"mult",building:1,val:2,req:()=>buildings[1].owned>=1,bought:false},
+  {name:"Steel Plows",icon:"🔧",cost:11000,desc:"Farms are 2x as efficient.",type:"mult",building:2,val:2,req:()=>buildings[2].owned>=1,bought:false},
+  {name:"Sugar Gas",icon:"⛽",cost:120000,desc:"Mines are 2x as efficient.",type:"mult",building:3,val:2,req:()=>buildings[3].owned>=1,bought:false},
+  {name:"Sturdier Conveyor Belts",icon:"🔩",cost:1300000,desc:"Factories are 2x as efficient.",type:"mult",building:4,val:2,req:()=>buildings[4].owned>=1,bought:false},
+  {name:"Taller Tellers",icon:"💰",cost:14000000,desc:"Banks are 2x as efficient.",type:"mult",building:5,val:2,req:()=>buildings[5].owned>=1,bought:false},
+  {name:"Golden Idols",icon:"🗿",cost:200000000,desc:"Temples are 2x as efficient.",type:"mult",building:6,val:2,req:()=>buildings[6].owned>=1,bought:false},
+  {name:"Lucky Day",icon:"🍀",cost:7777,desc:"+10% CPS globally.",type:"global",val:1.1,req:()=>state.totalBaked>=5000,bought:false},
+  {name:"Serendipity",icon:"🌟",cost:77777,desc:"+10% CPS globally.",type:"global",val:1.1,req:()=>state.totalBaked>=50000,bought:false},
+];
+
+let state={cookies:0,totalBaked:0,clicks:0,clickPower:1,cps:0,prestigeChips:0,prestigeMult:1,milestones:new Set()};
+
+const milestoneThresholds=[100,1000,10000,100000,1e6,1e7,1e8,1e9];
+
+function fmt(n){
+  if(n>=1e12)return (n/1e12).toFixed(2)+" T";
+  if(n>=1e9)return (n/1e9).toFixed(2)+" B";
+  if(n>=1e6)return (n/1e6).toFixed(2)+" M";
+  if(n>=1e3)return (n/1e3).toFixed(1)+" K";
+  return Math.floor(n).toLocaleString();
+}
+
+function cost(b){return Math.floor(b.baseCost*Math.pow(1.15,b.owned))}
+
+function recalcCps(){
+  let total=0;
+  const mults=Array(buildings.length).fill(1);
+  let globalMult=1;
+  for(const u of upgrades){
+    if(!u.bought)continue;
+    if(u.type==="mult")mults[u.building]*=u.val;
+    if(u.type==="global")globalMult*=u.val;
+  }
+  for(let i=0;i<buildings.length;i++){
+    total+=buildings[i].baseCps*buildings[i].owned*mults[i];
+  }
+  state.cps=total*globalMult*state.prestigeMult;
+}
+
+function recalcClick(){
+  let p=1;
+  for(const u of upgrades){if(u.bought&&u.type==="click")p+=u.val;}
+  state.clickPower=p;
+}
+
+function clickCookie(e){
+  const gain=state.clickPower*state.prestigeMult;
+  state.cookies+=gain;state.totalBaked+=gain;state.clicks++;
+  // float
+  const el=document.createElement("div");
+  el.className="click-float";
+  el.textContent="+"+fmt(gain);
+  el.style.left=(e.clientX-20)+"px";
+  el.style.top=(e.clientY-20)+"px";
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),800);
+  render();
+}
+
+function buyBuilding(i){
+  const b=buildings[i];const c=cost(b);
+  if(state.cookies<c)return;
+  state.cookies-=c;b.owned++;
+  recalcCps();render();
+}
+
+function buyUpgrade(i){
+  const u=upgrades[i];
+  if(u.bought||state.cookies<u.cost)return;
+  state.cookies-=u.cost;u.bought=true;
+  if(u.type==="click")recalcClick();
+  recalcCps();render();
+}
+
+function calcPrestigeChips(){return Math.floor(Math.pow(state.totalBaked/1e6,.5));}
+
+function doPrestige(){
+  const chips=calcPrestigeChips()-state.prestigeChips;
+  if(chips<=0)return;
+  state.prestigeChips+=chips;
+  state.prestigeMult=1+state.prestigeChips*0.1;
+  state.cookies=0;state.totalBaked=0;state.clicks=0;state.clickPower=1;
+  for(const b of buildings)b.owned=0;
+  for(const u of upgrades)u.bought=false;
+  recalcCps();recalcClick();render();
+  showMilestone("Prestiged! x"+state.prestigeMult.toFixed(1)+" multiplier");
+}
+
+function showMilestone(text){
+  const el=document.createElement("div");el.className="milestone";el.textContent=text;
+  document.body.appendChild(el);setTimeout(()=>el.remove(),2500);
+}
+
+function checkMilestones(){
+  for(const t of milestoneThresholds){
+    if(state.totalBaked>=t&&!state.milestones.has(t)){
+      state.milestones.add(t);
+      showMilestone("🎉 "+fmt(t)+" cookies baked!");
+    }
+  }
+}
+
+function render(){
+  document.getElementById("count").textContent=fmt(state.cookies)+" cookies";
+  document.getElementById("cps").textContent="per second: "+fmt(state.cps);
+  document.getElementById("stat-total").textContent="Total: "+fmt(state.totalBaked);
+  document.getElementById("stat-clicks").textContent="Clicks: "+state.clicks;
+  document.getElementById("stat-prestige").textContent="Prestige: x"+state.prestigeMult.toFixed(1);
+
+  // shop
+  const shop=document.getElementById("shop");
+  shop.innerHTML=buildings.map((b,i)=>{
+    const c=cost(b);const locked=state.cookies<c;
+    return `<div class="shop-item${locked?" locked":""}" onclick="buyBuilding(${i})">
+      <div class="icon">${b.icon}</div>
+      <div class="info"><div class="name">${b.name}</div><div class="desc">${b.desc}</div></div>
+      <div><span class="cost">🍪${fmt(c)}</span><span class="owned">${b.owned?"×"+b.owned:""}</span></div>
+    </div>`;
+  }).join("");
+
+  // upgrades
+  const ug=document.getElementById("upgrades");
+  ug.innerHTML=upgrades.map((u,i)=>{
+    if(u.bought)return `<div class="upgrade bought"><div class="u-icon">${u.icon}</div><div class="u-cost">✓</div></div>`;
+    if(!u.req())return "";
+    const locked=state.cookies<u.cost;
+    return `<div class="upgrade${locked?" locked":""}" onclick="buyUpgrade(${i})" onmouseenter="showTT(event,${i})" onmouseleave="hideTT()">
+      <div class="u-icon">${u.icon}</div><div class="u-cost">🍪${fmt(u.cost)}</div></div>`;
+  }).join("");
+
+  // prestige
+  const chips=calcPrestigeChips()-state.prestigeChips;
+  const pp=document.getElementById("prestige-panel");
+  pp.style.display=state.totalBaked>=1e6?"block":"none";
+  document.getElementById("prestige-btn").textContent="Prestige (+"+(chips>0?chips:0)+" chips)";
+  document.getElementById("prestige-btn").disabled=chips<=0;
+}
+
+function showTT(e,i){
+  const u=upgrades[i];const tt=document.getElementById("tooltip");
+  tt.innerHTML=`<div class="tt-name">${u.name}</div>${u.desc}<br>Cost: 🍪${fmt(u.cost)}`;
+  tt.style.display="block";
+  tt.style.left=Math.min(e.clientX+10,window.innerWidth-240)+"px";
+  tt.style.top=(e.clientY+10)+"px";
+}
+function hideTT(){document.getElementById("tooltip").style.display="none";}
+
+function tick(){
+  if(state.cps>0){
+    const gain=state.cps/30;
+    state.cookies+=gain;state.totalBaked+=gain;
+  }
+  checkMilestones();render();
+}
+
+function save(){localStorage.setItem("cookieSave",JSON.stringify({
+  cookies:state.cookies,totalBaked:state.totalBaked,clicks:state.clicks,
+  prestigeChips:state.prestigeChips,prestigeMult:state.prestigeMult,
+  milestones:[...state.milestones],
+  buildings:buildings.map(b=>b.owned),upgrades:upgrades.map(u=>u.bought)
+}));}
+
+function load(){
+  const d=localStorage.getItem("cookieSave");if(!d)return;
+  try{
+    const s=JSON.parse(d);
+    state.cookies=s.cookies;state.totalBaked=s.totalBaked;state.clicks=s.clicks;
+    state.prestigeChips=s.prestigeChips||0;state.prestigeMult=s.prestigeMult||1;
+    state.milestones=new Set(s.milestones||[]);
+    s.buildings.forEach((n,i)=>{if(buildings[i])buildings[i].owned=n;});
+    s.upgrades.forEach((b,i)=>{if(upgrades[i])upgrades[i].bought=b;});
+    recalcClick();recalcCps();
+  }catch(e){}
+}
+
+function startGame(){
+  document.getElementById("title-screen").style.display="none";
+  document.getElementById("game").style.display="block";
+  load();render();
+  setInterval(tick,1000/30);
+  setInterval(save,5000);
+}
+</script>
+</body>
+</html>
