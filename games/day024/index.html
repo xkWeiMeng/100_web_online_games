@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Color Flood Fill Puzzle</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f0f1a;color:#e0e0e0;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden}
+#app{text-align:center;width:100%;max-width:520px;padding:12px}
+h1{font-size:1.6rem;margin-bottom:4px;background:linear-gradient(135deg,#ff6b6b,#ffd93d,#6bcb77,#4d96ff,#9b59b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.subtitle{font-size:.85rem;color:#888;margin-bottom:12px}
+#board{display:inline-grid;gap:2px;border-radius:10px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+#board .cell{width:100%;aspect-ratio:1;transition:background .15s}
+.controls{display:flex;justify-content:center;gap:10px;margin:16px 0 8px;flex-wrap:wrap}
+.color-btn{width:48px;height:48px;border:3px solid transparent;border-radius:12px;cursor:pointer;transition:transform .15s,border-color .15s,box-shadow .15s}
+.color-btn:hover,.color-btn:focus{transform:scale(1.15);box-shadow:0 0 12px rgba(255,255,255,.3)}
+.color-btn.active{border-color:#fff;transform:scale(1.2)}
+.stats{display:flex;justify-content:center;gap:24px;font-size:.95rem;margin:8px 0}
+.stats span{background:rgba(255,255,255,.07);padding:6px 16px;border-radius:8px}
+.stats b{color:#ffd93d}
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;justify-content:center;align-items:center;z-index:10;backdrop-filter:blur(6px)}
+.modal{background:#1a1a2e;border-radius:16px;padding:32px 28px;max-width:400px;width:90%;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.modal h2{font-size:1.5rem;margin-bottom:12px}
+.modal p{color:#aaa;font-size:.9rem;line-height:1.5;margin-bottom:16px}
+.modal ul{text-align:left;color:#bbb;font-size:.85rem;line-height:1.7;margin:0 0 20px 20px}
+.btn{background:linear-gradient(135deg,#4d96ff,#9b59b6);border:none;color:#fff;padding:12px 32px;border-radius:10px;font-size:1rem;cursor:pointer;transition:opacity .2s}
+.btn:hover{opacity:.85}
+select{background:#262640;color:#e0e0e0;border:1px solid #444;padding:8px 12px;border-radius:8px;font-size:.9rem;margin-bottom:12px}
+.progress-bar{height:6px;background:rgba(255,255,255,.08);border-radius:3px;margin:8px 0;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;transition:width .3s;background:linear-gradient(90deg,#6bcb77,#ffd93d,#ff6b6b)}
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>Color Flood Fill</h1>
+  <p class="subtitle">Fill the entire board with one color</p>
+  <div class="stats">
+    <span>Moves: <b id="moves">0</b> / <b id="maxMoves">25</b></span>
+    <span>Filled: <b id="pct">0</b>%</span>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" id="prog" style="width:0%"></div></div>
+  <div id="board"></div>
+  <div class="controls" id="controls"></div>
+</div>
+<div id="overlay">
+  <div class="modal" id="modal">
+    <h2>🎨 Color Flood Fill</h2>
+    <p>Flood the entire board with a single color before you run out of moves!</p>
+    <ul>
+      <li>The flood starts from the <b>top-left</b> corner</li>
+      <li>Pick a color to change the flooded region</li>
+      <li>Connected cells of the new color join your region</li>
+      <li>Fill 100% of the board to win!</li>
+    </ul>
+    <label>Board size: <select id="sizeSelect">
+      <option value="10">10×10 (Easy)</option>
+      <option value="14" selected>14×14 (Medium)</option>
+      <option value="18">18×18 (Hard)</option>
+    </select></label><br>
+    <button class="btn" onclick="startGame()">Play</button>
+  </div>
+</div>
+<script>
+const COLORS=['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#9b59b6','#ff9f43'];
+const MAX_MOVES_MAP={10:22,14:28,18:34};
+let grid,size,moves,maxMoves,floodSet;
+
+function startGame(){
+  size=+document.getElementById('sizeSelect').value;
+  maxMoves=MAX_MOVES_MAP[size];
+  moves=0;
+  document.getElementById('maxMoves').textContent=maxMoves;
+  document.getElementById('moves').textContent=0;
+  document.getElementById('overlay').style.display='none';
+  buildBoard();
+  buildControls();
+  floodSet=new Set();
+  floodSet.add(0);
+  expandFlood(grid[0]);
+  render();
+}
+
+function buildBoard(){
+  const b=document.getElementById('board');
+  const cellSize=Math.min((window.innerWidth-40)/size,32);
+  b.style.gridTemplateColumns=`repeat(${size},${cellSize}px)`;
+  b.innerHTML='';
+  grid=[];
+  for(let i=0;i<size*size;i++){
+    const c=COLORS[Math.random()*6|0];
+    grid.push(c);
+    const d=document.createElement('div');
+    d.className='cell';
+    b.appendChild(d);
+  }
+}
+
+function buildControls(){
+  const c=document.getElementById('controls');
+  c.innerHTML='';
+  COLORS.forEach(col=>{
+    const b=document.createElement('button');
+    b.className='color-btn';
+    b.style.background=col;
+    b.onclick=()=>doMove(col);
+    c.appendChild(b);
+  });
+}
+
+function idx(r,c){return r*size+c}
+function rc(i){return[i/size|0,i%size]}
+
+function expandFlood(color){
+  const q=[...floodSet];
+  while(q.length){
+    const i=q.pop();
+    const[r,c]=rc(i);
+    [[r-1,c],[r+1,c],[r,c-1],[r,c+1]].forEach(([nr,nc])=>{
+      if(nr>=0&&nr<size&&nc>=0&&nc<size){
+        const ni=idx(nr,nc);
+        if(!floodSet.has(ni)&&grid[ni]===color){
+          floodSet.add(ni);
+          q.push(ni);
+        }
+      }
+    });
+  }
+}
+
+function doMove(color){
+  if(color===grid[floodSet.values().next().value])return;
+  moves++;
+  document.getElementById('moves').textContent=moves;
+  floodSet.forEach(i=>grid[i]=color);
+  expandFlood(color);
+  render();
+  const pct=floodSet.size/(size*size)*100;
+  if(pct>=100)setTimeout(()=>endScreen(true),300);
+  else if(moves>=maxMoves)setTimeout(()=>endScreen(false),300);
+}
+
+function render(){
+  const cells=document.getElementById('board').children;
+  for(let i=0;i<grid.length;i++)cells[i].style.background=grid[i];
+  const pct=(floodSet.size/(size*size)*100)|0;
+  document.getElementById('pct').textContent=pct;
+  document.getElementById('prog').style.width=pct+'%';
+  // highlight active color
+  const cur=grid[0];
+  document.querySelectorAll('.color-btn').forEach((b,i)=>{
+    b.classList.toggle('active',COLORS[i]===cur);
+  });
+}
+
+function endScreen(won){
+  const m=document.getElementById('modal');
+  m.innerHTML=won
+    ?`<h2>🎉 You Win!</h2><p>Board filled in <b>${moves}</b> moves (limit ${maxMoves}).</p><button class="btn" onclick="showStart()">Play Again</button>`
+    :`<h2>😔 Out of Moves</h2><p>You filled <b>${(floodSet.size/(size*size)*100)|0}%</b> of the board.</p><button class="btn" onclick="showStart()">Try Again</button>`;
+  document.getElementById('overlay').style.display='flex';
+}
+
+function showStart(){
+  const m=document.getElementById('modal');
+  m.innerHTML=`<h2>🎨 Color Flood Fill</h2><p>Flood the entire board with a single color before you run out of moves!</p><ul><li>The flood starts from the <b>top-left</b> corner</li><li>Pick a color to change the flooded region</li><li>Connected cells of the new color join your region</li><li>Fill 100% of the board to win!</li></ul><label>Board size: <select id="sizeSelect"><option value="10">10×10 (Easy)</option><option value="14" selected>14×14 (Medium)</option><option value="18">18×18 (Hard)</option></select></label><br><button class="btn" onclick="startGame()">Play</button>`;
+  document.getElementById('overlay').style.display='flex';
+}
+</script>
+</body>
+</html>
