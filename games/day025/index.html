@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Rhythm Tap</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;color:#fff;font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden;height:100vh;width:100vw;touch-action:none;user-select:none}
+#app{width:100%;height:100%;position:relative}
+
+/* Title Screen */
+#title{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10;background:linear-gradient(135deg,#0a0a1a 0%,#1a1040 50%,#0a0a1a 100%)}
+#title h1{font-size:3.5rem;background:linear-gradient(90deg,#ff6fd8,#3813c2,#00fff2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:.5rem;text-align:center}
+#title .sub{color:#8888aa;font-size:1rem;margin-bottom:2rem}
+#title .instructions{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:1.2rem 1.5rem;max-width:380px;text-align:center;margin-bottom:2rem;line-height:1.6;color:#aab}
+#title .instructions b{color:#ff6fd8}
+.btn{background:linear-gradient(135deg,#ff6fd8,#3813c2);border:none;color:#fff;padding:.9rem 2.5rem;font-size:1.2rem;border-radius:50px;cursor:pointer;transition:transform .15s,box-shadow .15s}
+.btn:hover,.btn:active{transform:scale(1.05);box-shadow:0 0 30px rgba(255,111,216,.4)}
+#songSelect{display:flex;flex-direction:column;gap:.6rem;margin-bottom:1.5rem;width:320px}
+.song-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#ddd;padding:.7rem 1rem;border-radius:10px;cursor:pointer;font-size:.95rem;transition:all .15s;text-align:left}
+.song-btn:hover,.song-btn.active{border-color:#ff6fd8;background:rgba(255,111,216,.1);color:#fff}
+.song-btn .bpm{float:right;color:#888;font-size:.85rem}
+
+/* Game Screen */
+#game{position:absolute;inset:0;display:none;flex-direction:column}
+#hud{display:flex;justify-content:space-between;align-items:center;padding:.8rem 1.2rem;background:rgba(0,0,0,.5);z-index:5}
+#hud .score{font-size:1.4rem;font-weight:700}
+#hud .combo{font-size:1rem;color:#ff6fd8}
+#hud .streak{font-size:.85rem;color:#888}
+#multiplier{font-size:.85rem;color:#00fff2}
+#progressBar{height:3px;background:rgba(255,255,255,.1)}
+#progressFill{height:100%;width:0;background:linear-gradient(90deg,#ff6fd8,#00fff2);transition:width .3s}
+
+#lanes{flex:1;position:relative;display:flex;overflow:hidden}
+.lane{flex:1;position:relative;border-right:1px solid rgba(255,255,255,.04)}
+.lane:last-child{border-right:none}
+
+.hit-zone{position:absolute;bottom:80px;left:0;right:0;height:4px;z-index:3}
+.hit-zone-glow{position:absolute;bottom:60px;left:0;right:0;height:48px;background:linear-gradient(transparent,rgba(255,111,216,.08));z-index:2;pointer-events:none}
+.lane-label{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);font-size:1.4rem;opacity:.3;z-index:3;pointer-events:none}
+
+.note{position:absolute;width:60%;left:20%;height:18px;border-radius:9px;z-index:4;pointer-events:none;transition:none}
+.note.n0{background:linear-gradient(135deg,#ff6fd8,#ff3faa);box-shadow:0 0 12px rgba(255,111,216,.5)}
+.note.n1{background:linear-gradient(135deg,#3813c2,#6c3fff);box-shadow:0 0 12px rgba(108,63,255,.5)}
+.note.n2{background:linear-gradient(135deg,#00fff2,#00b8d4);box-shadow:0 0 12px rgba(0,255,242,.5)}
+.note.n3{background:linear-gradient(135deg,#ffe066,#ffa726);box-shadow:0 0 12px rgba(255,167,38,.5)}
+
+.tap-area{position:absolute;bottom:0;left:0;right:0;height:100px;z-index:6;cursor:pointer}
+.tap-flash{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);width:50px;height:50px;border-radius:50%;pointer-events:none;z-index:5;opacity:0}
+
+#feedback{position:absolute;bottom:140px;left:50%;transform:translateX(-50%);font-size:1.6rem;font-weight:700;z-index:10;pointer-events:none;opacity:0;transition:opacity .15s}
+
+/* Results */
+#results{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:10;background:rgba(10,10,26,.95)}
+#results h2{font-size:2.5rem;margin-bottom:.5rem;background:linear-gradient(90deg,#ff6fd8,#00fff2);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#results .stats{margin:1.5rem 0;text-align:center;line-height:2}
+#results .grade{font-size:5rem;margin:.5rem 0}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- TITLE -->
+  <div id="title">
+    <h1>Rhythm Tap</h1>
+    <p class="sub">Feel the Beat</p>
+    <div class="instructions">
+      Notes fall down 4 lanes. <b>Tap</b> or press <b>D F J K</b> when they reach the line.<br>
+      Perfect timing = more points. Build combos for multipliers!
+    </div>
+    <div id="songSelect"></div>
+    <button class="btn" id="startBtn">Play</button>
+  </div>
+
+  <!-- GAME -->
+  <div id="game">
+    <div id="hud">
+      <div><span class="score" id="scoreVal">0</span><br><span id="multiplier">x1</span></div>
+      <div style="text-align:center"><span class="combo" id="comboVal"></span><br><span class="streak" id="streakVal"></span></div>
+      <div style="text-align:right"><span id="songTitle"></span></div>
+    </div>
+    <div id="progressBar"><div id="progressFill"></div></div>
+    <div id="lanes"></div>
+    <div id="feedback"></div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results">
+    <h2>Song Complete!</h2>
+    <div class="grade" id="grade"></div>
+    <div class="stats" id="statsBody"></div>
+    <button class="btn" id="restartBtn">Back to Menu</button>
+  </div>
+</div>
+
+<script>
+const SONGS = [
+  {name:"Neon Pulse", bpm:120, duration:45, density:.55},
+  {name:"Digital Storm", bpm:140, duration:40, density:.65},
+  {name:"Hyper Drive", bpm:160, duration:35, density:.75},
+  {name:"Chaos Mode", bpm:180, duration:30, density:.85},
+];
+
+const LANE_KEYS = ['d','f','j','k'];
+const LANE_COLORS = ['n0','n1','n2','n3'];
+const NUM_LANES = 4;
+const HIT_Y = 80; // px from bottom
+const NOTE_SPEED_BASE = 320; // px/s
+const PERFECT_WINDOW = 40;
+const GREAT_WINDOW = 70;
+const OK_WINDOW = 110;
+
+let selectedSong = 0;
+let score = 0, combo = 0, maxCombo = 0;
+let perfects = 0, greats = 0, oks = 0, misses = 0;
+let notes = [], activeNotes = [], spawnIndex = 0;
+let running = false, startTime = 0, audioCtx = null;
+let animId = null;
+let laneEls = [], lanesContainer;
+
+// --- Audio synthesis ---
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playTick(freq = 600, dur = 0.06, vol = 0.12) {
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = 'triangle';
+  o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  o.connect(g).connect(audioCtx.destination);
+  o.start(); o.stop(audioCtx.currentTime + dur);
+}
+
+function playBeat(time) {
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = 'sine';
+  o.frequency.value = 80;
+  g.gain.setValueAtTime(0.08, time);
+  g.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+  o.connect(g).connect(audioCtx.destination);
+  o.start(time); o.stop(time + 0.1);
+}
+
+// metronome
+let nextBeatTime = 0;
+function scheduleBeat() {
+  if (!running || !audioCtx) return;
+  const song = SONGS[selectedSong];
+  const interval = 60 / song.bpm;
+  while (nextBeatTime < audioCtx.currentTime + 0.1) {
+    playBeat(nextBeatTime);
+    nextBeatTime += interval;
+  }
+}
+
+// --- Note generation ---
+function generateNotes(song) {
+  const interval = 60 / song.bpm;
+  const halfBeat = interval / 2;
+  const totalBeats = Math.floor(song.duration / interval);
+  const arr = [];
+  let t = 2; // 2s lead-in
+  for (let i = 0; i < totalBeats; i++) {
+    if (Math.random() < song.density) {
+      const lane = Math.random() * NUM_LANES | 0;
+      arr.push({time: t, lane});
+      // occasional double
+      if (Math.random() < 0.2) {
+        let l2 = (lane + 1 + (Math.random()*2|0)) % NUM_LANES;
+        arr.push({time: t, lane: l2});
+      }
+    }
+    // off-beat
+    if (Math.random() < song.density * 0.4) {
+      arr.push({time: t + halfBeat, lane: Math.random() * NUM_LANES | 0});
+    }
+    t += interval;
+  }
+  arr.sort((a,b) => a.time - b.time);
+  return arr;
+}
+
+// --- UI setup ---
+function buildSongSelect() {
+  const c = document.getElementById('songSelect');
+  SONGS.forEach((s, i) => {
+    const d = document.createElement('div');
+    d.className = 'song-btn' + (i === 0 ? ' active' : '');
+    d.innerHTML = `${s.name} <span class="bpm">${s.bpm} BPM</span>`;
+    d.onclick = () => {
+      selectedSong = i;
+      c.querySelectorAll('.song-btn').forEach((b,j) => b.classList.toggle('active', j===i));
+    };
+    c.appendChild(d);
+  });
+}
+
+function buildLanes() {
+  lanesContainer = document.getElementById('lanes');
+  lanesContainer.innerHTML = '';
+  laneEls = [];
+  for (let i = 0; i < NUM_LANES; i++) {
+    const lane = document.createElement('div');
+    lane.className = 'lane';
+    lane.innerHTML = `
+      <div class="hit-zone" style="background:var(--c)"></div>
+      <div class="hit-zone-glow"></div>
+      <div class="lane-label">${LANE_KEYS[i].toUpperCase()}</div>
+      <div class="tap-area" data-lane="${i}"></div>
+      <div class="tap-flash"></div>`;
+    const colors = ['#ff6fd8','#6c3fff','#00fff2','#ffa726'];
+    lane.querySelector('.hit-zone').style.background = colors[i];
+    lanesContainer.appendChild(lane);
+    laneEls.push(lane);
+  }
+}
+
+// --- Game loop ---
+function startGame() {
+  initAudio();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const song = SONGS[selectedSong];
+  document.getElementById('title').style.display = 'none';
+  document.getElementById('results').style.display = 'none';
+  const g = document.getElementById('game');
+  g.style.display = 'flex';
+  document.getElementById('songTitle').textContent = song.name;
+
+  buildLanes();
+  notes = generateNotes(song);
+  activeNotes = [];
+  spawnIndex = 0;
+  score = 0; combo = 0; maxCombo = 0;
+  perfects = 0; greats = 0; oks = 0; misses = 0;
+  updateHUD();
+
+  const noteSpeed = NOTE_SPEED_BASE + song.bpm * 0.5;
+  const travelTime = (lanesContainer.clientHeight - HIT_Y) / noteSpeed;
+
+  startTime = performance.now();
+  nextBeatTime = audioCtx.currentTime + 2;
+  running = true;
+
+  function frame(now) {
+    if (!running) return;
+    const elapsed = (now - startTime) / 1000;
+    const totalTime = song.duration + 4;
+
+    // progress
+    document.getElementById('progressFill').style.width = Math.min(100, elapsed / totalTime * 100) + '%';
+
+    scheduleBeat();
+
+    // spawn notes
+    while (spawnIndex < notes.length && notes[spawnIndex].time - travelTime <= elapsed) {
+      spawnNote(notes[spawnIndex], noteSpeed);
+      spawnIndex++;
+    }
+
+    // move notes
+    const containerH = lanesContainer.clientHeight;
+    for (let i = activeNotes.length - 1; i >= 0; i--) {
+      const n = activeNotes[i];
+      const age = (now - n.spawnedAt) / 1000;
+      const y = age * noteSpeed;
+      n.el.style.top = y + 'px';
+
+      // missed
+      if (y > containerH - HIT_Y + OK_WINDOW + 30) {
+        n.el.remove();
+        activeNotes.splice(i, 1);
+        combo = 0;
+        misses++;
+        showFeedback('MISS', '#ff4444');
+        updateHUD();
+      }
+    }
+
+    // end
+    if (elapsed > totalTime && activeNotes.length === 0) {
+      endGame();
+      return;
+    }
+    animId = requestAnimationFrame(frame);
+  }
+  animId = requestAnimationFrame(frame);
+}
+
+function spawnNote(noteData, speed) {
+  const el = document.createElement('div');
+  el.className = 'note ' + LANE_COLORS[noteData.lane];
+  laneEls[noteData.lane].appendChild(el);
+  activeNotes.push({
+    el, lane: noteData.lane, time: noteData.time,
+    spawnedAt: performance.now(), speed
+  });
+}
+
+function tapLane(lane) {
+  const containerH = lanesContainer.clientHeight;
+  const targetY = containerH - HIT_Y;
+  let best = null, bestDist = Infinity;
+  for (const n of activeNotes) {
+    if (n.lane !== lane) continue;
+    const age = (performance.now() - n.spawnedAt) / 1000;
+    const y = age * n.speed;
+    const dist = Math.abs(y - targetY);
+    if (dist < bestDist) { bestDist = dist; best = n; }
+  }
+
+  // flash
+  const flash = laneEls[lane].querySelector('.tap-flash');
+  const colors = ['rgba(255,111,216,.5)','rgba(108,63,255,.5)','rgba(0,255,242,.5)','rgba(255,167,38,.5)'];
+  flash.style.background = colors[lane];
+  flash.style.opacity = '1';
+  flash.style.transition = 'none';
+  void flash.offsetWidth;
+  flash.style.transition = 'opacity .25s';
+  flash.style.opacity = '0';
+
+  if (!best || bestDist > OK_WINDOW) return;
+
+  let pts, label, color;
+  if (bestDist <= PERFECT_WINDOW) { pts = 300; label = 'PERFECT'; color = '#00fff2'; perfects++; playTick(800, .08, .15); }
+  else if (bestDist <= GREAT_WINDOW) { pts = 200; label = 'GREAT'; color = '#ff6fd8'; greats++; playTick(600, .06, .12); }
+  else { pts = 100; label = 'OK'; color = '#ffa726'; oks++; playTick(400, .05, .08); }
+
+  combo++;
+  if (combo > maxCombo) maxCombo = combo;
+  const mult = combo >= 30 ? 4 : combo >= 20 ? 3 : combo >= 10 ? 2 : 1;
+  score += pts * mult;
+
+  best.el.remove();
+  activeNotes.splice(activeNotes.indexOf(best), 1);
+  showFeedback(label, color);
+  updateHUD();
+}
+
+function showFeedback(text, color) {
+  const fb = document.getElementById('feedback');
+  fb.textContent = text;
+  fb.style.color = color;
+  fb.style.opacity = '1';
+  fb.style.transition = 'none';
+  void fb.offsetWidth;
+  fb.style.transition = 'opacity .4s';
+  fb.style.opacity = '0';
+}
+
+function updateHUD() {
+  document.getElementById('scoreVal').textContent = score;
+  const mult = combo >= 30 ? 4 : combo >= 20 ? 3 : combo >= 10 ? 2 : 1;
+  document.getElementById('multiplier').textContent = 'x' + mult;
+  document.getElementById('comboVal').textContent = combo > 1 ? combo + ' COMBO' : '';
+  document.getElementById('streakVal').textContent = maxCombo > 1 ? 'Best: ' + maxCombo : '';
+}
+
+function endGame() {
+  running = false;
+  if (animId) cancelAnimationFrame(animId);
+  document.getElementById('game').style.display = 'none';
+  const total = perfects + greats + oks + misses;
+  const pct = total ? ((perfects + greats + oks) / total * 100) : 0;
+  let grade = pct >= 95 ? 'S' : pct >= 85 ? 'A' : pct >= 70 ? 'B' : pct >= 50 ? 'C' : 'D';
+  document.getElementById('grade').textContent = grade;
+  document.getElementById('statsBody').innerHTML =
+    `Score: <b>${score}</b><br>
+     Max Combo: <b>${maxCombo}</b><br>
+     Perfect: ${perfects} | Great: ${greats} | OK: ${oks} | Miss: ${misses}<br>
+     Accuracy: ${pct.toFixed(1)}%`;
+  document.getElementById('results').style.display = 'flex';
+}
+
+// --- Input ---
+document.addEventListener('keydown', e => {
+  const idx = LANE_KEYS.indexOf(e.key.toLowerCase());
+  if (idx >= 0 && running) { e.preventDefault(); tapLane(idx); }
+});
+
+document.getElementById('lanes')?.addEventListener('pointerdown', e => {
+  const lane = e.target.closest('.tap-area');
+  if (lane && running) tapLane(+lane.dataset.lane);
+});
+// delegate since lanes rebuilt
+document.getElementById('app').addEventListener('pointerdown', e => {
+  const ta = e.target.closest('.tap-area');
+  if (ta && running) tapLane(+ta.dataset.lane);
+});
+
+document.getElementById('startBtn').onclick = startGame;
+document.getElementById('restartBtn').onclick = () => {
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('title').style.display = 'flex';
+};
+
+buildSongSelect();
+</script>
+</body>
+</html>
