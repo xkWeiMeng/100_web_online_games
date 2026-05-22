@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Math Quiz Speed Challenge</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f0f23;color:#e0e0e0;min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#game{width:100%;max-width:480px;padding:20px;text-align:center;position:relative}
+h1{font-size:2rem;background:linear-gradient(135deg,#f857a6,#ff5858,#ffc371);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.subtitle{color:#888;font-size:.9rem;margin-bottom:24px}
+.btn{background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:#fff;padding:14px 40px;font-size:1.1rem;border-radius:12px;cursor:pointer;transition:transform .15s,box-shadow .15s;font-weight:600}
+.btn:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(102,126,234,.4)}
+.btn:active{transform:scale(.97)}
+.btn.small{padding:10px 24px;font-size:.9rem}
+
+/* HUD */
+#hud{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.hud-item{background:#1a1a2e;padding:8px 16px;border-radius:10px;font-size:.85rem}
+.hud-item span{font-weight:700;color:#ffc371}
+
+/* Timer bar */
+#timer-bar-wrap{height:8px;background:#1a1a2e;border-radius:4px;margin-bottom:24px;overflow:hidden}
+#timer-bar{height:100%;width:100%;background:linear-gradient(90deg,#ff5858,#ffc371);border-radius:4px;transition:width .1s linear}
+
+/* Question */
+#question{font-size:2.4rem;font-weight:700;margin-bottom:28px;min-height:60px}
+
+/* Answer grid */
+#answers{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.answer-btn{background:#1a1a2e;border:2px solid #2a2a4a;color:#e0e0e0;padding:16px;font-size:1.3rem;border-radius:12px;cursor:pointer;transition:all .15s;font-weight:600}
+.answer-btn:hover{border-color:#667eea;background:#22223a}
+.answer-btn.correct{background:#1db954;border-color:#1db954;color:#fff}
+.answer-btn.wrong{background:#e74c3c;border-color:#e74c3c;color:#fff}
+
+/* Streak */
+#streak{font-size:.9rem;color:#888;min-height:24px;margin-bottom:8px}
+#streak span{color:#ffc371;font-weight:700}
+
+/* Combo flash */
+.combo-flash{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);font-size:2rem;font-weight:800;pointer-events:none;animation:comboAnim .7s ease-out forwards;color:#ffc371}
+@keyframes comboAnim{0%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-80%) scale(1.5)}}
+
+/* Results */
+#results h2{font-size:1.6rem;margin-bottom:16px;color:#ffc371}
+#results .stat{background:#1a1a2e;padding:12px 20px;border-radius:10px;margin-bottom:8px;display:flex;justify-content:space-between;font-size:1rem}
+#results .stat span:last-child{font-weight:700;color:#667eea}
+#results .grade{font-size:3rem;margin:16px 0;font-weight:800}
+
+/* Difficulty */
+.diff-btns{display:flex;gap:10px;justify-content:center;margin:16px 0 24px}
+.diff-btn{padding:10px 20px;border-radius:10px;border:2px solid #2a2a4a;background:#1a1a2e;color:#e0e0e0;cursor:pointer;font-size:.9rem;font-weight:600;transition:all .15s}
+.diff-btn.active{border-color:#667eea;background:#22223a;color:#fff}
+.diff-btn:hover{border-color:#667eea}
+
+.instructions{background:#1a1a2e;border-radius:12px;padding:16px;margin-bottom:20px;text-align:left;font-size:.85rem;line-height:1.6;color:#aaa}
+.instructions li{margin-left:16px;margin-bottom:4px}
+
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div id="game">
+  <!-- TITLE SCREEN -->
+  <div id="title-screen">
+    <h1>Math Quiz Speed Challenge</h1>
+    <p class="subtitle">How fast is your mental math?</p>
+    <div class="instructions">
+      <ul>
+        <li>Solve math problems before time runs out</li>
+        <li>Each correct answer earns points + bonus time</li>
+        <li>Build streaks for combo multipliers</li>
+        <li>Wrong answers lose time — be quick AND accurate</li>
+        <li>Survive 20 questions to finish the round</li>
+      </ul>
+    </div>
+    <div class="diff-btns">
+      <button class="diff-btn active" data-d="easy">Easy</button>
+      <button class="diff-btn" data-d="medium">Medium</button>
+      <button class="diff-btn" data-d="hard">Hard</button>
+    </div>
+    <button class="btn" id="start-btn">Start Challenge</button>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div id="game-screen" class="hidden">
+    <div id="hud">
+      <div class="hud-item">Q <span id="q-num">1</span>/20</div>
+      <div class="hud-item">Score: <span id="score">0</span></div>
+      <div class="hud-item">Streak: <span id="hud-streak">0</span></div>
+    </div>
+    <div id="timer-bar-wrap"><div id="timer-bar"></div></div>
+    <div id="question"></div>
+    <div id="answers"></div>
+    <div id="streak"></div>
+  </div>
+
+  <!-- RESULTS SCREEN -->
+  <div id="results" class="hidden"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+let difficulty = 'easy';
+let score, streak, bestStreak, qIndex, correct, total, times;
+let timeLeft, timerMax, timerInterval;
+const TOTAL_Q = 20;
+
+// Difficulty settings
+const DIFF = {
+  easy:   { ops: ['+','-'], range: [1,20], time: 10, bonus: 1.5, penalty: 2 },
+  medium: { ops: ['+','-','×'], range: [2,50], time: 8, bonus: 1.2, penalty: 2.5 },
+  hard:   { ops: ['+','-','×','÷'], range: [3,99], time: 6, bonus: 1, penalty: 3 }
+};
+
+// Difficulty buttons
+$$('.diff-btn').forEach(b => b.addEventListener('click', () => {
+  $$('.diff-btn').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  difficulty = b.dataset.d;
+}));
+
+$('#start-btn').addEventListener('click', startGame);
+
+function startGame() {
+  score = 0; streak = 0; bestStreak = 0; qIndex = 0; correct = 0; times = [];
+  total = TOTAL_Q;
+  const d = DIFF[difficulty];
+  timerMax = d.time;
+  timeLeft = timerMax;
+  $('#title-screen').classList.add('hidden');
+  $('#results').classList.add('hidden');
+  $('#game-screen').classList.remove('hidden');
+  nextQuestion();
+}
+
+function randInt(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
+
+function generateQuestion() {
+  const d = DIFF[difficulty];
+  const op = d.ops[randInt(0, d.ops.length - 1)];
+  let a, b, answer;
+  const [lo, hi] = d.range;
+
+  switch (op) {
+    case '+': a = randInt(lo, hi); b = randInt(lo, hi); answer = a + b; break;
+    case '-': a = randInt(lo, hi); b = randInt(lo, a); answer = a - b; break;
+    case '×': a = randInt(2, Math.min(hi, 12)); b = randInt(2, Math.min(hi, 12)); answer = a * b; break;
+    case '÷':
+      b = randInt(2, 12); answer = randInt(2, 12); a = b * answer; break;
+  }
+  return { text: `${a} ${op} ${b}`, answer };
+}
+
+function generateChoices(answer) {
+  const choices = new Set([answer]);
+  while (choices.size < 4) {
+    let off = randInt(1, Math.max(5, Math.abs(answer) > 10 ? Math.floor(Math.abs(answer) * 0.3) : 5));
+    if (Math.random() < 0.5) off = -off;
+    const v = answer + off;
+    if (v !== answer) choices.add(v);
+  }
+  return [...choices].sort(() => Math.random() - 0.5);
+}
+
+function nextQuestion() {
+  if (qIndex >= total) return endGame();
+  const q = generateQuestion();
+  const choices = generateChoices(q.answer);
+  qIndex++;
+  $('#q-num').textContent = qIndex;
+  $('#score').textContent = score;
+  $('#hud-streak').textContent = streak;
+  $('#question').textContent = q.text + ' = ?';
+  const ans = $('#answers');
+  ans.innerHTML = '';
+  choices.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'answer-btn';
+    btn.textContent = c;
+    btn.addEventListener('click', () => handleAnswer(c, q.answer, btn));
+    ans.appendChild(btn);
+  });
+  startTimer();
+}
+
+function startTimer() {
+  timeLeft = timerMax;
+  updateTimerBar();
+  clearInterval(timerInterval);
+  const start = performance.now();
+  timerInterval = setInterval(() => {
+    const elapsed = (performance.now() - start) / 1000;
+    timeLeft = Math.max(0, timerMax - elapsed);
+    updateTimerBar();
+    if (timeLeft <= 0) { clearInterval(timerInterval); handleAnswer(null, null, null); }
+  }, 50);
+}
+
+function updateTimerBar() {
+  const pct = (timeLeft / timerMax) * 100;
+  const bar = $('#timer-bar');
+  bar.style.width = pct + '%';
+  if (pct < 30) bar.style.background = '#e74c3c';
+  else if (pct < 60) bar.style.background = 'linear-gradient(90deg,#ff5858,#ffc371)';
+  else bar.style.background = 'linear-gradient(90deg,#1db954,#a8e063)';
+}
+
+function handleAnswer(chosen, answer, btn) {
+  clearInterval(timerInterval);
+  $$('.answer-btn').forEach(b => b.style.pointerEvents = 'none');
+
+  const isCorrect = chosen === answer;
+  const d = DIFF[difficulty];
+
+  if (isCorrect) {
+    btn.classList.add('correct');
+    streak++;
+    if (streak > bestStreak) bestStreak = streak;
+    const mult = streak >= 5 ? 3 : streak >= 3 ? 2 : 1;
+    const pts = 100 * mult;
+    score += pts;
+    timerMax = Math.min(timerMax + d.bonus, d.time * 1.5);
+    if (mult > 1) showCombo(mult);
+    correct++;
+    times.push(+(timerMax - timeLeft).toFixed(2));
+    $('#streak').innerHTML = streak >= 2 ? `Streak: <span>${streak}</span> (x${mult})` : '';
+  } else {
+    if (btn) btn.classList.add('wrong');
+    // highlight correct
+    $$('.answer-btn').forEach(b => { if (+b.textContent === answer) b.classList.add('correct'); });
+    streak = 0;
+    timerMax = Math.max(d.time * 0.6, timerMax - d.penalty);
+    $('#streak').textContent = '';
+  }
+
+  $('#score').textContent = score;
+  $('#hud-streak').textContent = streak;
+  setTimeout(nextQuestion, 600);
+}
+
+function showCombo(mult) {
+  const el = document.createElement('div');
+  el.className = 'combo-flash';
+  el.textContent = `x${mult} COMBO!`;
+  $('#game').appendChild(el);
+  setTimeout(() => el.remove(), 700);
+}
+
+function endGame() {
+  $('#game-screen').classList.add('hidden');
+  const pct = Math.round((correct / total) * 100);
+  const avgTime = times.length ? (times.reduce((a, b) => a + b, 0) / times.length).toFixed(2) : '—';
+  const grade = pct >= 95 ? 'S' : pct >= 85 ? 'A' : pct >= 70 ? 'B' : pct >= 50 ? 'C' : 'D';
+  const colors = { S: '#ffc371', A: '#1db954', B: '#667eea', C: '#e67e22', D: '#e74c3c' };
+
+  $('#results').innerHTML = `
+    <h2>Challenge Complete!</h2>
+    <div class="grade" style="color:${colors[grade]}">${grade}</div>
+    <div class="stat"><span>Score</span><span>${score}</span></div>
+    <div class="stat"><span>Correct</span><span>${correct} / ${total}</span></div>
+    <div class="stat"><span>Accuracy</span><span>${pct}%</span></div>
+    <div class="stat"><span>Best Streak</span><span>${bestStreak}</span></div>
+    <div class="stat"><span>Avg Time</span><span>${avgTime}s</span></div>
+    <div class="stat"><span>Difficulty</span><span>${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}</span></div>
+    <br>
+    <button class="btn" onclick="location.reload()">Play Again</button>
+  `;
+  $('#results').classList.remove('hidden');
+}
+</script>
+</body>
+</html>
