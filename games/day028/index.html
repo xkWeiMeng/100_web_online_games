@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Asteroids+</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;color:#e0e0ff;touch-action:none;user-select:none}
+canvas{display:block}
+#ui{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+#hud{position:absolute;top:12px;left:12px;right:12px;display:none;justify-content:space-between;font-size:15px}
+#hud>div{background:rgba(10,10,30,.6);padding:6px 14px;border-radius:8px;border:1px solid rgba(100,140,255,.25)}
+#lives span{color:#ff4466}
+#title-screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#0d1030 0%,#050510 100%)}
+#title-screen h1{font-size:clamp(36px,8vw,72px);font-weight:900;letter-spacing:4px;background:linear-gradient(135deg,#6af,#f4f);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+#title-screen h2{font-size:clamp(14px,3vw,22px);color:#8899cc;margin-bottom:32px;font-weight:400}
+.btn{pointer-events:all;cursor:pointer;background:linear-gradient(135deg,#2244aa,#4466dd);border:none;color:#fff;padding:14px 48px;font-size:20px;border-radius:12px;letter-spacing:1px;transition:transform .15s,box-shadow .15s;box-shadow:0 4px 24px rgba(60,100,255,.3)}
+.btn:hover{transform:scale(1.05);box-shadow:0 6px 32px rgba(60,100,255,.5)}
+#instructions{margin-top:28px;text-align:center;font-size:clamp(11px,2.2vw,15px);color:#7788bb;line-height:1.8}
+#instructions kbd{background:rgba(255,255,255,.1);padding:2px 8px;border-radius:4px;font-family:inherit}
+#upgrade-panel{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(5,5,16,.92);pointer-events:all}
+#upgrade-panel h2{font-size:28px;margin-bottom:6px}
+#upgrade-panel .sub{color:#7788bb;margin-bottom:24px;font-size:14px}
+#upgrade-options{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;max-width:600px}
+.upgrade-card{background:linear-gradient(160deg,#151535,#1a1a40);border:1px solid rgba(100,140,255,.2);border-radius:14px;padding:20px 24px;width:170px;cursor:pointer;transition:transform .15s,border-color .15s,box-shadow .15s;text-align:center}
+.upgrade-card:hover{transform:translateY(-4px);border-color:rgba(100,180,255,.6);box-shadow:0 8px 28px rgba(60,100,255,.25)}
+.upgrade-card .icon{font-size:32px;margin-bottom:8px}
+.upgrade-card .name{font-size:16px;font-weight:700;margin-bottom:4px}
+.upgrade-card .desc{font-size:12px;color:#8899bb}
+#game-over{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(5,5,16,.88);pointer-events:all}
+#game-over h2{font-size:42px;margin-bottom:8px;color:#ff4466}
+#game-over .final-score{font-size:22px;margin-bottom:24px;color:#aab}
+#mobile-controls{position:absolute;bottom:16px;left:0;right:0;display:none;justify-content:space-between;padding:0 16px;pointer-events:all}
+.mob-btn{width:64px;height:64px;border-radius:50%;background:rgba(100,140,255,.15);border:1px solid rgba(100,140,255,.3);display:flex;align-items:center;justify-content:center;font-size:28px;color:rgba(200,220,255,.6)}
+.mob-group{display:flex;gap:10px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div id="hud">
+    <div id="score-display">Score: <span id="score-val">0</span></div>
+    <div id="wave-display">Wave: <span id="wave-val">1</span></div>
+    <div id="lives">Lives: <span id="lives-val">♥♥♥</span></div>
+  </div>
+
+  <div id="title-screen">
+    <h1>ASTEROIDS+</h1>
+    <h2>with Ship Upgrades</h2>
+    <button class="btn" id="start-btn" onclick="startGame()">PLAY</button>
+    <div id="instructions">
+      <kbd>W</kbd> / <kbd>↑</kbd> Thrust &nbsp; <kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd> Rotate<br>
+      <kbd>Space</kbd> / <kbd>Click</kbd> Shoot &nbsp; Destroy asteroids · Earn upgrades every wave<br>
+      Mobile: on-screen buttons
+    </div>
+  </div>
+
+  <div id="upgrade-panel">
+    <h2>WAVE COMPLETE</h2>
+    <div class="sub">Choose an upgrade</div>
+    <div id="upgrade-options"></div>
+  </div>
+
+  <div id="game-over">
+    <h2>GAME OVER</h2>
+    <div class="final-score" id="final-score"></div>
+    <button class="btn" onclick="startGame()">PLAY AGAIN</button>
+  </div>
+
+  <div id="mobile-controls">
+    <div class="mob-group">
+      <div class="mob-btn" data-key="left">◀</div>
+      <div class="mob-btn" data-key="right">▶</div>
+    </div>
+    <div class="mob-group">
+      <div class="mob-btn" data-key="thrust">▲</div>
+      <div class="mob-btn" data-key="shoot">●</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;
+function resize(){W=C.width=innerWidth;H=C.height=innerHeight}
+resize();addEventListener('resize',resize);
+
+const isMobile='ontouchstart'in window;
+if(isMobile)document.getElementById('mobile-controls').style.display='flex';
+
+// --- State ---
+let state='title',ship,bullets,asteroids,particles,score,lives,wave,upgrades,shootCD,invT;
+
+const UPGRADES=[
+  {id:'firerate',icon:'🔥',name:'Rapid Fire',desc:'Shoot 25% faster',apply:u=>{u.fireRate*=0.75}},
+  {id:'damage',icon:'💥',name:'Piercing',desc:'+1 bullet pierce',apply:u=>{u.pierce+=1}},
+  {id:'speed',icon:'⚡',name:'Thrusters',desc:'+20% speed',apply:u=>{u.maxSpeed*=1.2;u.thrust*=1.2}},
+  {id:'spread',icon:'🔱',name:'Spread Shot',desc:'+1 bullet per shot',apply:u=>{u.bullets+=1}},
+  {id:'shield',icon:'🛡️',name:'Shield',desc:'+1 extra life',apply:()=>{lives=Math.min(lives+1,7)}},
+  {id:'magnet',icon:'🧲',name:'Score Boost',desc:'+50% score mult',apply:u=>{u.scoreMult+=0.5}},
+];
+
+function defaultShip(){
+  return{x:W/2,y:H/2,a:-Math.PI/2,vx:0,vy:0,r:16,
+    thrust:0.15,maxSpeed:5,fireRate:12,pierce:1,bullets:1,scoreMult:1,
+    drag:0.985};
+}
+
+function startGame(){
+  document.getElementById('title-screen').style.display='none';
+  document.getElementById('game-over').style.display='none';
+  document.getElementById('upgrade-panel').style.display='none';
+  document.getElementById('hud').style.display='flex';
+  ship=defaultShip();score=0;lives=3;wave=0;bullets=[];asteroids=[];particles=[];shootCD=0;invT=0;
+  upgrades=[];
+  nextWave();
+  state='play';
+}
+
+function nextWave(){
+  wave++;
+  document.getElementById('wave-val').textContent=wave;
+  let count=3+wave*2;
+  for(let i=0;i<count;i++) spawnAsteroid(3);
+}
+
+function spawnAsteroid(size,x,y){
+  if(x===undefined){
+    // spawn from edges
+    let side=Math.random()*4|0;
+    if(side===0){x=Math.random()*W;y=-40}
+    else if(side===1){x=W+40;y=Math.random()*H}
+    else if(side===2){x=Math.random()*W;y=H+40}
+    else{x=-40;y=Math.random()*H}
+  }
+  let speed=0.5+Math.random()*1.5;
+  let a=Math.random()*Math.PI*2;
+  let r=size===3?40:size===2?22:12;
+  let verts=[];
+  let n=7+Math.random()*5|0;
+  for(let i=0;i<n;i++){
+    let ang=i/n*Math.PI*2;
+    verts.push({a:ang,d:r*(0.7+Math.random()*0.5)});
+  }
+  asteroids.push({x,y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,r,size,verts,rot:Math.random()*6-3*0.01});
+}
+
+function addParticles(x,y,n,color,speed){
+  for(let i=0;i<n;i++){
+    let a=Math.random()*Math.PI*2,s=Math.random()*speed;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,color,decay:0.015+Math.random()*0.02});
+  }
+}
+
+// --- Input ---
+const keys={};
+addEventListener('keydown',e=>{keys[e.code]=true;if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault()});
+addEventListener('keyup',e=>keys[e.code]=false);
+
+let mouseDown=false;
+C.addEventListener('mousedown',()=>mouseDown=true);
+C.addEventListener('mouseup',()=>mouseDown=false);
+C.addEventListener('touchstart',e=>e.preventDefault(),{passive:false});
+
+// Mobile
+const mobKeys={left:false,right:false,thrust:false,shoot:false};
+document.querySelectorAll('.mob-btn').forEach(b=>{
+  let k=b.dataset.key;
+  b.addEventListener('touchstart',e=>{e.preventDefault();mobKeys[k]=true},{passive:false});
+  b.addEventListener('touchend',e=>{e.preventDefault();mobKeys[k]=false},{passive:false});
+  b.addEventListener('touchcancel',()=>mobKeys[k]=false);
+});
+
+function isKey(action){
+  if(action==='left')return keys['ArrowLeft']||keys['KeyA']||mobKeys.left;
+  if(action==='right')return keys['ArrowRight']||keys['KeyD']||mobKeys.right;
+  if(action==='thrust')return keys['ArrowUp']||keys['KeyW']||mobKeys.thrust;
+  if(action==='shoot')return keys['Space']||mouseDown||mobKeys.shoot;
+}
+
+// --- Upgrade UI ---
+function showUpgrades(){
+  state='upgrade';
+  let panel=document.getElementById('upgrade-panel');
+  let opts=document.getElementById('upgrade-options');
+  opts.innerHTML='';
+  // pick 3 random
+  let pool=[...UPGRADES].sort(()=>Math.random()-0.5).slice(0,3);
+  pool.forEach(u=>{
+    let card=document.createElement('div');
+    card.className='upgrade-card';
+    card.innerHTML=`<div class="icon">${u.icon}</div><div class="name">${u.name}</div><div class="desc">${u.desc}</div>`;
+    card.onclick=()=>{
+      u.apply(ship);
+      upgrades.push(u.id);
+      panel.style.display='none';
+      nextWave();
+      state='play';
+    };
+    opts.appendChild(card);
+  });
+  panel.style.display='flex';
+}
+
+function gameOver(){
+  state='over';
+  document.getElementById('hud').style.display='none';
+  document.getElementById('final-score').textContent=`Score: ${score} · Wave: ${wave}`;
+  document.getElementById('game-over').style.display='flex';
+}
+
+// --- Update ---
+function update(){
+  if(state!=='play')return;
+
+  // Ship rotation & thrust
+  if(isKey('left'))ship.a-=0.065;
+  if(isKey('right'))ship.a+=0.065;
+  if(isKey('thrust')){
+    ship.vx+=Math.cos(ship.a)*ship.thrust;
+    ship.vy+=Math.sin(ship.a)*ship.thrust;
+    if(Math.random()<0.4)addParticles(ship.x-Math.cos(ship.a)*16,ship.y-Math.sin(ship.a)*16,1,'#f84',2);
+  }
+  let spd=Math.sqrt(ship.vx*ship.vx+ship.vy*ship.vy);
+  if(spd>ship.maxSpeed){ship.vx*=ship.maxSpeed/spd;ship.vy*=ship.maxSpeed/spd}
+  ship.vx*=ship.drag;ship.vy*=ship.drag;
+  ship.x+=ship.vx;ship.y+=ship.vy;
+  // wrap
+  if(ship.x<-20)ship.x=W+20;if(ship.x>W+20)ship.x=-20;
+  if(ship.y<-20)ship.y=H+20;if(ship.y>H+20)ship.y=-20;
+
+  // Shoot
+  if(shootCD>0)shootCD--;
+  if(isKey('shoot')&&shootCD<=0){
+    shootCD=ship.fireRate;
+    let spread=ship.bullets;
+    let arc=spread>1?0.15*(spread-1):0;
+    for(let i=0;i<spread;i++){
+      let a=ship.a-arc/2+arc/(Math.max(spread-1,1))*i;
+      bullets.push({x:ship.x+Math.cos(ship.a)*18,y:ship.y+Math.sin(ship.a)*18,
+        vx:Math.cos(a)*7+ship.vx*0.3,vy:Math.sin(a)*7+ship.vy*0.3,life:60,pierce:ship.pierce});
+    }
+  }
+
+  // Bullets
+  for(let i=bullets.length-1;i>=0;i--){
+    let b=bullets[i];
+    b.x+=b.vx;b.y+=b.vy;b.life--;
+    if(b.x<-10||b.x>W+10||b.y<-10||b.y>H+10||b.life<=0)bullets.splice(i,1);
+  }
+
+  // Asteroids
+  for(let i=asteroids.length-1;i>=0;i--){
+    let a=asteroids[i];
+    a.x+=a.vx;a.y+=a.vy;
+    if(a.x<-60)a.x=W+60;if(a.x>W+60)a.x=-60;
+    if(a.y<-60)a.y=H+60;if(a.y>H+60)a.y=-60;
+  }
+
+  // Bullet-asteroid collision
+  for(let i=bullets.length-1;i>=0;i--){
+    let b=bullets[i];
+    for(let j=asteroids.length-1;j>=0;j--){
+      let a=asteroids[j];
+      let dx=b.x-a.x,dy=b.y-a.y;
+      if(dx*dx+dy*dy<a.r*a.r){
+        b.pierce--;
+        if(b.pierce<=0)bullets.splice(i,1);
+        let pts=(4-a.size)*25;
+        score+=Math.round(pts*ship.scoreMult);
+        document.getElementById('score-val').textContent=score;
+        addParticles(a.x,a.y,8+a.size*4,a.size===3?'#4af':a.size===2?'#8cf':'#adf',2+a.size);
+        if(a.size>1){
+          for(let k=0;k<2;k++)spawnAsteroid(a.size-1,a.x,a.y);
+        }
+        asteroids.splice(j,1);
+        break;
+      }
+    }
+  }
+
+  // Ship-asteroid collision
+  if(invT>0)invT--;
+  else{
+    for(let a of asteroids){
+      let dx=ship.x-a.x,dy=ship.y-a.y;
+      if(dx*dx+dy*dy<(ship.r+a.r-6)**2){
+        lives--;
+        document.getElementById('lives-val').textContent='♥'.repeat(Math.max(lives,0));
+        if(lives<=0){addParticles(ship.x,ship.y,40,'#f44',5);gameOver();return}
+        invT=120;
+        addParticles(ship.x,ship.y,20,'#f84',3);
+        ship.vx=0;ship.vy=0;
+        break;
+      }
+    }
+  }
+
+  // Particles
+  for(let i=particles.length-1;i>=0;i--){
+    let p=particles[i];
+    p.x+=p.vx;p.y+=p.vy;p.life-=p.decay;p.vx*=0.98;p.vy*=0.98;
+    if(p.life<=0)particles.splice(i,1);
+  }
+
+  // Wave clear
+  if(asteroids.length===0){
+    showUpgrades();
+  }
+}
+
+// --- Draw ---
+function drawShip(){
+  if(invT>0&&invT%8<4)return;
+  X.save();
+  X.translate(ship.x,ship.y);
+  X.rotate(ship.a);
+  X.strokeStyle='#8af';X.lineWidth=2;X.fillStyle='rgba(40,60,140,.4)';
+  X.beginPath();
+  X.moveTo(20,0);X.lineTo(-14,12);X.lineTo(-8,0);X.lineTo(-14,-12);X.closePath();
+  X.fill();X.stroke();
+  // glow
+  X.shadowColor='#4af';X.shadowBlur=12;X.stroke();X.shadowBlur=0;
+  X.restore();
+}
+
+function drawAsteroid(a){
+  X.save();X.translate(a.x,a.y);
+  a._rot=(a._rot||0)+a.rot;
+  X.rotate(a._rot);
+  let g=a.size===3?'#556':'#667';
+  X.strokeStyle='#8899aa';X.lineWidth=1.5;X.fillStyle=g;
+  X.beginPath();
+  for(let i=0;i<a.verts.length;i++){
+    let v=a.verts[i];
+    let px=Math.cos(v.a)*v.d,py=Math.sin(v.a)*v.d;
+    i===0?X.moveTo(px,py):X.lineTo(px,py);
+  }
+  X.closePath();X.fill();X.stroke();
+  X.restore();
+}
+
+let starField=[];
+for(let i=0;i<120;i++)starField.push({x:Math.random(),y:Math.random(),s:Math.random()*1.5+0.5,b:Math.random()});
+
+function draw(){
+  X.fillStyle='#0a0a1a';X.fillRect(0,0,W,H);
+
+  // stars
+  for(let s of starField){
+    s.b+=0.003;
+    let a=0.3+Math.sin(s.b)*0.2;
+    X.fillStyle=`rgba(180,200,255,${a})`;
+    X.fillRect(s.x*W,s.y*H,s.s,s.s);
+  }
+
+  if(state==='title'||state==='over')return;
+
+  // particles
+  for(let p of particles){
+    X.globalAlpha=p.life;
+    X.fillStyle=p.color;
+    X.fillRect(p.x-1.5,p.y-1.5,3,3);
+  }
+  X.globalAlpha=1;
+
+  // asteroids
+  for(let a of asteroids)drawAsteroid(a);
+
+  // bullets
+  X.fillStyle='#fff';X.shadowColor='#4af';X.shadowBlur=6;
+  for(let b of bullets){
+    X.beginPath();X.arc(b.x,b.y,2.5,0,Math.PI*2);X.fill();
+  }
+  X.shadowBlur=0;
+
+  // ship
+  if(state==='play'||state==='upgrade')drawShip();
+}
+
+function loop(){
+  update();draw();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
