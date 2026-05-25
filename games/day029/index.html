@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Doodle Jump</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden;touch-action:none}
+canvas{border-radius:12px;box-shadow:0 0 40px rgba(72,202,228,.3)}
+#ui{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+#ui.active{pointer-events:auto}
+#ui h1{font-size:2.4rem;color:#48cae4;text-shadow:0 0 20px rgba(72,202,228,.5);margin-bottom:8px}
+#ui p{color:#caf0f8;font-size:.95rem;margin-bottom:4px;text-align:center;max-width:320px}
+#ui button{margin-top:18px;padding:14px 48px;font-size:1.1rem;border:none;border-radius:30px;background:linear-gradient(135deg,#48cae4,#0077b6);color:#fff;cursor:pointer;font-weight:700;letter-spacing:1px;transition:transform .15s;pointer-events:auto}
+#ui button:hover{transform:scale(1.05)}
+#score{position:absolute;top:16px;left:50%;transform:translateX(-50%);color:#caf0f8;font-size:1.3rem;font-weight:700;font-family:'Segoe UI',sans-serif;text-shadow:0 0 8px rgba(72,202,228,.4);display:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui" class="active">
+<h1>Doodle Jump</h1>
+<p>Jump from platform to platform and climb as high as you can!</p>
+<p style="font-size:.82rem;color:#90e0ef">← → Arrow keys or tilt device to move. You wrap around edges!</p>
+<button id="startBtn">Play</button>
+</div>
+<div id="score">0</div>
+
+<script>
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d'),ui=document.getElementById('ui'),scoreEl=document.getElementById('score'),startBtn=document.getElementById('startBtn');
+let W,H,dpr;
+
+function resize(){
+  dpr=window.devicePixelRatio||1;
+  const maxW=420,maxH=680;
+  W=Math.min(maxW,innerWidth-20);H=Math.min(maxH,innerHeight-20);
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+resize();window.addEventListener('resize',resize);
+
+// Colors
+const SKY1='#0a1628',SKY2='#16213e',PLAT_NORMAL='#48cae4',PLAT_MOVING='#f72585',PLAT_BREAK='#fca311',PLAT_SPRING='#06d6a0',DOODLE='#caf0f8';
+
+// Game state
+let player,platforms,score,highScore=+localStorage.getItem('dj_hs')||0,gameOver,gameStarted,particles,springs;
+
+const PLAT_W=68,PLAT_H=14,GRAVITY=0.35,JUMP_VEL=-10.5,SPRING_VEL=-15;
+
+function init(){
+  player={x:W/2-15,y:H-80,w:30,h:36,vx:0,vy:0,dir:1};
+  platforms=[];particles=[];springs=[];score=0;gameOver=false;
+  // Generate initial platforms
+  for(let i=0;i<8;i++){
+    platforms.push(makePlatform(Math.random()*(W-PLAT_W),H-80-i*80,i===0?'normal':null));
+  }
+  // Ensure first platform is under player
+  platforms[0].x=player.x-PLAT_W/2+15;
+  platforms[0].y=player.y+player.h;
+  platforms[0].type='normal';
+}
+
+function makePlatform(x,y,forceType){
+  const r=Math.random();
+  let type=forceType||(r<0.55?'normal':r<0.75?'moving':r<0.88?'break':'spring');
+  const p={x,y,w:PLAT_W,h:PLAT_H,type,broken:false,vx:type==='moving'?(Math.random()>.5?1.5:-1.5):0};
+  return p;
+}
+
+// Input
+let keys={};
+document.addEventListener('keydown',e=>{keys[e.key]=true;if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))e.preventDefault()});
+document.addEventListener('keyup',e=>keys[e.key]=false);
+
+let tiltX=0;
+window.addEventListener('deviceorientation',e=>{if(e.gamma!=null)tiltX=e.gamma/30*5});
+
+// Touch
+let touchX=null;
+canvas.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX});
+canvas.addEventListener('touchmove',e=>{
+  const nx=e.touches[0].clientX;
+  tiltX=(nx-touchX)*0.3;
+  touchX=nx;
+  e.preventDefault();
+},{passive:false});
+canvas.addEventListener('touchend',()=>{tiltX=0;touchX=null});
+
+function spawnParticles(x,y,color,n){
+  for(let i=0;i<n;i++) particles.push({x,y,vx:(Math.random()-.5)*4,vy:-Math.random()*3-1,life:30+Math.random()*20,color,r:2+Math.random()*2});
+}
+
+function update(){
+  if(gameOver)return;
+
+  // Movement
+  if(keys['ArrowLeft']||keys['a'])player.vx=-5;
+  else if(keys['ArrowRight']||keys['d'])player.vx=5;
+  else if(tiltX)player.vx=tiltX;
+  else player.vx*=0.7;
+
+  player.x+=player.vx;
+  // Wrap
+  if(player.x>W)player.x=-player.w;
+  if(player.x+player.w<0)player.x=W;
+
+  player.vy+=GRAVITY;
+  player.y+=player.vy;
+
+  player.dir=player.vx>=0?1:-1;
+
+  // Move platforms
+  for(const p of platforms){
+    if(p.type==='moving'&&!p.broken){
+      p.x+=p.vx;
+      if(p.x<0||p.x+p.w>W)p.vx*=-1;
+    }
+  }
+
+  // Collision (only when falling)
+  if(player.vy>0){
+    for(const p of platforms){
+      if(p.broken)continue;
+      if(player.x+player.w>p.x&&player.x<p.x+p.w&&player.y+player.h>p.y&&player.y+player.h<p.y+p.h+player.vy+2){
+        if(p.type==='break'){
+          p.broken=true;
+          spawnParticles(p.x+p.w/2,p.y,PLAT_BREAK,8);
+          continue;
+        }
+        player.y=p.y-player.h;
+        player.vy=p.type==='spring'?SPRING_VEL:JUMP_VEL;
+        spawnParticles(player.x+player.w/2,player.y+player.h,p.type==='spring'?PLAT_SPRING:PLAT_NORMAL,5);
+      }
+    }
+  }
+
+  // Scroll world when player above mid
+  if(player.y<H*0.4){
+    const shift=H*0.4-player.y;
+    player.y=H*0.4;
+    score+=shift;
+    for(const p of platforms)p.y+=shift;
+    for(const pt of particles)pt.y+=shift;
+    // Remove off-screen & add new
+    for(let i=platforms.length-1;i>=0;i--){
+      if(platforms[i].y>H+20)platforms.splice(i,1);
+    }
+    while(platforms.length<8){
+      let topY=Math.min(...platforms.map(p=>p.y));
+      platforms.push(makePlatform(Math.random()*(W-PLAT_W),topY-60-Math.random()*50));
+    }
+  }
+
+  // Particles
+  for(let i=particles.length-1;i>=0;i--){
+    const pt=particles[i];
+    pt.x+=pt.vx;pt.y+=pt.vy;pt.vy+=0.1;pt.life--;
+    if(pt.life<=0)particles.splice(i,1);
+  }
+
+  // Game over
+  if(player.y>H+50){
+    gameOver=true;
+    const finalScore=Math.floor(score/10);
+    if(finalScore>highScore){highScore=finalScore;localStorage.setItem('dj_hs',highScore)}
+    setTimeout(showGameOver,300);
+  }
+
+  scoreEl.textContent=Math.floor(score/10);
+}
+
+function drawPlayer(){
+  const p=player;
+  ctx.save();
+  ctx.translate(p.x+p.w/2,p.y+p.h/2);
+  ctx.scale(p.dir,1);
+  // Body
+  ctx.fillStyle=DOODLE;
+  ctx.beginPath();
+  ctx.ellipse(0,-4,14,16,0,0,Math.PI*2);
+  ctx.fill();
+  // Eyes
+  ctx.fillStyle='#1a1a2e';
+  ctx.beginPath();ctx.arc(4,-8,3.5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';
+  ctx.beginPath();ctx.arc(5,-9,1.5,0,Math.PI*2);ctx.fill();
+  // Nose
+  ctx.fillStyle='#f72585';
+  ctx.beginPath();ctx.arc(10,-5,2.5,0,Math.PI*2);ctx.fill();
+  // Feet
+  ctx.fillStyle=DOODLE;
+  const legOff=Math.sin(Date.now()/100)*2*(player.vy<0?1:0.2);
+  ctx.fillRect(-10,12+legOff,8,5);
+  ctx.fillRect(3,12-legOff,8,5);
+  ctx.restore();
+}
+
+function drawPlatform(p){
+  if(p.broken)return;
+  const colors={normal:PLAT_NORMAL,moving:PLAT_MOVING,break:PLAT_BREAK,spring:PLAT_SPRING};
+  ctx.fillStyle=colors[p.type];
+  ctx.beginPath();
+  ctx.roundRect(p.x,p.y,p.w,p.h,6);
+  ctx.fill();
+  // Spring indicator
+  if(p.type==='spring'){
+    ctx.fillStyle='#fff';
+    ctx.fillRect(p.x+p.w/2-3,p.y-6,6,6);
+  }
+  // Glow
+  ctx.shadowColor=colors[p.type];ctx.shadowBlur=8;
+  ctx.beginPath();ctx.roundRect(p.x,p.y,p.w,p.h,6);ctx.fill();
+  ctx.shadowBlur=0;
+}
+
+function draw(){
+  // Background gradient
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,SKY1);g.addColorStop(1,SKY2);
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+
+  // Stars
+  ctx.fillStyle='rgba(202,240,248,0.15)';
+  for(let i=0;i<30;i++){
+    const sx=(i*137.5+score*0.02)%W,sy=(i*97.3)%H;
+    ctx.fillRect(sx,sy,1.5,1.5);
+  }
+
+  for(const p of platforms)drawPlatform(p);
+
+  // Particles
+  for(const pt of particles){
+    ctx.globalAlpha=pt.life/50;
+    ctx.fillStyle=pt.color;
+    ctx.beginPath();ctx.arc(pt.x,pt.y,pt.r,0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  drawPlayer();
+
+  // High score line
+  if(score>highScore*10&&highScore>0){
+    ctx.strokeStyle='rgba(247,37,133,0.3)';ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(0,H*0.4);ctx.lineTo(W,H*0.4);ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function loop(){
+  update();draw();
+  if(gameStarted)requestAnimationFrame(loop);
+}
+
+function showGameOver(){
+  gameStarted=false;
+  scoreEl.style.display='none';
+  ui.innerHTML=`<h1>Game Over</h1><p>Score: ${Math.floor(score/10)}</p><p>Best: ${highScore}</p><button id="startBtn">Retry</button>`;
+  ui.classList.add('active');
+  document.getElementById('startBtn').addEventListener('click',startGame);
+}
+
+function startGame(){
+  init();
+  ui.classList.remove('active');
+  scoreEl.style.display='block';
+  gameStarted=true;
+  loop();
+}
+
+startBtn.addEventListener('click',startGame);
+</script>
+</body>
+</html>
