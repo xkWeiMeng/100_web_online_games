@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Brick Builder - Pixel Art Painter</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;font-family:'Segoe UI',system-ui,sans-serif;color:#e0e0e0;overflow:hidden;height:100vh;display:flex;flex-direction:column;user-select:none;-webkit-user-select:none}
+#titleScreen{position:fixed;inset:0;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;gap:20px}
+#titleScreen h1{font-size:clamp(28px,6vw,52px);background:linear-gradient(90deg,#e94560,#f5a623,#44d7b6,#6c5ce7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:none;letter-spacing:2px}
+#titleScreen p{color:#aaa;max-width:500px;text-align:center;line-height:1.6;padding:0 20px;font-size:14px}
+#titleScreen button{padding:14px 48px;font-size:18px;border:none;border-radius:12px;background:linear-gradient(135deg,#e94560,#c0392b);color:#fff;cursor:pointer;font-weight:700;transition:transform .15s}
+#titleScreen button:hover{transform:scale(1.05)}
+.app{display:flex;flex-direction:column;height:100vh;width:100vw}
+.toolbar{display:flex;align-items:center;gap:6px;padding:6px 10px;background:#16213e;border-bottom:1px solid #2a3a5c;flex-wrap:wrap;min-height:48px}
+.toolbar button,.toolbar label{padding:6px 10px;border:none;border-radius:6px;background:#0f3460;color:#e0e0e0;cursor:pointer;font-size:13px;white-space:nowrap;display:flex;align-items:center;gap:4px;transition:background .15s}
+.toolbar button:hover,.toolbar label:hover{background:#1a5276}
+.toolbar button.active{background:#e94560;color:#fff}
+.toolbar .sep{width:1px;height:24px;background:#2a3a5c;margin:0 2px}
+#gridSizeLabel{font-size:12px;color:#888}
+#gridSize{width:50px;background:#0f3460;border:1px solid #2a3a5c;color:#e0e0e0;border-radius:4px;padding:2px 4px;text-align:center;font-size:13px}
+.palette-wrap{display:flex;gap:3px;align-items:center;flex-wrap:wrap}
+.swatch{width:26px;height:26px;border-radius:5px;cursor:pointer;border:2px solid transparent;transition:transform .1s,border-color .1s}
+.swatch.active{border-color:#fff;transform:scale(1.2)}
+.swatch:hover{transform:scale(1.15)}
+#customColor{width:26px;height:26px;padding:0;border:none;border-radius:5px;cursor:pointer;background:none}
+.canvas-wrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;background:#111827}
+canvas{image-rendering:pixelated;cursor:crosshair}
+.status{padding:4px 10px;background:#16213e;border-top:1px solid #2a3a5c;font-size:12px;color:#888;display:flex;justify-content:space-between}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:200}
+.modal-box{background:#1e293b;border-radius:12px;padding:24px;max-width:400px;width:90%}
+.modal-box h3{margin-bottom:12px}
+.modal-box input{width:100%;padding:8px;margin:6px 0;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e0e0e0}
+.modal-box .btn-row{display:flex;gap:8px;margin-top:14px;justify-content:flex-end}
+.modal-box button{padding:8px 18px;border:none;border-radius:6px;cursor:pointer;font-weight:600}
+.modal-box .btn-ok{background:#e94560;color:#fff}
+.modal-box .btn-cancel{background:#334155;color:#ccc}
+.hidden{display:none!important}
+.score-bar{display:flex;align-items:center;gap:12px;margin-left:auto;font-size:13px;color:#f5a623;font-weight:700}
+</style>
+</head>
+<body>
+
+<div id="titleScreen">
+  <h1>Brick Builder</h1>
+  <p><b>Pixel Art Painter</b><br><br>
+    Paint pixel art brick by brick! Use the palette to pick colors, choose tools to draw, fill, or erase.
+    Complete challenges to earn points, or freestyle your masterpiece.<br><br>
+    <b>Controls:</b> Click/tap to place bricks. Right-click or long-press to pick a color from canvas. Scroll to zoom.
+  </p>
+  <button onclick="startApp()">Start Painting</button>
+</div>
+
+<div class="app hidden" id="app">
+  <div class="toolbar" id="toolbar">
+    <button id="btnPen" class="active" title="Pen (B)">&#9998; Pen</button>
+    <button id="btnFill" title="Fill (G)">&#9681; Fill</button>
+    <button id="btnLine" title="Line (L)">&#9585; Line</button>
+    <button id="btnRect" title="Rect (R)">&#9633; Rect</button>
+    <button id="btnEraser" title="Eraser (E)">&#9003; Eraser</button>
+    <button id="btnPicker" title="Color Picker (I)">&#9738; Pick</button>
+    <div class="sep"></div>
+    <div class="palette-wrap" id="palette"></div>
+    <input type="color" id="customColor" value="#e94560" title="Custom color">
+    <div class="sep"></div>
+    <label id="gridSizeLabel">Size:</label>
+    <input type="number" id="gridSize" value="32" min="8" max="128" step="1">
+    <button id="btnResize">Apply</button>
+    <div class="sep"></div>
+    <button id="btnGrid" title="Toggle grid">Grid</button>
+    <button id="btnUndo" title="Undo (Ctrl+Z)">&#8630; Undo</button>
+    <button id="btnRedo" title="Redo (Ctrl+Y)">&#8631; Redo</button>
+    <button id="btnClear" title="Clear canvas">&#10005; Clear</button>
+    <button id="btnExport" title="Export PNG">&#8681; Export</button>
+    <button id="btnChallenge" title="New challenge">&#9733; Challenge</button>
+    <div class="score-bar">Score: <span id="scoreVal">0</span></div>
+  </div>
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="c"></canvas>
+  </div>
+  <div class="status">
+    <span id="coordInfo">0, 0</span>
+    <span id="brickCount">0 bricks</span>
+  </div>
+</div>
+
+<script>
+const COLORS = [
+  '#1a1a2e','#e94560','#f5a623','#f1c40f','#2ecc71','#44d7b6','#3498db',
+  '#6c5ce7','#e056a0','#c0392b','#e67e22','#27ae60','#2980b9','#8e44ad',
+  '#ecf0f1','#bdc3c7','#95a5a6','#7f8c8d','#ffffff','#000000',
+  '#d35400','#1abc9c','#16a085','#f39c12','#d63031','#6d214f',
+  '#82589f','#38ada9','#e77f67','#574b90'
+];
+
+let grid, W, H, cellPx, tool='pen', color='#e94560', showGrid=true;
+let undoStack=[], redoStack=[], maxUndo=80;
+let score=0, challenge=null;
+let canvas, ctx, wrap;
+let zoom=1, panX=0, panY=0;
+let painting=false, lineStart=null, rectStart=null;
+let lastCell=null;
+
+function startApp(){
+  document.getElementById('titleScreen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  init();
+}
+
+function init(){
+  canvas=document.getElementById('c');
+  ctx=canvas.getContext('2d');
+  wrap=document.getElementById('canvasWrap');
+  W=H=parseInt(document.getElementById('gridSize').value)||32;
+  grid=Array.from({length:H},()=>Array(W).fill(null));
+  buildPalette();
+  setupEvents();
+  fitCanvas();
+  pushUndo();
+  render();
+}
+
+function buildPalette(){
+  const p=document.getElementById('palette');
+  p.innerHTML='';
+  COLORS.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='swatch'+(c===color?' active':'');
+    d.style.background=c;
+    d.onclick=()=>{color=c;setTool(tool==='eraser'?'pen':tool);document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active'));d.classList.add('active');document.getElementById('customColor').value=c};
+    p.appendChild(d);
+  });
+}
+
+function setTool(t){
+  tool=t;
+  document.querySelectorAll('#toolbar button[id^=btn]').forEach(b=>{
+    const n=b.id.replace('btn','').toLowerCase();
+    b.classList.toggle('active',n===t);
+  });
+}
+
+function fitCanvas(){
+  const ww=wrap.clientWidth, wh=wrap.clientHeight;
+  cellPx=Math.max(2,Math.floor(Math.min(ww/W,wh/H)*0.9));
+  canvas.width=W*cellPx;
+  canvas.height=H*cellPx;
+  canvas.style.width=canvas.width*zoom+'px';
+  canvas.style.height=canvas.height*zoom+'px';
+}
+
+function render(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  // bg
+  ctx.fillStyle='#222';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  // cells
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    if(grid[y][x]){
+      ctx.fillStyle=grid[y][x];
+      ctx.fillRect(x*cellPx,y*cellPx,cellPx,cellPx);
+      // brick effect
+      if(cellPx>=6){
+        ctx.fillStyle='rgba(255,255,255,0.08)';
+        ctx.fillRect(x*cellPx,y*cellPx,cellPx,cellPx/4);
+        ctx.fillStyle='rgba(0,0,0,0.1)';
+        ctx.fillRect(x*cellPx,y*cellPx+cellPx*3/4,cellPx,cellPx/4);
+      }
+    }
+  }
+  // challenge overlay
+  if(challenge){
+    ctx.globalAlpha=0.12;
+    for(let y=0;y<challenge.pattern.length;y++) for(let x=0;x<challenge.pattern[y].length;x++){
+      if(challenge.pattern[y][x]){
+        ctx.fillStyle=challenge.pattern[y][x];
+        ctx.fillRect(x*cellPx,y*cellPx,cellPx,cellPx);
+      }
+    }
+    ctx.globalAlpha=1;
+  }
+  // grid lines
+  if(showGrid && cellPx>=4){
+    ctx.strokeStyle='rgba(255,255,255,0.07)';
+    ctx.lineWidth=1;
+    for(let x=0;x<=W;x++){ctx.beginPath();ctx.moveTo(x*cellPx+.5,0);ctx.lineTo(x*cellPx+.5,H*cellPx);ctx.stroke()}
+    for(let y=0;y<=H;y++){ctx.beginPath();ctx.moveTo(0,y*cellPx+.5);ctx.lineTo(W*cellPx,y*cellPx+.5);ctx.stroke()}
+  }
+  // brick count
+  let cnt=0;
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(grid[y][x]) cnt++;
+  document.getElementById('brickCount').textContent=cnt+' bricks';
+  document.getElementById('scoreVal').textContent=score;
+}
+
+function cellAt(e){
+  const r=canvas.getBoundingClientRect();
+  const sx=(e.clientX-r.left)/zoom, sy=(e.clientY-r.top)/zoom;
+  const x=Math.floor(sx/cellPx), y=Math.floor(sy/cellPx);
+  if(x<0||x>=W||y<0||y>=H) return null;
+  return {x,y};
+}
+
+function setCell(x,y,c){
+  if(x<0||x>=W||y<0||y>=H) return;
+  grid[y][x]=c;
+}
+
+function floodFill(sx,sy,nc){
+  const oc=grid[sy][sx];
+  if(oc===nc) return;
+  const stack=[[sx,sy]];
+  while(stack.length){
+    const [x,y]=stack.pop();
+    if(x<0||x>=W||y<0||y>=H) continue;
+    if(grid[y][x]!==oc) continue;
+    grid[y][x]=nc;
+    stack.push([x-1,y],[x+1,y],[x,y-1],[x,y+1]);
+  }
+}
+
+function drawLine(x0,y0,x1,y1,c){
+  const dx=Math.abs(x1-x0),dy=Math.abs(y1-y0);
+  const sx=x0<x1?1:-1,sy=y0<y1?1:-1;
+  let err=dx-dy;
+  while(true){
+    setCell(x0,y0,c);
+    if(x0===x1&&y0===y1) break;
+    const e2=2*err;
+    if(e2>-dy){err-=dy;x0+=sx}
+    if(e2<dx){err+=dx;y0+=sy}
+  }
+}
+
+function drawRect(x0,y0,x1,y1,c){
+  const lx=Math.min(x0,x1),hx=Math.max(x0,x1),ly=Math.min(y0,y1),hy=Math.max(y0,y1);
+  for(let x=lx;x<=hx;x++){setCell(x,ly,c);setCell(x,hy,c)}
+  for(let y=ly;y<=hy;y++){setCell(lx,y,c);setCell(hx,y,c)}
+}
+
+function pushUndo(){
+  undoStack.push(grid.map(r=>[...r]));
+  if(undoStack.length>maxUndo) undoStack.shift();
+  redoStack=[];
+}
+function undo(){
+  if(undoStack.length<2) return;
+  redoStack.push(undoStack.pop());
+  grid=undoStack[undoStack.length-1].map(r=>[...r]);
+  render();
+}
+function redo(){
+  if(!redoStack.length) return;
+  const s=redoStack.pop();
+  undoStack.push(s);
+  grid=s.map(r=>[...r]);
+  render();
+}
+
+function checkChallenge(){
+  if(!challenge) return;
+  let match=0,total=0;
+  for(let y=0;y<challenge.pattern.length;y++) for(let x=0;x<challenge.pattern[y].length;x++){
+    if(challenge.pattern[y][x]){
+      total++;
+      if(grid[y]&&grid[y][x]===challenge.pattern[y][x]) match++;
+    }
+  }
+  if(total&&match===total){
+    score+=total*10;
+    alert('Challenge complete! +'+total*10+' points!');
+    challenge=null;
+    render();
+  }
+}
+
+function generateChallenge(){
+  const patterns=[genHeart,genStar,genSmile,genArrow,genDiamond];
+  const fn=patterns[Math.floor(Math.random()*patterns.length)];
+  challenge=fn();
+  render();
+}
+
+function genHeart(){
+  const p=Array.from({length:H},()=>Array(W).fill(null));
+  const c=COLORS[1];const ox=Math.floor(W/2)-3,oy=Math.floor(H/2)-2;
+  const h=[[1,0],[2,0],[4,0],[5,0],[0,1],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[0,2],[1,2],[2,2],[3,2],[4,2],[5,2],[6,2],[1,3],[2,3],[3,3],[4,3],[5,3],[2,4],[3,4],[4,4],[3,5]];
+  h.forEach(([x,y])=>{if(oy+y<H&&ox+x<W&&oy+y>=0&&ox+x>=0) p[oy+y][ox+x]=c});
+  return {pattern:p,name:'Heart'};
+}
+function genStar(){
+  const p=Array.from({length:H},()=>Array(W).fill(null));
+  const c=COLORS[3];const ox=Math.floor(W/2)-3,oy=Math.floor(H/2)-3;
+  const s=[[3,0],[2,1],[3,1],[4,1],[0,2],[1,2],[2,2],[3,2],[4,2],[5,2],[6,2],[1,3],[2,3],[3,3],[4,3],[5,3],[2,4],[3,4],[4,4],[1,5],[2,5],[4,5],[5,5],[0,6],[1,6],[5,6],[6,6]];
+  s.forEach(([x,y])=>{if(oy+y<H&&ox+x<W&&oy+y>=0&&ox+x>=0) p[oy+y][ox+x]=c});
+  return {pattern:p,name:'Star'};
+}
+function genSmile(){
+  const p=Array.from({length:H},()=>Array(W).fill(null));
+  const c=COLORS[3];const ox=Math.floor(W/2)-3,oy=Math.floor(H/2)-3;
+  const s=[[2,0],[3,0],[4,0],[1,1],[5,1],[0,2],[2,2],[4,2],[6,2],[0,3],[6,3],[0,4],[1,4],[5,4],[6,4],[1,5],[2,5],[4,5],[5,5],[2,6],[3,6],[4,6]];
+  s.forEach(([x,y])=>{if(oy+y<H&&ox+x<W&&oy+y>=0&&ox+x>=0) p[oy+y][ox+x]=c});
+  return {pattern:p,name:'Smile'};
+}
+function genArrow(){
+  const p=Array.from({length:H},()=>Array(W).fill(null));
+  const c=COLORS[6];const ox=Math.floor(W/2)-2,oy=Math.floor(H/2)-4;
+  const a=[[2,0],[1,1],[2,1],[3,1],[0,2],[1,2],[2,2],[3,2],[4,2],[2,3],[2,4],[2,5],[2,6],[2,7]];
+  a.forEach(([x,y])=>{if(oy+y<H&&ox+x<W&&oy+y>=0&&ox+x>=0) p[oy+y][ox+x]=c});
+  return {pattern:p,name:'Arrow'};
+}
+function genDiamond(){
+  const p=Array.from({length:H},()=>Array(W).fill(null));
+  const c=COLORS[5];const ox=Math.floor(W/2)-3,oy=Math.floor(H/2)-3;
+  const d=[[3,0],[2,1],[4,1],[1,2],[5,2],[0,3],[6,3],[1,4],[5,4],[2,5],[4,5],[3,6]];
+  d.forEach(([x,y])=>{if(oy+y<H&&ox+x<W&&oy+y>=0&&ox+x>=0) p[oy+y][ox+x]=c});
+  return {pattern:p,name:'Diamond'};
+}
+
+function setupEvents(){
+  // tool buttons
+  document.getElementById('btnPen').onclick=()=>setTool('pen');
+  document.getElementById('btnFill').onclick=()=>setTool('fill');
+  document.getElementById('btnLine').onclick=()=>setTool('line');
+  document.getElementById('btnRect').onclick=()=>setTool('rect');
+  document.getElementById('btnEraser').onclick=()=>setTool('eraser');
+  document.getElementById('btnPicker').onclick=()=>setTool('picker');
+  document.getElementById('btnGrid').onclick=()=>{showGrid=!showGrid;render()};
+  document.getElementById('btnUndo').onclick=undo;
+  document.getElementById('btnRedo').onclick=redo;
+  document.getElementById('btnClear').onclick=()=>{grid=Array.from({length:H},()=>Array(W).fill(null));pushUndo();render()};
+  document.getElementById('btnChallenge').onclick=generateChallenge;
+  document.getElementById('btnResize').onclick=()=>{
+    const v=parseInt(document.getElementById('gridSize').value);
+    if(v>=8&&v<=128){W=H=v;grid=Array.from({length:H},()=>Array(W).fill(null));undoStack=[];redoStack=[];challenge=null;fitCanvas();pushUndo();render()}
+  };
+  document.getElementById('customColor').oninput=e=>{
+    color=e.target.value;
+    document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active'));
+    if(tool==='eraser') setTool('pen');
+  };
+  document.getElementById('btnExport').onclick=()=>{
+    const ec=document.createElement('canvas');
+    ec.width=W;ec.height=H;
+    const ectx=ec.getContext('2d');
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      if(grid[y][x]){ectx.fillStyle=grid[y][x];ectx.fillRect(x,y,1,1)}
+    }
+    const a=document.createElement('a');
+    a.download='pixel-art.png';a.href=ec.toDataURL();a.click();
+    score+=5;render();
+  };
+
+  // canvas events
+  const getPos=e=>e.touches?{clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}:e;
+
+  canvas.addEventListener('pointerdown',e=>{
+    e.preventDefault();
+    const c2=cellAt(e);if(!c2) return;
+    if(e.button===2){color=grid[c2.y][c2.x]||color;document.getElementById('customColor').value=color;return}
+    painting=true; lastCell=c2;
+    if(tool==='pen'||tool==='eraser'){
+      pushUndo();
+      setCell(c2.x,c2.y,tool==='eraser'?null:color);
+      render();
+    } else if(tool==='fill'){
+      pushUndo();
+      floodFill(c2.x,c2.y,color);
+      score+=1;
+      render();checkChallenge();
+    } else if(tool==='picker'){
+      if(grid[c2.y][c2.x]){color=grid[c2.y][c2.x];document.getElementById('customColor').value=color;document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active'))}
+    } else if(tool==='line'||tool==='rect'){
+      lineStart=c2;
+    }
+  });
+
+  canvas.addEventListener('pointermove',e=>{
+    const c2=cellAt(e);
+    if(c2) document.getElementById('coordInfo').textContent=c2.x+', '+c2.y;
+    if(!painting||!c2) return;
+    if(tool==='pen'||tool==='eraser'){
+      if(lastCell&&(lastCell.x!==c2.x||lastCell.y!==c2.y)){
+        // interpolate
+        drawLine(lastCell.x,lastCell.y,c2.x,c2.y,tool==='eraser'?null:color);
+      }
+      lastCell=c2;
+      render();
+    }
+  });
+
+  const endPaint=e=>{
+    if(!painting) return;
+    painting=false;
+    const c2=cellAt(e)||lastCell;
+    if(c2&&lineStart&&tool==='line'){pushUndo();drawLine(lineStart.x,lineStart.y,c2.x,c2.y,color);render();checkChallenge()}
+    if(c2&&lineStart&&tool==='rect'){pushUndo();drawRect(lineStart.x,lineStart.y,c2.x,c2.y,color);render();checkChallenge()}
+    lineStart=null;lastCell=null;
+    checkChallenge();
+  };
+  canvas.addEventListener('pointerup',endPaint);
+  canvas.addEventListener('pointerleave',endPaint);
+  canvas.addEventListener('contextmenu',e=>e.preventDefault());
+
+  // zoom
+  wrap.addEventListener('wheel',e=>{
+    e.preventDefault();
+    zoom=Math.max(0.25,Math.min(8,zoom+(e.deltaY<0?0.15:-0.15)));
+    canvas.style.width=canvas.width*zoom+'px';
+    canvas.style.height=canvas.height*zoom+'px';
+  },{passive:false});
+
+  // keyboard
+  document.addEventListener('keydown',e=>{
+    if(e.key==='b') setTool('pen');
+    if(e.key==='g') setTool('fill');
+    if(e.key==='e') setTool('eraser');
+    if(e.key==='l') setTool('line');
+    if(e.key==='r'&&!e.ctrlKey) setTool('rect');
+    if(e.key==='i') setTool('picker');
+    if(e.key==='z'&&(e.ctrlKey||e.metaKey)){e.preventDefault();undo()}
+    if(e.key==='y'&&(e.ctrlKey||e.metaKey)){e.preventDefault();redo()}
+  });
+
+  window.addEventListener('resize',()=>{fitCanvas();render()});
+}
+</script>
+</body>
+</html>
