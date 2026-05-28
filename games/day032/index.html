@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Klondike Solitaire</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-user-select:none;user-select:none}
+body{background:#1a6b3c;font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden;height:100vh;width:100vw}
+#title-screen{position:fixed;inset:0;background:linear-gradient(135deg,#0d4a2a,#1a6b3c,#0d4a2a);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;color:#fff}
+#title-screen h1{font-size:3rem;text-shadow:2px 4px 8px rgba(0,0,0,.5);margin-bottom:.5rem}
+#title-screen .subtitle{font-size:1.1rem;opacity:.8;margin-bottom:2rem}
+#title-screen .instructions{background:rgba(0,0,0,.25);border-radius:12px;padding:1.2rem 1.5rem;max-width:420px;text-align:left;font-size:.9rem;line-height:1.6;margin-bottom:2rem}
+#title-screen .instructions b{color:#ffd700}
+#title-screen button{background:linear-gradient(135deg,#d4af37,#f0d060);color:#1a3a1a;border:none;padding:14px 48px;font-size:1.3rem;font-weight:700;border-radius:50px;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,.3);transition:transform .15s}
+#title-screen button:hover{transform:scale(1.05)}
+#game{display:none;width:100%;height:100%;position:relative}
+#hud{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:rgba(0,0,0,.2);color:#fff;font-size:.85rem;height:36px}
+#hud button{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.25);padding:4px 12px;border-radius:6px;cursor:pointer;font-size:.8rem}
+#hud button:hover{background:rgba(255,255,255,.25)}
+#win-screen{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:2000;flex-direction:column;color:#fff}
+#win-screen h2{font-size:2.5rem;color:#ffd700;margin-bottom:1rem;text-shadow:0 0 20px rgba(255,215,0,.5)}
+#win-screen p{font-size:1.1rem;margin-bottom:1.5rem}
+#win-screen button{background:linear-gradient(135deg,#d4af37,#f0d060);color:#1a3a1a;border:none;padding:12px 40px;font-size:1.1rem;font-weight:700;border-radius:50px;cursor:pointer}
+canvas{display:block}
+</style>
+</head>
+<body>
+<div id="title-screen">
+  <h1>♠ Solitaire ♥</h1>
+  <div class="subtitle">Klondike · Draw One</div>
+  <div class="instructions">
+    <b>Goal:</b> Move all cards to the four foundation piles (top right), building each suit from Ace to King.<br><br>
+    <b>Tableau:</b> Build downward in alternating colors. Move groups of face-up cards together.<br><br>
+    <b>Stock:</b> Click the deck (top left) to draw cards to the waste pile.<br><br>
+    <b>Controls:</b> Click or drag cards. Double-click to auto-send to foundations.
+  </div>
+  <button onclick="startGame()">Deal Cards</button>
+</div>
+<div id="game">
+  <div id="hud">
+    <span>Score: <b id="score-val">0</b></span>
+    <span>Moves: <b id="moves-val">0</b></span>
+    <span>Time: <b id="time-val">0:00</b></span>
+    <div>
+      <button onclick="undoMove()">Undo</button>
+      <button onclick="newGame()">New Game</button>
+    </div>
+  </div>
+  <canvas id="c"></canvas>
+</div>
+<div id="win-screen">
+  <h2>🎉 You Win!</h2>
+  <p id="win-stats"></p>
+  <button onclick="newGame()">Play Again</button>
+</div>
+<script>
+const SUITS=['♠','♥','♦','♣'],SUIT_COLORS=['#222','#d32f2f','#d32f2f','#222'];
+const RANKS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+let CW=90,CH=126,GAP=16,canvas,ctx,W,H;
+let stock=[],waste=[],foundations=[[],[],[],[]],tableau=[[],[],[],[],[],[],[]];
+let score=0,moves=0,timer=0,timerInterval=null,gameStarted=false;
+let dragging=null,dragOffX=0,dragOffY=0,dragCards=[],dragSource=null,dragSourceIdx=-1;
+let history=[];
+let zones={stock:{},waste:{},foundations:[],tableau:[]};
+
+function makeCard(suit,rank){return{suit,rank,suitIdx:SUITS.indexOf(suit),rankIdx:RANKS.indexOf(rank),faceUp:false,x:0,y:0}}
+function cardColor(c){return SUIT_COLORS[c.suitIdx]}
+function isRed(c){return c.suitIdx===1||c.suitIdx===2}
+
+function createDeck(){
+  let d=[];
+  for(let s of SUITS)for(let r of RANKS)d.push(makeCard(s,r));
+  for(let i=d.length-1;i>0;i--){let j=Math.random()*i+1|0;[d[i],d[j]]=[d[j],d[i]]}
+  return d;
+}
+
+function deal(){
+  let deck=createDeck();
+  stock=[];waste=[];foundations=[[],[],[],[]];tableau=[[],[],[],[],[],[],[]];
+  score=0;moves=0;history=[];
+  for(let i=0;i<7;i++){
+    tableau[i]=[];
+    for(let j=0;j<=i;j++){
+      let c=deck.pop();
+      c.faceUp=j===i;
+      tableau[i].push(c);
+    }
+  }
+  stock=deck.reverse();
+  stock.forEach(c=>c.faceUp=false);
+  updateScore();
+}
+
+function layoutZones(){
+  let topY=8;
+  let cols=7;
+  let totalW=cols*CW+(cols-1)*GAP;
+  let startX=(W-totalW)/2;
+  if(startX<8)startX=8;
+  zones.stock={x:startX,y:topY,w:CW,h:CH};
+  zones.waste={x:startX+CW+GAP,y:topY,w:CW,h:CH};
+  zones.foundations=[];
+  for(let i=0;i<4;i++) zones.foundations.push({x:startX+(3+i)*(CW+GAP),y:topY,w:CW,h:CH});
+  zones.tableau=[];
+  let tabY=topY+CH+GAP;
+  for(let i=0;i<7;i++) zones.tableau.push({x:startX+i*(CW+GAP),y:tabY,w:CW,h:H-tabY-8});
+}
+
+function positionCards(){
+  stock.forEach((c,i)=>{c.x=zones.stock.x;c.y=zones.stock.y});
+  waste.forEach((c,i)=>{c.x=zones.waste.x;c.y=zones.waste.y});
+  for(let i=0;i<4;i++) foundations[i].forEach(c=>{c.x=zones.foundations[i].x;c.y=zones.foundations[i].y});
+  let overlap=Math.min(28,((H-zones.tableau[0].y-CH-16)/20));
+  let faceDownOverlap=Math.min(14,overlap/2);
+  for(let i=0;i<7;i++){
+    let pile=tableau[i],ty=zones.tableau[i].y;
+    pile.forEach((c,j)=>{
+      c.x=zones.tableau[i].x;
+      c.y=ty;
+      ty+=c.faceUp?overlap:faceDownOverlap;
+    });
+  }
+}
+
+function drawRoundedRect(x,y,w,h,r){
+  ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+}
+
+function drawCard(c,x,y,shadow){
+  let cx=x??c.x,cy=y??c.y;
+  if(shadow){ctx.save();ctx.shadowColor='rgba(0,0,0,.35)';ctx.shadowBlur=12;ctx.shadowOffsetY=6}
+  drawRoundedRect(cx,cy,CW,CH,6);
+  if(!c.faceUp){
+    ctx.fillStyle='#1565c0';ctx.fill();ctx.strokeStyle='#0d47a1';ctx.lineWidth=1;ctx.stroke();
+    // back pattern
+    drawRoundedRect(cx+4,cy+4,CW-8,CH-8,4);
+    ctx.fillStyle='#1976d2';ctx.fill();ctx.strokeStyle='#1565c0';ctx.stroke();
+    drawRoundedRect(cx+8,cy+8,CW-16,CH-16,3);
+    ctx.strokeStyle='#42a5f5';ctx.stroke();
+  } else {
+    ctx.fillStyle='#fff';ctx.fill();ctx.strokeStyle='#bbb';ctx.lineWidth=1;ctx.stroke();
+    let col=cardColor(c);
+    ctx.fillStyle=col;ctx.font='bold '+Math.round(CW*.2)+'px sans-serif';ctx.textBaseline='top';
+    ctx.fillText(c.rank,cx+5,cy+4);
+    ctx.font=Math.round(CW*.18)+'px sans-serif';
+    ctx.fillText(c.suit,cx+5,cy+4+CW*.2);
+    // center suit
+    ctx.font=Math.round(CW*.45)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(c.suit,cx+CW/2,cy+CH/2+4);
+    ctx.textAlign='start';
+    // bottom right
+    ctx.save();ctx.translate(cx+CW-5,cy+CH-4);ctx.rotate(Math.PI);ctx.textBaseline='top';
+    ctx.font='bold '+Math.round(CW*.2)+'px sans-serif';ctx.fillText(c.rank,0,0);
+    ctx.font=Math.round(CW*.18)+'px sans-serif';ctx.fillText(c.suit,0,CW*.2);
+    ctx.restore();
+  }
+  if(shadow) ctx.restore();
+}
+
+function drawEmptySlot(x,y,label){
+  drawRoundedRect(x,y,CW,CH,6);
+  ctx.fillStyle='rgba(0,0,0,.12)';ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.15)';ctx.lineWidth=2;ctx.setLineDash([6,4]);ctx.stroke();ctx.setLineDash([]);
+  if(label){ctx.fillStyle='rgba(255,255,255,.2)';ctx.font='bold '+Math.round(CW*.35)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,x+CW/2,y+CH/2);ctx.textAlign='start'}
+}
+
+function render(){
+  ctx.clearRect(0,0,W,H);
+  // stock
+  if(stock.length) drawCard(stock[stock.length-1]); else drawEmptySlot(zones.stock.x,zones.stock.y,'↻');
+  // waste
+  if(waste.length){let c=waste[waste.length-1];if(!isDragged(c)) drawCard(c)} else drawEmptySlot(zones.waste.x,zones.waste.y);
+  // foundations
+  for(let i=0;i<4;i++){
+    let f=foundations[i];
+    if(f.length){let c=f[f.length-1];if(!isDragged(c)) drawCard(c)} else drawEmptySlot(zones.foundations[i].x,zones.foundations[i].y,SUITS[i])
+  }
+  // tableau
+  for(let i=0;i<7;i++){
+    let pile=tableau[i];
+    if(!pile.length){drawEmptySlot(zones.tableau[i].x,zones.tableau[i].y);continue}
+    pile.forEach(c=>{if(!isDragged(c)) drawCard(c)});
+  }
+  // dragging
+  if(dragCards.length){
+    dragCards.forEach(c=>drawCard(c,c.x,c.y,true));
+  }
+}
+
+function isDragged(c){return dragCards.includes(c)}
+
+function hitTest(mx,my){
+  // tableau (check top to bottom, last card first)
+  for(let i=6;i>=0;i--){
+    let pile=tableau[i];
+    for(let j=pile.length-1;j>=0;j--){
+      let c=pile[j];
+      if(c.faceUp&&mx>=c.x&&mx<=c.x+CW&&my>=c.y&&my<=c.y+(j===pile.length-1?CH:28)){
+        return{zone:'tableau',col:i,idx:j,card:c};
+      }
+    }
+  }
+  // waste
+  if(waste.length){let c=waste[waste.length-1];if(mx>=c.x&&mx<=c.x+CW&&my>=c.y&&my<=c.y+CH) return{zone:'waste',card:c}}
+  // foundations
+  for(let i=0;i<4;i++){
+    let z=zones.foundations[i];
+    if(mx>=z.x&&mx<=z.x+CW&&my>=z.y&&my<=z.y+CH) return{zone:'foundation',col:i,card:foundations[i].length?foundations[i][foundations[i].length-1]:null}
+  }
+  // stock
+  let s=zones.stock;
+  if(mx>=s.x&&mx<=s.x+CW&&my>=s.y&&my<=s.y+CH) return{zone:'stock'};
+  return null;
+}
+
+function dropTarget(mx,my){
+  // foundations
+  for(let i=0;i<4;i++){
+    let z=zones.foundations[i];
+    if(mx>=z.x-10&&mx<=z.x+CW+10&&my>=z.y-10&&my<=z.y+CH+10) return{zone:'foundation',col:i};
+  }
+  // tableau
+  for(let i=0;i<7;i++){
+    let z=zones.tableau[i];
+    let pile=tableau[i];
+    let bottomY=pile.length?pile[pile.length-1].y+CH:z.y+CH;
+    if(mx>=z.x-5&&mx<=z.x+CW+5&&my>=z.y-5&&my<=bottomY+10) return{zone:'tableau',col:i};
+  }
+  return null;
+}
+
+function canPlaceOnFoundation(card,fi){
+  let f=foundations[fi];
+  if(dragCards.length>1) return false;
+  if(!f.length) return card.rankIdx===0;
+  let top=f[f.length-1];
+  return card.suitIdx===top.suitIdx&&card.rankIdx===top.rankIdx+1;
+}
+
+function canPlaceOnTableau(card,ti){
+  let pile=tableau[ti];
+  if(!pile.length) return card.rankIdx===12; // only King
+  let top=pile[pile.length-1];
+  return top.faceUp&&isRed(card)!==isRed(top)&&card.rankIdx===top.rankIdx-1;
+}
+
+function saveState(){
+  history.push({
+    stock:stock.map(c=>({...c})),waste:waste.map(c=>({...c})),
+    foundations:foundations.map(f=>f.map(c=>({...c}))),
+    tableau:tableau.map(t=>t.map(c=>({...c}))),
+    score,moves
+  });
+  if(history.length>50) history.shift();
+}
+
+function undoMove(){
+  if(!history.length) return;
+  let s=history.pop();
+  // rebuild card objects
+  stock=s.stock.map(d=>{let c=makeCard(d.suit,d.rank);c.faceUp=d.faceUp;return c});
+  waste=s.waste.map(d=>{let c=makeCard(d.suit,d.rank);c.faceUp=d.faceUp;return c});
+  foundations=s.foundations.map(f=>f.map(d=>{let c=makeCard(d.suit,d.rank);c.faceUp=d.faceUp;return c}));
+  tableau=s.tableau.map(t=>t.map(d=>{let c=makeCard(d.suit,d.rank);c.faceUp=d.faceUp;return c}));
+  score=s.score;moves=s.moves;
+  positionCards();render();updateScore();
+}
+
+function updateScore(){
+  document.getElementById('score-val').textContent=score;
+  document.getElementById('moves-val').textContent=moves;
+}
+
+function flipTopTableau(col){
+  let pile=tableau[col];
+  if(pile.length&&!pile[pile.length-1].faceUp){pile[pile.length-1].faceUp=true;score+=5}
+}
+
+function checkWin(){
+  return foundations.every(f=>f.length===13);
+}
+
+function showWin(){
+  clearInterval(timerInterval);
+  let m=Math.floor(timer/60),s=timer%60;
+  document.getElementById('win-stats').textContent=`Score: ${score} · Moves: ${moves} · Time: ${m}:${s.toString().padStart(2,'0')}`;
+  document.getElementById('win-screen').style.display='flex';
+}
+
+function doStock(){
+  saveState();
+  if(stock.length){
+    let c=stock.pop();c.faceUp=true;waste.push(c);
+  } else if(waste.length){
+    stock=waste.reverse();stock.forEach(c=>c.faceUp=false);waste=[];
+    score=Math.max(0,score-20);
+  }
+  moves++;updateScore();positionCards();render();
+}
+
+function tryAutoFoundation(card,sourceZone,sourceCol,sourceIdx){
+  for(let i=0;i<4;i++){
+    if(canPlaceOnFoundation(card,i)){
+      saveState();
+      if(sourceZone==='waste') waste.pop();
+      else if(sourceZone==='tableau'){
+        tableau[sourceCol].splice(sourceIdx);
+        flipTopTableau(sourceCol);
+      }
+      else if(sourceZone==='foundation') foundations[sourceCol].pop();
+      card.faceUp=true;foundations[i].push(card);
+      score+=10;moves++;updateScore();positionCards();render();
+      if(checkWin()) setTimeout(showWin,300);
+      return true;
+    }
+  }
+  return false;
+}
+
+// Input handling
+let pointerDown=false,startMX,startMY,clickTime=0,lastClickTime=0,lastClickCard=null;
+
+function getPos(e){
+  let r=canvas.getBoundingClientRect();
+  let t=e.touches?e.touches[0]||e.changedTouches[0]:e;
+  return[(t.clientX-r.left)*(W/r.width),(t.clientY-r.top)*(H/r.height)];
+}
+
+function onDown(e){
+  e.preventDefault();
+  let[mx,my]=getPos(e);
+  let hit=hitTest(mx,my);
+  if(!hit) return;
+
+  let now=Date.now();
+  // double click
+  if(now-lastClickTime<350&&lastClickCard===hit.card&&hit.card){
+    lastClickTime=0;lastClickCard=null;
+    if(hit.zone==='waste'){tryAutoFoundation(hit.card,'waste');return}
+    if(hit.zone==='tableau'){tryAutoFoundation(hit.card,'tableau',hit.col,hit.idx);return}
+    return;
+  }
+  lastClickTime=now;lastClickCard=hit.card;
+
+  if(hit.zone==='stock'){doStock();return}
+
+  pointerDown=true;startMX=mx;startMY=my;
+  if(hit.zone==='waste'&&waste.length){
+    dragSource={zone:'waste'};dragCards=[waste[waste.length-1]];
+    dragOffX=mx-dragCards[0].x;dragOffY=my-dragCards[0].y;
+  } else if(hit.zone==='tableau'){
+    let pile=tableau[hit.col];
+    dragSource={zone:'tableau',col:hit.col,idx:hit.idx};
+    dragCards=pile.slice(hit.idx);
+    dragOffX=mx-dragCards[0].x;dragOffY=my-dragCards[0].y;
+  } else if(hit.zone==='foundation'&&hit.card){
+    dragSource={zone:'foundation',col:hit.col};dragCards=[hit.card];
+    dragOffX=mx-hit.card.x;dragOffY=my-hit.card.y;
+  }
+}
+
+function onMove(e){
+  if(!pointerDown||!dragCards.length) return;
+  e.preventDefault();
+  let[mx,my]=getPos(e);
+  let dx=mx-dragOffX,dy=my-dragOffY;
+  let overlap=Math.min(28,((H-zones.tableau[0].y-CH-16)/20));
+  dragCards.forEach((c,i)=>{c.x=dx;c.y=dy+i*overlap});
+  render();
+}
+
+function onUp(e){
+  if(!pointerDown) return;
+  pointerDown=false;
+  if(!dragCards.length) return;
+  let[mx,my]=getPos(e);
+  let moved=Math.abs(mx-startMX)+Math.abs(my-startMY)>5;
+  let placed=false;
+
+  if(moved){
+    let target=dropTarget(dragCards[0].x+CW/2,dragCards[0].y+CH/3);
+    if(target){
+      if(target.zone==='foundation'&&dragCards.length===1&&canPlaceOnFoundation(dragCards[0],target.col)){
+        saveState();
+        removeFromSource();
+        foundations[target.col].push(dragCards[0]);
+        score+=10;moves++;placed=true;
+        if(checkWin()) setTimeout(showWin,300);
+      } else if(target.zone==='tableau'&&canPlaceOnTableau(dragCards[0],target.col)){
+        saveState();
+        removeFromSource();
+        tableau[target.col].push(...dragCards);
+        if(dragSource.zone==='waste') score+=5;
+        else if(dragSource.zone==='foundation') score=Math.max(0,score-15);
+        moves++;placed=true;
+      }
+    }
+  }
+
+  if(placed) updateScore();
+  dragCards=[];dragSource=null;
+  positionCards();render();
+}
+
+function removeFromSource(){
+  if(dragSource.zone==='waste') waste.pop();
+  else if(dragSource.zone==='tableau'){
+    tableau[dragSource.col].splice(dragSource.idx);
+    flipTopTableau(dragSource.col);
+  }
+  else if(dragSource.zone==='foundation') foundations[dragSource.col].pop();
+}
+
+function resize(){
+  let dpr=window.devicePixelRatio||1;
+  let cw=window.innerWidth,ch=window.innerHeight-36;
+  // scale card size
+  CW=Math.min(90,Math.floor((cw-8*GAP)/7));
+  CH=Math.round(CW*1.4);
+  GAP=Math.max(6,Math.floor(CW*.15));
+  W=cw;H=ch;
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  layoutZones();positionCards();render();
+}
+
+function startTimer(){
+  if(timerInterval) clearInterval(timerInterval);
+  timer=0;
+  timerInterval=setInterval(()=>{
+    timer++;
+    let m=Math.floor(timer/60),s=timer%60;
+    document.getElementById('time-val').textContent=m+':'+s.toString().padStart(2,'0');
+  },1000);
+}
+
+function startGame(){
+  document.getElementById('title-screen').style.display='none';
+  document.getElementById('game').style.display='block';
+  canvas=document.getElementById('c');ctx=canvas.getContext('2d');
+  canvas.addEventListener('mousedown',onDown);canvas.addEventListener('mousemove',onMove);
+  canvas.addEventListener('mouseup',onUp);canvas.addEventListener('mouseleave',onUp);
+  canvas.addEventListener('touchstart',onDown,{passive:false});canvas.addEventListener('touchmove',onMove,{passive:false});
+  canvas.addEventListener('touchend',onUp);
+  window.addEventListener('resize',resize);
+  deal();resize();startTimer();
+}
+
+function newGame(){
+  document.getElementById('win-screen').style.display='none';
+  document.getElementById('title-screen').style.display='none';
+  document.getElementById('game').style.display='block';
+  deal();
+  if(!canvas){canvas=document.getElementById('c');ctx=canvas.getContext('2d')}
+  resize();startTimer();
+}
+</script>
+</body>
+</html>
