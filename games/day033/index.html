@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blackjack</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0b5e2a;color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow-x:hidden;user-select:none}
+#title-screen{position:fixed;inset:0;background:linear-gradient(135deg,#0b3d1a,#1a7a3a);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;gap:24px}
+#title-screen h1{font-size:3.5rem;text-shadow:0 4px 20px rgba(0,0,0,.5);letter-spacing:2px}
+#title-screen .subtitle{color:#aed6a1;font-size:1.1rem;max-width:400px;text-align:center;line-height:1.6}
+#title-screen button{background:linear-gradient(135deg,#d4af37,#b8941e);color:#1a1a1a;border:none;padding:16px 48px;font-size:1.3rem;font-weight:700;border-radius:50px;cursor:pointer;transition:.2s;box-shadow:0 4px 15px rgba(0,0,0,.4)}
+#title-screen button:hover{transform:scale(1.05);box-shadow:0 6px 25px rgba(212,175,55,.5)}
+.game-container{width:100%;max-width:700px;padding:16px;display:none;flex-direction:column;align-items:center;gap:12px;min-height:100vh}
+.info-bar{display:flex;justify-content:space-between;width:100%;background:rgba(0,0,0,.3);border-radius:12px;padding:12px 20px;font-size:1rem}
+.info-bar span{display:flex;align-items:center;gap:6px}
+.label{color:#aed6a1;font-size:.8rem}
+.val{font-weight:700;font-size:1.2rem;color:#f0d060}
+.area{width:100%;min-height:120px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.area-label{font-size:.85rem;color:#8fc98a;text-transform:uppercase;letter-spacing:1px}
+.cards{display:flex;gap:-20px;flex-wrap:wrap;justify-content:center;min-height:100px;perspective:600px}
+.card{width:72px;height:104px;border-radius:10px;background:#fff;color:#222;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;font-size:1.5rem;box-shadow:0 4px 12px rgba(0,0,0,.35);margin-left:-12px;transition:transform .3s;position:relative;line-height:1}
+.card:first-child{margin-left:0}
+.card.red{color:#c0392b}
+.card.hidden-card{background:linear-gradient(135deg,#1a3a7a,#2a5abf);color:transparent;background-image:repeating-linear-gradient(45deg,transparent,transparent 8px,rgba(255,255,255,.06) 8px,rgba(255,255,255,.06) 16px)}
+.card.hidden-card *{visibility:hidden}
+.card .suit{font-size:.9rem;margin-top:2px}
+.score-badge{background:rgba(0,0,0,.5);padding:4px 14px;border-radius:20px;font-size:.95rem;font-weight:600;min-width:40px;text-align:center}
+.score-badge.bust{background:#c0392b}
+.score-badge.bj{background:#d4af37;color:#1a1a1a}
+.actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+.actions button{padding:12px 28px;font-size:1rem;font-weight:700;border:none;border-radius:10px;cursor:pointer;transition:.15s;text-transform:uppercase;letter-spacing:1px}
+.actions button:active{transform:scale(.95)}
+#btn-hit{background:#27ae60;color:#fff}
+#btn-stand{background:#e67e22;color:#fff}
+#btn-double{background:#8e44ad;color:#fff}
+#btn-newround{background:linear-gradient(135deg,#d4af37,#b8941e);color:#1a1a1a;font-size:1.1rem;padding:14px 36px}
+.actions button:disabled{opacity:.4;cursor:default}
+.message{font-size:1.5rem;font-weight:700;text-align:center;min-height:40px;text-shadow:0 2px 8px rgba(0,0,0,.4)}
+.message.win{color:#2ecc71}.message.lose{color:#e74c3c}.message.push{color:#f39c12}.message.bj{color:#f0d060}
+.bet-area{display:flex;flex-direction:column;align-items:center;gap:10px}
+.bet-area .chips{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.chip{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;cursor:pointer;border:3px dashed rgba(255,255,255,.4);transition:.15s;box-shadow:0 3px 10px rgba(0,0,0,.3)}
+.chip:hover{transform:scale(1.1)}
+.chip.c5{background:#e74c3c}.chip.c10{background:#3498db}.chip.c25{background:#27ae60}.chip.c50{background:#8e44ad}.chip.c100{background:#1a1a1a;border-color:#d4af37;color:#d4af37}
+#btn-deal{background:linear-gradient(135deg,#d4af37,#b8941e);color:#1a1a1a;border:none;padding:12px 36px;font-size:1.1rem;font-weight:700;border-radius:10px;cursor:pointer}
+#btn-deal:disabled{opacity:.4;cursor:default}
+#btn-clear-bet{background:transparent;border:1px solid rgba(255,255,255,.3);color:#ccc;padding:8px 18px;font-size:.85rem;border-radius:8px;cursor:pointer}
+@media(max-width:500px){
+  .card{width:58px;height:84px;font-size:1.2rem;border-radius:8px}
+  .actions button{padding:10px 20px;font-size:.9rem}
+  #title-screen h1{font-size:2.4rem}
+}
+</style>
+</head>
+<body>
+
+<div id="title-screen">
+  <h1>♠ Blackjack ♥</h1>
+  <p class="subtitle">Get as close to 21 as possible without going over. Beat the dealer to win! Aces count as 1 or 11. Face cards are worth 10. Blackjack pays 3:2.</p>
+  <button onclick="startGame()">Play</button>
+</div>
+
+<div class="game-container" id="game">
+  <div class="info-bar">
+    <span><span class="label">Balance</span>&nbsp;<span class="val" id="balance">1000</span></span>
+    <span><span class="label">Bet</span>&nbsp;<span class="val" id="cur-bet">0</span></span>
+    <span><span class="label">Wins</span>&nbsp;<span class="val" id="wins">0</span></span>
+  </div>
+
+  <div class="area">
+    <span class="area-label">Dealer</span>
+    <div class="cards" id="dealer-cards"></div>
+    <div class="score-badge" id="dealer-score" style="visibility:hidden">0</div>
+  </div>
+
+  <div class="message" id="msg"></div>
+
+  <div class="area">
+    <span class="area-label">You</span>
+    <div class="cards" id="player-cards"></div>
+    <div class="score-badge" id="player-score" style="visibility:hidden">0</div>
+  </div>
+
+  <!-- Betting phase -->
+  <div class="bet-area" id="bet-area">
+    <div class="chips">
+      <div class="chip c5" onclick="addBet(5)">5</div>
+      <div class="chip c10" onclick="addBet(10)">10</div>
+      <div class="chip c25" onclick="addBet(25)">25</div>
+      <div class="chip c50" onclick="addBet(50)">50</div>
+      <div class="chip c100" onclick="addBet(100)">100</div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button id="btn-clear-bet" onclick="clearBet()">Clear</button>
+      <button id="btn-deal" onclick="deal()" disabled>Deal</button>
+    </div>
+  </div>
+
+  <!-- Play phase -->
+  <div class="actions" id="play-actions" style="display:none">
+    <button id="btn-hit" onclick="hit()">Hit</button>
+    <button id="btn-stand" onclick="stand()">Stand</button>
+    <button id="btn-double" onclick="doDouble()">Double</button>
+  </div>
+
+  <!-- Round over -->
+  <div class="actions" id="round-over" style="display:none">
+    <button id="btn-newround" onclick="newRound()">Next Hand</button>
+  </div>
+</div>
+
+<script>
+const suits=['♠','♥','♦','♣'],ranks=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+let deck,playerHand,dealerHand,balance=1000,bet=0,wins=0,gameActive=false;
+
+function startGame(){document.getElementById('title-screen').style.display='none';document.getElementById('game').style.display='flex';newRound()}
+
+function makeDeck(){let d=[];for(let s of suits)for(let r of ranks)d.push({rank:r,suit:s});for(let i=d.length-1;i>0;i--){let j=Math.random()*i|0;[d[i],d[j]]=[d[j],d[i]]}return d}
+
+function cardVal(c){if('JQK'.includes(c.rank))return 10;if(c.rank==='A')return 11;return+c.rank}
+function handVal(h){let v=0,a=0;for(let c of h){v+=cardVal(c);if(c.rank==='A')a++}while(v>21&&a>0){v-=10;a--}return v}
+function isRed(c){return c.suit==='♥'||c.suit==='♦'}
+
+function renderCard(c,hidden){
+  if(hidden)return'<div class="card hidden-card"><span>?</span></div>';
+  return`<div class="card${isRed(c)?' red':''}"><span>${c.rank}</span><span class="suit">${c.suit}</span></div>`
+}
+
+function render(revealDealer){
+  const dc=document.getElementById('dealer-cards'),pc=document.getElementById('player-cards');
+  const ds=document.getElementById('dealer-score'),ps=document.getElementById('player-score');
+  dc.innerHTML=dealerHand.map((c,i)=>renderCard(c,!revealDealer&&i===1)).join('');
+  pc.innerHTML=playerHand.map(c=>renderCard(c)).join('');
+  const pv=handVal(playerHand);
+  ps.style.visibility='visible';ps.textContent=pv;
+  ps.className='score-badge'+(pv>21?' bust':pv===21&&playerHand.length===2?' bj':'');
+  if(revealDealer){const dv=handVal(dealerHand);ds.style.visibility='visible';ds.textContent=dv;ds.className='score-badge'+(dv>21?' bust':'')}
+  else{ds.style.visibility='visible';ds.textContent=cardVal(dealerHand[0])}
+  document.getElementById('balance').textContent=balance;
+  document.getElementById('cur-bet').textContent=bet;
+  document.getElementById('wins').textContent=wins;
+}
+
+function newRound(){
+  document.getElementById('msg').textContent='';document.getElementById('msg').className='message';
+  document.getElementById('dealer-cards').innerHTML='';document.getElementById('player-cards').innerHTML='';
+  document.getElementById('dealer-score').style.visibility='hidden';document.getElementById('player-score').style.visibility='hidden';
+  document.getElementById('bet-area').style.display='flex';
+  document.getElementById('play-actions').style.display='none';
+  document.getElementById('round-over').style.display='none';
+  bet=0;document.getElementById('cur-bet').textContent=0;
+  document.getElementById('btn-deal').disabled=true;
+  if(balance<=0){document.getElementById('msg').textContent='Bankrupt! Resetting...';balance=1000;document.getElementById('balance').textContent=balance}
+}
+
+function addBet(v){if(v>balance-bet)return;bet+=v;document.getElementById('cur-bet').textContent=bet;document.getElementById('btn-deal').disabled=bet===0}
+function clearBet(){bet=0;document.getElementById('cur-bet').textContent=0;document.getElementById('btn-deal').disabled=true}
+
+function deal(){
+  balance-=bet;deck=makeDeck();playerHand=[deck.pop(),deck.pop()];dealerHand=[deck.pop(),deck.pop()];
+  document.getElementById('bet-area').style.display='none';
+  const pv=handVal(playerHand),dv=handVal(dealerHand);
+  // Check naturals
+  if(pv===21&&dv===21){render(true);endRound('push');return}
+  if(pv===21){render(true);endRound('blackjack');return}
+  if(dv===21){render(true);endRound('dealer-bj');return}
+  document.getElementById('play-actions').style.display='flex';
+  document.getElementById('btn-double').disabled=balance<bet;
+  gameActive=true;render(false)
+}
+
+function hit(){if(!gameActive)return;playerHand.push(deck.pop());const v=handVal(playerHand);document.getElementById('btn-double').disabled=true;render(false);if(v>21){gameActive=false;render(true);endRound('bust')}else if(v===21)stand()}
+
+function stand(){if(!gameActive)return;gameActive=false;dealerPlay()}
+
+function doDouble(){if(!gameActive||balance<bet)return;balance-=bet;bet*=2;document.getElementById('cur-bet').textContent=bet;playerHand.push(deck.pop());render(false);if(handVal(playerHand)>21){render(true);endRound('bust');return}gameActive=false;dealerPlay()}
+
+function dealerPlay(){
+  render(true);
+  const step=()=>{if(handVal(dealerHand)<17){dealerHand.push(deck.pop());render(true);setTimeout(step,400)}else{resolve()}};
+  const resolve=()=>{const pv=handVal(playerHand),dv=handVal(dealerHand);if(dv>21)endRound('win');else if(dv>pv)endRound('lose');else if(pv>dv)endRound('win');else endRound('push')};
+  setTimeout(step,400)
+}
+
+function endRound(result){
+  document.getElementById('play-actions').style.display='none';
+  document.getElementById('round-over').style.display='flex';
+  const m=document.getElementById('msg');
+  if(result==='blackjack'){balance+=Math.floor(bet*2.5);wins++;m.textContent='Blackjack! +'+Math.floor(bet*1.5);m.className='message bj'}
+  else if(result==='win'){balance+=bet*2;wins++;m.textContent='You win! +'+bet;m.className='message win'}
+  else if(result==='bust'){m.textContent='Bust! -'+bet;m.className='message lose'}
+  else if(result==='lose'){m.textContent='Dealer wins. -'+bet;m.className='message lose'}
+  else if(result==='push'){balance+=bet;m.textContent='Push. Bet returned.';m.className='message push'}
+  else if(result==='dealer-bj'){m.textContent='Dealer Blackjack!';m.className='message lose'}
+  render(true);
+}
+</script>
+</body>
+</html>
