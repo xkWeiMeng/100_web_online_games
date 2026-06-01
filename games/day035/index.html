@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Color Match</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f0f1a;color:#fff;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden}
+#app{text-align:center;width:100%;max-width:480px;padding:20px}
+h1{font-size:2.4rem;margin-bottom:8px;background:linear-gradient(135deg,#ff6b6b,#ffd93d,#6bcb77,#4d96ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{color:#888;margin-bottom:24px;font-size:.95rem}
+.btn{background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;color:#fff;padding:14px 40px;border-radius:12px;font-size:1.1rem;cursor:pointer;transition:transform .15s,box-shadow .15s;box-shadow:0 4px 20px rgba(99,102,241,.4)}
+.btn:hover{transform:scale(1.05)}
+.btn:active{transform:scale(.97)}
+.instructions{background:rgba(255,255,255,.06);border-radius:14px;padding:20px;margin:20px 0;text-align:left;line-height:1.7;font-size:.92rem;color:#bbb}
+.instructions b{color:#e0e0e0}
+
+/* HUD */
+#hud{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;font-size:1rem}
+#hud span{background:rgba(255,255,255,.08);padding:6px 14px;border-radius:8px}
+#timer-bar{height:6px;background:rgba(255,255,255,.1);border-radius:3px;margin-bottom:24px;overflow:hidden}
+#timer-fill{height:100%;width:100%;background:linear-gradient(90deg,#ff6b6b,#ffd93d);border-radius:3px;transition:width .1s linear}
+
+/* Prompt */
+#prompt{font-size:2.8rem;font-weight:800;margin:30px 0;letter-spacing:2px;min-height:60px;transition:opacity .15s}
+
+/* Choices */
+#choices{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px}
+.choice{height:90px;border-radius:14px;cursor:pointer;border:3px solid transparent;transition:transform .12s,border-color .12s,opacity .12s}
+.choice:hover{transform:scale(1.04);border-color:rgba(255,255,255,.3)}
+.choice:active{transform:scale(.95)}
+
+/* Feedback */
+#feedback{font-size:1.3rem;margin-top:18px;min-height:36px;font-weight:600}
+.correct{color:#6bcb77}
+.wrong{color:#ff6b6b}
+.timeout{color:#ffd93d}
+
+/* Game Over */
+#results{margin-top:20px}
+#results .stat{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.08);font-size:1rem}
+#results .stat:last-child{border:none}
+#results .val{font-weight:700;color:#a78bfa}
+#final-score{font-size:3rem;font-weight:800;background:linear-gradient(135deg,#6bcb77,#4d96ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:10px 0}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const COLORS = [
+  {name:'Red',hex:'#ff6b6b'},
+  {name:'Blue',hex:'#4d96ff'},
+  {name:'Green',hex:'#6bcb77'},
+  {name:'Yellow',hex:'#ffd93d'},
+  {name:'Purple',hex:'#a855f7'},
+  {name:'Orange',hex:'#fb923c'},
+  {name:'Pink',hex:'#f472b6'},
+  {name:'Cyan',hex:'#22d3ee'}
+];
+const ROUNDS=20, BASE_TIME=3000, MIN_TIME=1200, TIME_DECAY=80;
+let round,score,streak,bestStreak,totalTime,correctCount,timer,startTs,timeLeft,roundTime;
+const $=id=>document.getElementById(id);
+const app=document.getElementById('app');
+
+function showMenu(){
+  app.innerHTML=`
+    <h1>Color Match</h1>
+    <p class="subtitle">How fast can you match colors?</p>
+    <div class="instructions">
+      <b>How to play:</b><br>
+      A color <b>name</b> appears on screen written in a <b>different</b> color.<br>
+      Pick the button whose color matches the <b>written word</b>, not the text color!<br><br>
+      <b>Scoring:</b> Faster = more points. Build streaks for bonus multipliers!<br>
+      ${ROUNDS} rounds total. Good luck!
+    </div>
+    <button class="btn" onclick="startGame()">Play</button>`;
+}
+
+function startGame(){
+  round=0;score=0;streak=0;bestStreak=0;totalTime=0;correctCount=0;
+  nextRound();
+}
+
+function nextRound(){
+  if(round>=ROUNDS) return endGame();
+  round++;
+  roundTime=Math.max(MIN_TIME,BASE_TIME-round*TIME_DECAY);
+
+  // pick target color (the word) and ink color (different)
+  let ti=Math.floor(Math.random()*COLORS.length);
+  let ii;
+  do{ii=Math.floor(Math.random()*COLORS.length)}while(ii===ti);
+  const target=COLORS[ti], ink=COLORS[ii];
+
+  // pick 4 choices, must include target
+  let idxs=new Set([ti]);
+  while(idxs.size<4){idxs.add(Math.floor(Math.random()*COLORS.length))}
+  let choices=[...idxs].map(i=>COLORS[i]).sort(()=>Math.random()-.5);
+
+  app.innerHTML=`
+    <div id="hud">
+      <span>Round ${round}/${ROUNDS}</span>
+      <span>Streak: ${streak}x</span>
+      <span>Score: ${score}</span>
+    </div>
+    <div id="timer-bar"><div id="timer-fill"></div></div>
+    <div id="prompt" style="color:${ink.hex}">${target.name}</div>
+    <div id="choices">
+      ${choices.map((c,i)=>`<div class="choice" data-name="${c.name}" style="background:${c.hex}" onclick="pick(this)"></div>`).join('')}
+    </div>
+    <div id="feedback"></div>`;
+
+  startTs=performance.now();
+  timeLeft=roundTime;
+  updateBar();
+  timer=setInterval(()=>{
+    timeLeft=roundTime-(performance.now()-startTs);
+    if(timeLeft<=0){clearInterval(timer);onTimeout();}
+    else updateBar();
+  },30);
+}
+
+function updateBar(){
+  const f=$('timer-fill');
+  if(f) f.style.width=Math.max(0,timeLeft/roundTime*100)+'%';
+}
+
+function pick(el){
+  clearInterval(timer);
+  const elapsed=performance.now()-startTs;
+  const promptName=$('prompt').textContent;
+  const fb=$('feedback');
+  // disable further clicks
+  document.querySelectorAll('.choice').forEach(c=>c.onclick=null);
+
+  if(el.dataset.name===promptName){
+    const timeBonus=Math.round(Math.max(0,(roundTime-elapsed)/roundTime)*100);
+    streak++;
+    if(streak>bestStreak) bestStreak=streak;
+    const mult=1+Math.floor(streak/3)*0.5;
+    const pts=Math.round((10+timeBonus)*mult);
+    score+=pts;
+    totalTime+=elapsed;
+    correctCount++;
+    fb.className='correct';
+    fb.textContent=`+${pts} pts${mult>1?' ('+mult+'x)':''}`;
+    el.style.borderColor='#fff';
+  } else {
+    streak=0;
+    fb.className='wrong';
+    fb.textContent='Wrong!';
+    el.style.opacity='.4';
+    // highlight correct
+    document.querySelectorAll('.choice').forEach(c=>{
+      if(c.dataset.name===promptName) c.style.borderColor='#fff';
+    });
+  }
+  setTimeout(nextRound,900);
+}
+
+function onTimeout(){
+  streak=0;
+  const fb=$('feedback');
+  fb.className='timeout';
+  fb.textContent='Too slow!';
+  document.querySelectorAll('.choice').forEach(c=>{
+    c.onclick=null;
+    if(c.dataset.name===$('prompt').textContent) c.style.borderColor='#fff';
+  });
+  setTimeout(nextRound,900);
+}
+
+function endGame(){
+  const avg=correctCount?Math.round(totalTime/correctCount):0;
+  const acc=Math.round(correctCount/ROUNDS*100);
+  app.innerHTML=`
+    <h1>Game Over</h1>
+    <div id="final-score">${score}</div>
+    <p class="subtitle">points</p>
+    <div id="results">
+      <div class="stat"><span>Accuracy</span><span class="val">${acc}%</span></div>
+      <div class="stat"><span>Correct</span><span class="val">${correctCount}/${ROUNDS}</span></div>
+      <div class="stat"><span>Best Streak</span><span class="val">${bestStreak}</span></div>
+      <div class="stat"><span>Avg Reaction</span><span class="val">${avg}ms</span></div>
+    </div>
+    <br>
+    <button class="btn" onclick="startGame()">Play Again</button>
+    <br><br>
+    <button class="btn" style="background:rgba(255,255,255,.1);box-shadow:none" onclick="showMenu()">Menu</button>`;
+}
+
+showMenu();
+</script>
+</body>
+</html>
