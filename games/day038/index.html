@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Gravity Puzzle - Planets</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a2a; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; display: flex; align-items: center; justify-content: center; color: #fff; }
+canvas { display: block; border-radius: 12px; touch-action: none; }
+#ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+#ui > div { pointer-events: auto; }
+#menu { background: rgba(10,10,42,0.95); border: 2px solid #4a6fa5; border-radius: 16px; padding: 40px; text-align: center; max-width: 420px; }
+#menu h1 { font-size: 2em; margin-bottom: 8px; background: linear-gradient(135deg, #ffd700, #ff6b6b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+#menu p { color: #aab; font-size: 0.9em; line-height: 1.6; margin: 16px 0; }
+#menu button, #hud button { background: linear-gradient(135deg, #4a6fa5, #6b5ce7); border: none; color: #fff; padding: 12px 32px; border-radius: 8px; font-size: 1.1em; cursor: pointer; margin-top: 12px; }
+#menu button:hover, #hud button:hover { opacity: 0.85; }
+#hud { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: center; pointer-events: none; font-size: 0.95em; }
+#hud span { background: rgba(10,10,42,0.8); padding: 6px 14px; border-radius: 8px; border: 1px solid #4a6fa5; }
+#hud button { pointer-events: auto; padding: 6px 14px; font-size: 0.85em; margin: 0; }
+#win { display: none; }
+#win.show { display: block; }
+.stars { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: -1; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="ui">
+  <div id="menu">
+    <h1>Gravity Puzzle</h1>
+    <p>Guide the spaceship to the goal by placing planets.<br>
+    Planets create gravity wells that pull the ship.<br>
+    Tap/click to place a planet, then launch!<br>
+    Use fewer planets for a higher score.</p>
+    <button onclick="startGame()">Start Game</button>
+  </div>
+  <div id="win" class="show" style="display:none">
+    <div id="menu">
+      <h1 id="winTitle">Level Complete!</h1>
+      <p id="winText"></p>
+      <button id="winBtn" onclick="nextAction()">Next Level</button>
+    </div>
+  </div>
+</div>
+<div id="hud" style="display:none">
+  <span id="scoreDisp">Score: 0</span>
+  <span id="levelDisp">Level 1</span>
+  <button id="launchBtn" onclick="launch()">Launch</button>
+  <button onclick="resetLevel()">Reset</button>
+</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() {
+  W = Math.min(window.innerWidth, 800);
+  H = Math.min(window.innerHeight, 600);
+  canvas.width = W; canvas.height = H;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const G = 800;
+let state = 'menu'; // menu, placing, flying, done
+let level = 0, score = 0, totalScore = 0;
+let ship, goal, walls, placedPlanets, shipTrail;
+let maxPlanets, flying;
+
+const levels = [
+  { ship: [80, 300], goal: [700, 300], walls: [], max: 3 },
+  { ship: [80, 100], goal: [700, 500], walls: [[350, 200, 20, 250]], max: 3 },
+  { ship: [80, 500], goal: [700, 80], walls: [[300, 0, 20, 350], [500, 250, 20, 350]], max: 4 },
+  { ship: [400, 550], goal: [400, 50], walls: [[200, 200, 250, 20], [350, 400, 250, 20]], max: 4 },
+  { ship: [60, 300], goal: [740, 300], walls: [[250, 100, 20, 200], [400, 300, 20, 200], [550, 100, 20, 200]], max: 5 },
+  { ship: [60, 60], goal: [740, 540], walls: [[200, 0, 20, 400], [400, 200, 20, 400], [600, 0, 20, 400]], max: 5 },
+];
+
+function loadLevel(i) {
+  const l = levels[i];
+  ship = { x: l.ship[0], y: l.ship[1], vx: 0, vy: 0, r: 10, alive: true };
+  goal = { x: l.goal[0], y: l.goal[1], r: 20 };
+  walls = l.walls.map(w => ({ x: w[0], y: w[1], w: w[2], h: w[3] }));
+  maxPlanets = l.max;
+  placedPlanets = [];
+  shipTrail = [];
+  flying = false;
+  state = 'placing';
+  document.getElementById('levelDisp').textContent = `Level ${i + 1}/${levels.length}`;
+  document.getElementById('launchBtn').textContent = 'Launch';
+}
+
+function startGame() {
+  document.getElementById('menu').parentElement.querySelector('#menu').style.display = 'none';
+  document.getElementById('ui').querySelector('#menu').style.display = 'none';
+  document.getElementById('hud').style.display = 'flex';
+  document.getElementById('win').style.display = 'none';
+  level = 0; totalScore = 0;
+  document.getElementById('scoreDisp').textContent = `Score: 0`;
+  loadLevel(0);
+}
+
+function launch() {
+  if (state !== 'placing') return;
+  state = 'flying'; flying = true;
+  ship.vx = 0; ship.vy = 0;
+  document.getElementById('launchBtn').textContent = 'Flying...';
+}
+
+function resetLevel() {
+  loadLevel(level);
+}
+
+canvas.addEventListener('click', (e) => {
+  if (state !== 'placing') return;
+  if (placedPlanets.length >= maxPlanets) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  // don't place on ship or goal
+  if (Math.hypot(x - ship.x, y - ship.y) < 30) return;
+  if (Math.hypot(x - goal.x, y - goal.y) < 30) return;
+  placedPlanets.push({ x, y, r: 18, mass: 1 });
+});
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const t = e.touches[0];
+  canvas.dispatchEvent(new MouseEvent('click', { clientX: t.clientX, clientY: t.clientY }));
+});
+
+function update(dt) {
+  if (state !== 'flying') return;
+  // gravity from placed planets
+  for (const p of placedPlanets) {
+    const dx = p.x - ship.x, dy = p.y - ship.y;
+    const dist = Math.max(Math.hypot(dx, dy), 25);
+    const f = G * p.mass / (dist * dist);
+    ship.vx += f * dx / dist * dt;
+    ship.vy += f * dy / dist * dt;
+  }
+  ship.x += ship.vx * dt;
+  ship.y += ship.vy * dt;
+  shipTrail.push({ x: ship.x, y: ship.y });
+  if (shipTrail.length > 200) shipTrail.shift();
+
+  // check goal
+  if (Math.hypot(ship.x - goal.x, ship.y - goal.y) < goal.r + ship.r) {
+    winLevel();
+    return;
+  }
+  // check walls
+  for (const w of walls) {
+    if (ship.x + ship.r > w.x && ship.x - ship.r < w.x + w.w &&
+        ship.y + ship.r > w.y && ship.y - ship.r < w.y + w.h) {
+      failLevel(); return;
+    }
+  }
+  // check planet collision
+  for (const p of placedPlanets) {
+    if (Math.hypot(ship.x - p.x, ship.y - p.y) < p.r + ship.r) {
+      failLevel(); return;
+    }
+  }
+  // out of bounds
+  if (ship.x < -50 || ship.x > W + 50 || ship.y < -50 || ship.y > H + 50) {
+    failLevel();
+  }
+}
+
+function winLevel() {
+  state = 'done';
+  const bonus = Math.max(0, (maxPlanets - placedPlanets.length + 1) * 100);
+  score = bonus;
+  totalScore += score;
+  document.getElementById('scoreDisp').textContent = `Score: ${totalScore}`;
+  const isLast = level >= levels.length - 1;
+  document.getElementById('winTitle').textContent = isLast ? 'You Win!' : 'Level Complete!';
+  document.getElementById('winText').textContent = `Planets used: ${placedPlanets.length}/${maxPlanets}\nBonus: +${bonus}${isLast ? '\nTotal Score: ' + totalScore : ''}`;
+  document.getElementById('winBtn').textContent = isLast ? 'Play Again' : 'Next Level';
+  document.getElementById('win').style.display = 'block';
+}
+
+function failLevel() {
+  state = 'done';
+  document.getElementById('winTitle').textContent = 'Ship Lost!';
+  document.getElementById('winText').textContent = 'The ship crashed or flew away. Try again!';
+  document.getElementById('winBtn').textContent = 'Retry';
+  document.getElementById('win').style.display = 'block';
+}
+
+function nextAction() {
+  document.getElementById('win').style.display = 'none';
+  const title = document.getElementById('winTitle').textContent;
+  if (title === 'Ship Lost!') { loadLevel(level); return; }
+  if (level >= levels.length - 1) { level = 0; totalScore = 0; document.getElementById('scoreDisp').textContent = 'Score: 0'; }
+  else { level++; }
+  loadLevel(level);
+}
+
+// Stars background
+let stars = Array.from({length: 120}, () => ({ x: Math.random() * 800, y: Math.random() * 600, s: Math.random() * 1.5 + 0.5, b: Math.random() }));
+
+function draw() {
+  ctx.fillStyle = '#0a0a2a';
+  ctx.fillRect(0, 0, W, H);
+
+  // stars
+  for (const s of stars) {
+    ctx.globalAlpha = 0.3 + s.b * 0.5;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(s.x, s.y, s.s, s.s);
+  }
+  ctx.globalAlpha = 1;
+
+  if (state === 'menu') return;
+
+  // walls
+  ctx.fillStyle = '#3a4a6a';
+  for (const w of walls) ctx.fillRect(w.x, w.y, w.w, w.h);
+
+  // goal
+  ctx.beginPath();
+  ctx.arc(goal.x, goal.y, goal.r, 0, Math.PI * 2);
+  ctx.fillStyle = '#2ecc40';
+  ctx.shadowColor = '#2ecc40'; ctx.shadowBlur = 15;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // placed planets
+  for (const p of placedPlanets) {
+    const grad = ctx.createRadialGradient(p.x - 4, p.y - 4, 2, p.x, p.y, p.r);
+    grad.addColorStop(0, '#ffa94d');
+    grad.addColorStop(1, '#c0392b');
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    // gravity ring
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 50, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,169,77,0.2)';
+    ctx.stroke();
+  }
+
+  // trail
+  if (shipTrail.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(shipTrail[0].x, shipTrail[0].y);
+    for (let i = 1; i < shipTrail.length; i++) ctx.lineTo(shipTrail[i].x, shipTrail[i].y);
+    ctx.strokeStyle = 'rgba(100,180,255,0.5)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.lineWidth = 1;
+  }
+
+  // ship
+  if (ship.alive) {
+    ctx.beginPath();
+    ctx.arc(ship.x, ship.y, ship.r, 0, Math.PI * 2);
+    ctx.fillStyle = '#64b5f6';
+    ctx.shadowColor = '#64b5f6'; ctx.shadowBlur = 10;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // triangle indicator
+    ctx.beginPath();
+    ctx.moveTo(ship.x + 8, ship.y);
+    ctx.lineTo(ship.x - 5, ship.y - 5);
+    ctx.lineTo(ship.x - 5, ship.y + 5);
+    ctx.closePath();
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+  }
+
+  // planets remaining indicator
+  if (state === 'placing') {
+    ctx.fillStyle = '#aab';
+    ctx.font = '14px Segoe UI';
+    ctx.fillText(`Planets: ${placedPlanets.length}/${maxPlanets} (click to place)`, 12, H - 16);
+  }
+}
+
+let lastTime = 0;
+function loop(t) {
+  const dt = Math.min((t - lastTime) / 1000, 0.05);
+  lastTime = t;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
