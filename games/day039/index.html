@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipe Mania - Day 39</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1a1a2e;
+    color: #eee;
+    font-family: 'Segoe UI', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  h1 {
+    margin: 16px 0 4px;
+    font-size: 2rem;
+    color: #00d4ff;
+    text-shadow: 0 0 16px #00d4ff88;
+    letter-spacing: 3px;
+  }
+
+  #subtitle { color: #888; font-size: 0.85rem; margin-bottom: 10px; }
+
+  #hud {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 10px;
+    font-size: 1rem;
+  }
+  #hud span { background: #16213e; padding: 6px 16px; border-radius: 20px; border: 1px solid #0f3460; }
+  #hud .label { color: #888; font-size: 0.75rem; display: block; text-align: center; }
+  #hud .val { color: #00d4ff; font-weight: bold; font-size: 1.1rem; text-align: center; }
+
+  #game-wrap {
+    position: relative;
+    display: inline-block;
+  }
+
+  canvas {
+    display: block;
+    border: 2px solid #0f3460;
+    border-radius: 8px;
+    cursor: pointer;
+    touch-action: none;
+    background: #16213e;
+  }
+
+  #queue-panel {
+    margin-top: 10px;
+    background: #16213e;
+    border: 1px solid #0f3460;
+    border-radius: 8px;
+    padding: 10px 16px;
+    text-align: center;
+    width: 100%;
+    max-width: 420px;
+  }
+  #queue-panel .qlabel { color: #888; font-size: 0.75rem; margin-bottom: 6px; }
+  #queue-canvas { display: block; margin: 0 auto; }
+
+  #overlay {
+    position: fixed;
+    inset: 0;
+    background: #000a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+  #overlay.hidden { display: none; }
+
+  #modal {
+    background: #16213e;
+    border: 2px solid #00d4ff;
+    border-radius: 16px;
+    padding: 36px 40px;
+    text-align: center;
+    max-width: 360px;
+    box-shadow: 0 0 40px #00d4ff44;
+  }
+  #modal h2 { font-size: 1.8rem; color: #00d4ff; margin-bottom: 12px; }
+  #modal p { color: #aaa; font-size: 0.95rem; line-height: 1.6; margin-bottom: 20px; }
+  #modal .final-score { font-size: 2rem; color: #ffd700; font-weight: bold; margin: 8px 0 20px; }
+
+  button {
+    background: linear-gradient(135deg, #0f3460, #16213e);
+    color: #00d4ff;
+    border: 1px solid #00d4ff;
+    border-radius: 8px;
+    padding: 12px 32px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+  }
+  button:hover { background: #00d4ff22; box-shadow: 0 0 12px #00d4ff44; }
+
+  #timer-bar-wrap {
+    width: 100%;
+    max-width: 420px;
+    height: 8px;
+    background: #0f3460;
+    border-radius: 4px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  #timer-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #00d4ff, #0077ff);
+    border-radius: 4px;
+    transition: width 0.1s linear, background 0.5s;
+  }
+</style>
+</head>
+<body>
+<h1>🔧 PIPE MANIA</h1>
+<div id="subtitle">Connect the pipes before the water flows!</div>
+
+<div id="hud">
+  <span><div class="label">SCORE</div><div class="val" id="score-val">0</div></span>
+  <span><div class="label">LEVEL</div><div class="val" id="level-val">1</div></span>
+  <span><div class="label">PIPES LEFT</div><div class="val" id="pipes-val">-</div></span>
+</div>
+
+<div id="game-wrap">
+  <canvas id="gameCanvas"></canvas>
+</div>
+
+<div id="timer-bar-wrap">
+  <div id="timer-bar" style="width:100%"></div>
+</div>
+
+<div id="queue-panel">
+  <div class="qlabel">UPCOMING PIPES (click/tap grid to place)</div>
+  <canvas id="queue-canvas"></canvas>
+</div>
+
+<div id="overlay">
+  <div id="modal">
+    <h2 id="modal-title">PIPE MANIA</h2>
+    <p id="modal-desc">Connect pipes from the source to the drain before the water runs out!<br><br>
+    Place pipes by clicking/tapping the grid. The water starts flowing after a delay — build fast!</p>
+    <button id="modal-btn" onclick="startGame()">START GAME</button>
+  </div>
+</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+const COLS = 9, ROWS = 8;
+const CELL = 46;
+const W = COLS * CELL, H = ROWS * CELL;
+const QUEUE_SIZE = 5;
+
+// Pipe types: each has 4 flags [top, right, bottom, left]
+// 0=straight H, 1=straight V, 2=bend TL, 3=bend TR, 4=bend BL, 5=bend BR, 6=cross (+)
+const PIPE_DEFS = [
+  { open: [0,1,0,1], name:'H' },  // 0 ─
+  { open: [1,0,1,0], name:'V' },  // 1 │
+  { open: [1,1,0,0], name:'TR' }, // 2 ┐
+  { open: [1,0,0,1], name:'TL' }, // 3 ┌
+  { open: [0,1,1,0], name:'BR' }, // 4 ┘
+  { open: [0,0,1,1], name:'BL' }, // 5 └
+  { open: [1,1,1,1], name:'+' },  // 6 ╋
+];
+
+const DIR = {T:0, R:1, B:2, L:3};
+const OPPOSITE = {0:2, 1:3, 2:0, 3:1};
+const DROW = [-1,0,1,0], DCOL = [0,1,0,-1];
+
+// Pipe colors
+const PIPE_COLOR = '#4a9eff';
+const PIPE_FILLED_COLOR = '#00d4ff';
+const PIPE_BORDER = '#1a3a6e';
+const CELL_BG = '#1a2a4a';
+const CELL_HOVER = '#1e3055';
+
+// ── State ──────────────────────────────────────────────────────────────────
+let grid = [];       // grid[r][c] = { type: int|null, filled: false, fillPct: 0 }
+let queue = [];
+let sourceR, sourceC, drainR, drainC;
+let waterPath = [];  // [{r,c}] path traced so far
+let waterPos = 0;    // float index into waterPath
+let waterSpeed = 0;  // cells per second
+let gameRunning = false;
+let score = 0;
+let level = 1;
+let countdown = 0;   // seconds before water starts
+let countdownMax = 0;
+let hoverR = -1, hoverC = -1;
+let lastTime = null;
+let animId;
+let gameOver = false;
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = W; canvas.height = H;
+
+const qCanvas = document.getElementById('queue-canvas');
+const qCtx = qCanvas.getContext('2d');
+const QCELL = 44;
+qCanvas.width = QUEUE_SIZE * QCELL + (QUEUE_SIZE-1)*6;
+qCanvas.height = QCELL;
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function rand(n){ return Math.floor(Math.random()*n); }
+
+function randomPipe(){
+  // Weighted: less crosses, more bends/straights
+  const weights = [10,10,12,12,12,12,4];
+  let total = weights.reduce((a,b)=>a+b,0), r=rand(total);
+  for(let i=0;i<weights.length;i++){ r-=weights[i]; if(r<0) return i; }
+  return 0;
+}
+
+function initGrid(){
+  grid = [];
+  for(let r=0;r<ROWS;r++){
+    grid[r] = [];
+    for(let c=0;c<COLS;c++) grid[r][c] = {type:null, filled:false, fillPct:0};
+  }
+}
+
+function placeSpecial(){
+  // Source on left edge, drain on right edge
+  sourceR = 1 + rand(ROWS-2);
+  sourceC = 0;
+  drainR  = 1 + rand(ROWS-2);
+  drainC  = COLS-1;
+  while(drainR===sourceR) drainR = 1+rand(ROWS-2);
+  // Place source pipe (H opening right)
+  grid[sourceR][sourceC] = {type:0, filled:false, fillPct:0, isSource:true};
+  // Place drain pipe (H opening left)
+  grid[drainR][drainC]   = {type:0, filled:false, fillPct:0, isDrain:true};
+}
+
+function refillQueue(){
+  while(queue.length < QUEUE_SIZE) queue.push(randomPipe());
+}
+
+function levelConfig(){
+  countdownMax = Math.max(3, 8 - (level-1)*0.5);
+  waterSpeed   = 1.2 + (level-1)*0.3; // cells/sec
+  return Math.max(3, 10 - level);      // pre-placed obstacles
+}
+
+function startGame(){
+  document.getElementById('overlay').classList.add('hidden');
+  score = 0; level = 1;
+  newLevel();
+}
+
+function newLevel(){
+  if(animId) cancelAnimationFrame(animId);
+  gameOver = false;
+  gameRunning = true;
+  initGrid();
+  placeSpecial();
+  queue = [];
+  refillQueue();
+  waterPath = [{r:sourceR, c:sourceC}];
+  waterPos = 0;
+  const cfg = levelConfig();
+  countdown = countdownMax;
+  lastTime = null;
+  updateHUD();
+  loop();
+}
+
+// ── Water flow logic ───────────────────────────────────────────────────────
+function getOpenDirs(r,c){
+  const cell = grid[r][c];
+  if(cell.type===null) return [];
+  return PIPE_DEFS[cell.type].open.map((v,i)=>v?i:-1).filter(i=>i>=0);
+}
+
+function canFlow(fromDir, r, c){
+  // Can water enter cell (r,c) from direction fromDir?
+  const enterDir = OPPOSITE[fromDir]; // direction water enters from
+  const dirs = getOpenDirs(r,c);
+  return dirs.includes(enterDir);
+}
+
+function extendPath(){
+  // Try to extend waterPath one more cell
+  const last = waterPath[waterPath.length-1];
+  const cell = grid[last.r][last.c];
+  if(cell.type===null) return false;
+  const dirs = getOpenDirs(last.r, last.c);
+  // Find exit direction (not where we came from)
+  let fromDir = null;
+  if(waterPath.length >= 2){
+    const prev = waterPath[waterPath.length-2];
+    const dr = last.r - prev.r, dc = last.c - prev.c;
+    fromDir = dr===-1?DIR.B : dr===1?DIR.T : dc===-1?DIR.R : DIR.L;
+    // fromDir is the direction the water came from INTO last cell
+    // so exit must be a different open dir
+  }
+  for(const d of dirs){
+    if(fromDir !== null && d === fromDir) continue;
+    const nr = last.r + DROW[d], nc = last.c + DCOL[d];
+    if(nr<0||nr>=ROWS||nc<0||nc>=COLS) continue;
+    if(grid[nr][nc].type===null) return false; // blocked
+    if(!canFlow(d, nr, nc)) return false;
+    if(waterPath.some(p=>p.r===nr&&p.c===nc)) return false; // loop
+    waterPath.push({r:nr, c:nc});
+    return true;
+  }
+  return false;
+}
+
+function checkWin(){
+  const last = waterPath[waterPath.length-1];
+  return last.r===drainR && last.c===drainC;
+}
+
+// ── Game loop ──────────────────────────────────────────────────────────────
+function loop(ts){
+  if(!gameRunning) return;
+  animId = requestAnimationFrame(loop);
+  if(!lastTime){ lastTime=ts||performance.now(); }
+  const dt = ((ts||performance.now()) - lastTime)/1000;
+  lastTime = ts||performance.now();
+
+  if(countdown > 0){
+    countdown -= dt;
+    if(countdown < 0) countdown = 0;
+  } else {
+    // Extend path as needed
+    while(Math.floor(waterPos+1) >= waterPath.length){
+      if(!extendPath()){
+        // water is stuck / hit empty cell
+        if(Math.ceil(waterPos) >= waterPath.length) {
+          triggerGameOver();
+          return;
+        }
+        break;
+      }
+    }
+    waterPos += waterSpeed * dt;
+
+    // Mark filled cells
+    const filledIdx = Math.floor(waterPos);
+    for(let i=0;i<waterPath.length;i++){
+      const {r,c} = waterPath[i];
+      if(i < filledIdx){
+        grid[r][c].filled = true;
+        grid[r][c].fillPct = 1;
+      } else if(i === filledIdx){
+        grid[r][c].fillPct = waterPos - filledIdx;
+      }
+    }
+
+    if(checkWin() && waterPos >= waterPath.length-1){
+      triggerWin();
+      return;
+    }
+
+    // Check if water can't advance
+    if(waterPos >= waterPath.length - 0.05 && !extendPath()){
+      // Give a tiny grace period
+      if(waterPos >= waterPath.length + 0.5){
+        triggerGameOver();
+        return;
+      }
+    }
+  }
+
+  render();
+}
+
+function triggerWin(){
+  gameRunning = false;
+  // Score: path length * 10 * level
+  const bonus = waterPath.length * 10 * level;
+  score += bonus;
+  level++;
+  updateHUD();
+  showModal('🎉 LEVEL COMPLETE!',
+    `Path length: ${waterPath.length} pipes<br>Bonus: +${bonus} points`,
+    'NEXT LEVEL', ()=>newLevel());
+}
+
+function triggerGameOver(){
+  gameRunning = false;
+  render();
+  showModal('💧 FLOODED!',
+    `The water overflowed!<br>Final score: <span class="final-score">${score}</span>`,
+    'PLAY AGAIN', ()=>{ score=0; level=1; newLevel(); });
+}
+
+// ── Input ──────────────────────────────────────────────────────────────────
+function cellAt(x,y){
+  return { c: Math.floor(x/CELL), r: Math.floor(y/CELL) };
+}
+
+function placePipe(r,c){
+  if(!gameRunning) return;
+  if(r<0||r>=ROWS||c<0||c>=COLS) return;
+  const cell = grid[r][c];
+  if(cell.isSource || cell.isDrain) return;
+  if(cell.filled) return;
+  // Don't replace cells already in water path that are filling
+  const idx = waterPath.findIndex(p=>p.r===r&&p.c===c);
+  if(idx !== -1 && idx <= Math.floor(waterPos)) return;
+
+  // If replacing a path cell, truncate path
+  if(idx !== -1){
+    waterPath = waterPath.slice(0, idx);
+    waterPos = Math.min(waterPos, idx-0.01);
+  }
+
+  cell.type = queue.shift();
+  refillQueue();
+  cell.filled = false;
+  cell.fillPct = 0;
+
+  updateHUD();
+  drawQueue();
+}
+
+canvas.addEventListener('click', e=>{
+  const rect = canvas.getBoundingClientRect();
+  const sx = canvas.width / rect.width, sy = canvas.height / rect.height;
+  const x = (e.clientX - rect.left)*sx, y = (e.clientY - rect.top)*sy;
+  const {r,c} = cellAt(x,y);
+  placePipe(r,c);
+});
+
+canvas.addEventListener('touchstart', e=>{
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const sx = canvas.width / rect.width, sy = canvas.height / rect.height;
+  const t = e.touches[0];
+  const x = (t.clientX - rect.left)*sx, y = (t.clientY - rect.top)*sy;
+  const {r,c} = cellAt(x,y);
+  placePipe(r,c);
+}, {passive:false});
+
+canvas.addEventListener('mousemove', e=>{
+  const rect = canvas.getBoundingClientRect();
+  const sx = canvas.width / rect.width, sy = canvas.height / rect.height;
+  const x = (e.clientX - rect.left)*sx, y = (e.clientY - rect.top)*sy;
+  const pos = cellAt(x,y);
+  if(pos.r!==hoverR||pos.c!==hoverC){ hoverR=pos.r; hoverC=pos.c; }
+});
+canvas.addEventListener('mouseleave', ()=>{ hoverR=-1; hoverC=-1; });
+
+// ── Rendering ──────────────────────────────────────────────────────────────
+function drawPipeShape(ctx, type, x, y, size, color, alpha=1){
+  const cx = x + size/2, cy = y + size/2;
+  const hw = size*0.18; // half pipe width
+  const def = PIPE_DEFS[type];
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = hw*2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Draw each open connection to center
+  ctx.beginPath();
+  if(def.open[0]) { ctx.moveTo(cx,y); ctx.lineTo(cx,cy); } // top
+  if(def.open[1]) { ctx.moveTo(x+size,cy); ctx.lineTo(cx,cy); } // right
+  if(def.open[2]) { ctx.moveTo(cx,y+size); ctx.lineTo(cx,cy); } // bottom
+  if(def.open[3]) { ctx.moveTo(x,cy); ctx.lineTo(cx,cy); } // left
+  ctx.stroke();
+
+  // Center dot
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(cx,cy, hw*0.7, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawCell(r,c){
+  const x = c*CELL, y = r*CELL;
+  const cell = grid[r][c];
+
+  // Background
+  ctx.fillStyle = (r===hoverR&&c===hoverC&&cell.type===null) ? CELL_HOVER : CELL_BG;
+  ctx.fillRect(x+1,y+1,CELL-2,CELL-2);
+
+  if(cell.type === null) return;
+
+  // Draw pipe background (unfilled)
+  drawPipeShape(ctx, cell.type, x+2, y+2, CELL-4, PIPE_BORDER, 1);
+  drawPipeShape(ctx, cell.type, x+2, y+2, CELL-4, PIPE_COLOR, 1);
+
+  // Draw filled overlay
+  if(cell.fillPct > 0){
+    drawPipeShape(ctx, cell.type, x+2, y+2, CELL-4, PIPE_FILLED_COLOR, Math.min(1, cell.fillPct+0.1));
+  }
+
+  // Source label
+  if(cell.isSource){
+    ctx.fillStyle = '#ffd700';
+    ctx.font = `bold ${CELL*0.28}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('SRC', x+CELL/2, y+3);
+  }
+  if(cell.isDrain){
+    ctx.fillStyle = '#ff6b6b';
+    ctx.font = `bold ${CELL*0.28}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('END', x+CELL/2, y+3);
+  }
+}
+
+function render(){
+  ctx.clearRect(0,0,W,H);
+
+  // Grid lines
+  ctx.strokeStyle = '#0f3460';
+  ctx.lineWidth = 1;
+  for(let r=0;r<=ROWS;r++){ ctx.beginPath(); ctx.moveTo(0,r*CELL); ctx.lineTo(W,r*CELL); ctx.stroke(); }
+  for(let c=0;c<=COLS;c++){ ctx.beginPath(); ctx.moveTo(c*CELL,0); ctx.lineTo(c*CELL,H); ctx.stroke(); }
+
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) drawCell(r,c);
+
+  // Hover ghost
+  if(hoverR>=0&&hoverR<ROWS&&hoverC>=0&&hoverC<COLS && grid[hoverR][hoverC].type===null && gameRunning){
+    drawPipeShape(ctx, queue[0], hoverC*CELL+2, hoverR*CELL+2, CELL-4, '#ffffff', 0.25);
+  }
+
+  // Countdown overlay
+  if(countdown > 0){
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = '#ffd700';
+    ctx.font = `bold ${CELL*1.5}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(Math.ceil(countdown), W/2, H/2);
+    ctx.font = `${CELL*0.4}px sans-serif`;
+    ctx.fillStyle = '#ccc';
+    ctx.fillText('Place pipes before water flows!', W/2, H/2 + CELL);
+  }
+
+  // Timer bar
+  const pct = countdown>0 ? countdown/countdownMax : 0;
+  const bar = document.getElementById('timer-bar');
+  bar.style.width = (pct*100)+'%';
+  bar.style.background = pct>0.5 ? 'linear-gradient(90deg,#00d4ff,#0077ff)'
+    : pct>0.2 ? 'linear-gradient(90deg,#ffd700,#ff8800)'
+    : 'linear-gradient(90deg,#ff4444,#ff0000)';
+}
+
+function drawQueue(){
+  qCtx.clearRect(0,0,qCanvas.width,qCanvas.height);
+  for(let i=0;i<Math.min(queue.length,QUEUE_SIZE);i++){
+    const x = i*(QCELL+6);
+    qCtx.fillStyle = i===0 ? '#1e3a5f' : '#16213e';
+    qCtx.strokeStyle = i===0 ? '#00d4ff' : '#0f3460';
+    qCtx.lineWidth = i===0 ? 2 : 1;
+    qCtx.beginPath();
+    qCtx.roundRect(x,0,QCELL,QCELL,6);
+    qCtx.fill(); qCtx.stroke();
+    drawPipeShape(qCtx, queue[i], x+2, 2, QCELL-4, i===0?PIPE_FILLED_COLOR:PIPE_COLOR, 1);
+  }
+}
+
+function updateHUD(){
+  document.getElementById('score-val').textContent = score;
+  document.getElementById('level-val').textContent = level;
+  document.getElementById('pipes-val').textContent = queue.length;
+}
+
+function showModal(title, desc, btnText, cb){
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-desc').innerHTML = desc;
+  const btn = document.getElementById('modal-btn');
+  btn.textContent = btnText;
+  btn.onclick = cb;
+  document.getElementById('overlay').classList.remove('hidden');
+}
+
+// Initial queue draw
+refillQueue();
+drawQueue();
+</script>
+</body>
+</html>
