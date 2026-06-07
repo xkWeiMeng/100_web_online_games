@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crossword Puzzle Generator</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#0f1729;--surface:#1a2340;--surface2:#232e4a;--border:#2d3a5c;
+--primary:#6c63ff;--primary-glow:#6c63ff44;--accent:#00d4aa;--accent2:#ff6b9d;
+--text:#e8eaf6;--text2:#8892b0;--correct:#00d4aa;--wrong:#ff4757;
+--gold:#ffd700;--cell-bg:#1e2a4a;--cell-active:#2a3a6a;--cell-highlight:#1e3355;
+}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+#title-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px;text-align:center;animation:fadeIn .6s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+@keyframes glow{0%,100%{box-shadow:0 0 20px var(--primary-glow)}50%{box-shadow:0 0 40px var(--primary-glow)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+@keyframes popIn{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes correctFlash{0%{background:var(--correct)}100%{background:var(--cell-bg)}}
+@keyframes wrongShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.logo{font-size:clamp(2.5rem,6vw,4rem);font-weight:800;background:linear-gradient(135deg,var(--primary),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:10px;letter-spacing:-1px}
+.subtitle{font-size:clamp(1rem,2.5vw,1.3rem);color:var(--text2);margin-bottom:40px}
+.menu-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:30px;max-width:500px;width:100%;margin-bottom:20px}
+.menu-box h3{color:var(--accent);margin-bottom:15px;font-size:1.1rem}
+.menu-box p{color:var(--text2);font-size:.9rem;line-height:1.6;text-align:left}
+.menu-box ul{color:var(--text2);font-size:.9rem;line-height:1.8;text-align:left;padding-left:20px}
+.diff-buttons{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;justify-content:center}
+.diff-btn{padding:12px 24px;border:2px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);font-size:1rem;cursor:pointer;transition:all .2s;flex:1;min-width:100px}
+.diff-btn:hover{border-color:var(--primary);background:var(--primary);transform:translateY(-2px)}
+.diff-btn.selected{border-color:var(--primary);background:var(--primary)}
+.start-btn{margin-top:25px;padding:16px 48px;font-size:1.2rem;font-weight:700;background:linear-gradient(135deg,var(--primary),#8b5cf6);color:#fff;border:none;border-radius:12px;cursor:pointer;transition:all .3s;animation:glow 2s ease infinite}
+.start-btn:hover{transform:translateY(-3px) scale(1.03)}
+#game-screen{display:none;min-height:100vh;padding:10px}
+.game-header{display:flex;justify-content:space-between;align-items:center;padding:10px 15px;background:var(--surface);border-radius:12px;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+.header-left{display:flex;align-items:center;gap:15px}
+.game-title{font-size:1.1rem;font-weight:700;color:var(--primary)}
+.stat{display:flex;flex-direction:column;align-items:center;padding:4px 12px;background:var(--surface2);border-radius:8px;min-width:60px}
+.stat-label{font-size:.65rem;color:var(--text2);text-transform:uppercase}
+.stat-value{font-size:1rem;font-weight:700;color:var(--accent)}
+.header-right{display:flex;gap:8px}
+.icon-btn{padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-size:.85rem;transition:all .2s;white-space:nowrap}
+.icon-btn:hover{border-color:var(--primary);color:var(--primary);transform:translateY(-1px)}
+.icon-btn.danger{border-color:var(--wrong);color:var(--wrong)}
+.game-body{display:flex;gap:15px;max-width:1200px;margin:0 auto}
+.grid-panel{flex:1;display:flex;flex-direction:column;align-items:center}
+.crossword-grid{display:inline-grid;gap:2px;background:var(--bg);padding:2px;border-radius:8px;border:2px solid var(--border)}
+.cell{width:clamp(28px,5vw,38px);height:clamp(28px,5vw,38px);display:flex;align-items:center;justify-content:center;font-size:clamp(.8rem,2vw,1.1rem);font-weight:700;cursor:pointer;position:relative;transition:background .15s;border-radius:3px;text-transform:uppercase}
+.cell.empty{background:var(--bg);cursor:default}
+.cell.filled{background:var(--cell-bg)}
+.cell.filled:hover{background:var(--cell-active)}
+.cell.active{background:var(--primary)!important;color:#fff}
+.cell.highlighted{background:var(--cell-highlight)}
+.cell.correct{animation:correctFlash .8s ease forwards}
+.cell.wrong{animation:wrongShake .3s ease;background:var(--wrong)!important}
+.cell.revealed{color:var(--accent);opacity:.8}
+.cell-number{position:absolute;top:1px;left:2px;font-size:clamp(.45rem,1vw,.6rem);font-weight:600;color:var(--accent);line-height:1}
+.cell input{position:absolute;inset:0;width:100%;height:100%;background:transparent;border:none;color:inherit;font-size:inherit;font-weight:inherit;text-align:center;text-transform:uppercase;outline:none;caret-color:transparent;cursor:pointer}
+.clues-panel{width:320px;max-height:calc(100vh - 100px);overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+.clue-section{background:var(--surface);border-radius:12px;padding:15px}
+.clue-section h3{color:var(--primary);font-size:.9rem;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.clue-item{padding:8px 10px;font-size:.85rem;color:var(--text2);cursor:pointer;border-radius:6px;transition:all .15s;line-height:1.4}
+.clue-item:hover{background:var(--surface2);color:var(--text)}
+.clue-item.active{background:var(--primary);color:#fff}
+.clue-item.completed{color:var(--correct);text-decoration:line-through;opacity:.7}
+.clue-num{color:var(--accent);font-weight:700;margin-right:6px}
+.active-clue-bar{background:var(--surface);border-radius:10px;padding:12px 16px;margin:8px 0;font-size:.9rem;color:var(--text);display:none;border-left:3px solid var(--primary)}
+.active-clue-bar .clue-direction{color:var(--primary);font-weight:700;margin-right:8px;text-transform:uppercase;font-size:.75rem}
+#mobile-keyboard{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:2px solid var(--border);padding:6px;z-index:100}
+.kb-row{display:flex;justify-content:center;gap:3px;margin-bottom:3px}
+.kb-key{padding:10px 0;flex:1;max-width:38px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:1rem;font-weight:600;cursor:pointer;text-align:center;transition:all .1s;text-transform:uppercase}
+.kb-key:active{background:var(--primary);transform:scale(.95)}
+.kb-key.wide{max-width:60px;font-size:.7rem}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:30px;max-width:420px;width:100%;text-align:center;animation:popIn .3s ease}
+.modal h2{font-size:1.5rem;margin-bottom:10px;background:linear-gradient(135deg,var(--primary),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.modal p{color:var(--text2);margin-bottom:8px;font-size:.95rem}
+.modal .big-score{font-size:3rem;font-weight:800;color:var(--gold);margin:15px 0}
+.modal .stats-row{display:flex;justify-content:center;gap:20px;margin:15px 0}
+.modal .stats-row .stat{background:var(--surface2);padding:10px 16px;border-radius:10px}
+.modal-btn{margin-top:15px;padding:12px 32px;background:linear-gradient(135deg,var(--primary),#8b5cf6);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;transition:all .2s}
+.modal-btn:hover{transform:translateY(-2px)}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-100px);background:var(--surface);border:1px solid var(--border);padding:12px 24px;border-radius:10px;color:var(--text);font-size:.9rem;z-index:300;transition:transform .3s ease;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.success{border-color:var(--correct)}
+.toast.error{border-color:var(--wrong)}
+@media(max-width:768px){
+.game-body{flex-direction:column}
+.clues-panel{width:100%;max-height:200px;flex-direction:row;overflow-x:auto}
+.clue-section{min-width:280px;flex-shrink:0}
+.active-clue-bar{display:block}
+#mobile-keyboard{display:block}
+.game-body{padding-bottom:180px}
+.header-left{gap:8px}
+}
+.progress-bar{width:100%;height:4px;background:var(--surface2);border-radius:2px;margin-top:8px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));border-radius:2px;transition:width .3s ease}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text2)}
+</style>
+</head>
+<body>
+
+<div id="title-screen">
+  <div class="logo">Crossword Puzzle</div>
+  <div class="subtitle">Generate & Solve Unique Puzzles</div>
+  
+  <div class="menu-box">
+    <h3>How to Play</h3>
+    <ul>
+      <li>Click a cell to select it, then type your answer</li>
+      <li>Click a cell again to toggle between Across and Down</li>
+      <li>Click any clue to jump to that word</li>
+      <li>Use hints if you're stuck (costs points)</li>
+      <li>Check your answers or reveal letters when needed</li>
+      <li>Complete the puzzle to earn bonus points!</li>
+    </ul>
+  </div>
+
+  <div class="menu-box">
+    <h3>Select Difficulty</h3>
+    <div class="diff-buttons">
+      <button class="diff-btn selected" data-diff="easy">Easy<br><small>8-10 words</small></button>
+      <button class="diff-btn" data-diff="medium">Medium<br><small>12-15 words</small></button>
+      <button class="diff-btn" data-diff="hard">Hard<br><small>16-20 words</small></button>
+    </div>
+  </div>
+
+  <button class="start-btn" onclick="startGame()">Generate Puzzle</button>
+</div>
+
+<div id="game-screen">
+  <div class="game-header">
+    <div class="header-left">
+      <span class="game-title">Crossword</span>
+      <div class="stat"><span class="stat-label">Score</span><span class="stat-value" id="score">0</span></div>
+      <div class="stat"><span class="stat-label">Time</span><span class="stat-value" id="timer">0:00</span></div>
+      <div class="stat"><span class="stat-label">Words</span><span class="stat-value" id="word-count">0/0</span></div>
+    </div>
+    <div class="header-right">
+      <button class="icon-btn" onclick="giveHint()" title="Reveal a letter">Hint</button>
+      <button class="icon-btn" onclick="checkAnswers()" title="Check answers">Check</button>
+      <button class="icon-btn" onclick="revealWord()" title="Reveal current word">Reveal</button>
+      <button class="icon-btn danger" onclick="newPuzzle()">New</button>
+    </div>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+  <div class="active-clue-bar" id="active-clue-bar">
+    <span class="clue-direction" id="active-dir"></span>
+    <span id="active-clue-text"></span>
+  </div>
+  <div class="game-body">
+    <div class="grid-panel">
+      <div class="crossword-grid" id="crossword-grid"></div>
+    </div>
+    <div class="clues-panel" id="clues-panel">
+      <div class="clue-section" id="across-clues"><h3>Across</h3></div>
+      <div class="clue-section" id="down-clues"><h3>Down</h3></div>
+    </div>
+  </div>
+</div>
+
+<div id="mobile-keyboard">
+  <div class="kb-row" id="kb-row1"></div>
+  <div class="kb-row" id="kb-row2"></div>
+  <div class="kb-row" id="kb-row3"></div>
+</div>
+
+<div class="modal-overlay" id="win-modal">
+  <div class="modal">
+    <h2>Puzzle Complete!</h2>
+    <div class="big-score" id="final-score">0</div>
+    <p>Points Earned</p>
+    <div class="stats-row">
+      <div class="stat"><span class="stat-label">Time</span><span class="stat-value" id="final-time">0:00</span></div>
+      <div class="stat"><span class="stat-label">Hints</span><span class="stat-value" id="final-hints">0</span></div>
+      <div class="stat"><span class="stat-label">Accuracy</span><span class="stat-value" id="final-accuracy">100%</span></div>
+    </div>
+    <button class="modal-btn" onclick="newPuzzle()">New Puzzle</button>
+    <button class="modal-btn" style="background:var(--surface2);margin-left:8px" onclick="backToMenu()">Menu</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const WORD_BANK = [
+  {word:"ALGORITHM",clue:"Step-by-step problem-solving procedure"},
+  {word:"BROWSER",clue:"Software to view web pages"},
+  {word:"COMPILE",clue:"Convert source code to machine code"},
+  {word:"DATABASE",clue:"Organized collection of structured data"},
+  {word:"ENCRYPT",clue:"Convert data into a coded format"},
+  {word:"FIREWALL",clue:"Network security barrier"},
+  {word:"GATEWAY",clue:"Network point that acts as an entrance"},
+  {word:"HACKER",clue:"Person who breaks into computer systems"},
+  {word:"ITERATE",clue:"Repeat a process in a loop"},
+  {word:"JAVASCRIPT",clue:"Popular web programming language"},
+  {word:"KERNEL",clue:"Core component of an operating system"},
+  {word:"LAPTOP",clue:"Portable computer"},
+  {word:"MALWARE",clue:"Malicious software designed to harm"},
+  {word:"NETWORK",clue:"Group of connected computers"},
+  {word:"OPTIMIZE",clue:"Make something as effective as possible"},
+  {word:"PIXEL",clue:"Smallest unit of a digital image"},
+  {word:"QUERY",clue:"Request for data from a database"},
+  {word:"ROUTER",clue:"Device that forwards data packets"},
+  {word:"SERVER",clue:"Computer that provides data to others"},
+  {word:"TOKEN",clue:"Unit of authentication or data"},
+  {word:"UPLOAD",clue:"Transfer data to a remote system"},
+  {word:"VIRTUAL",clue:"Not physically existing, simulated"},
+  {word:"WIDGET",clue:"Small application component on screen"},
+  {word:"PYTHON",clue:"Programming language named after a snake"},
+  {word:"BINARY",clue:"Number system with only 0 and 1"},
+  {word:"CACHE",clue:"Temporary storage for fast access"},
+  {word:"DEBUG",clue:"Find and fix errors in code"},
+  {word:"RENDER",clue:"Generate an image from a model"},
+  {word:"SYNTAX",clue:"Rules governing code structure"},
+  {word:"ARRAY",clue:"Ordered collection of elements"},
+  {word:"CLOUD",clue:"Remote computing services over internet"},
+  {word:"STACK",clue:"Last-in-first-out data structure"},
+  {word:"QUEUE",clue:"First-in-first-out data structure"},
+  {word:"LOGIC",clue:"Reasoning used in programming decisions"},
+  {word:"INPUT",clue:"Data entered into a computer"},
+  {word:"PARSE",clue:"Analyze a string into components"},
+  {word:"PATCH",clue:"Software update to fix issues"},
+  {word:"PROXY",clue:"Intermediary server between client and host"},
+  {word:"REGEX",clue:"Pattern matching in text strings"},
+  {word:"SCOPE",clue:"Region where a variable is accessible"},
+  {word:"VIRUS",clue:"Self-replicating malicious program"},
+  {word:"BYTE",clue:"Unit of digital data, eight bits"},
+  {word:"CODE",clue:"Instructions written for computers"},
+  {word:"DATA",clue:"Information processed by a computer"},
+  {word:"FILE",clue:"Named collection of stored data"},
+  {word:"HASH",clue:"Fixed-size output from input data"},
+  {word:"HEAP",clue:"Memory area for dynamic allocation"},
+  {word:"HOST",clue:"Computer connected to a network"},
+  {word:"LINK",clue:"Connection between web pages"},
+  {word:"NODE",clue:"Point in a network or data structure"},
+  {word:"PORT",clue:"Communication endpoint on a computer"},
+  {word:"ROOT",clue:"Top-level administrator account"},
+  {word:"SPAM",clue:"Unwanted bulk electronic messages"},
+  {word:"TREE",clue:"Hierarchical data structure with branches"},
+  {word:"WAVE",clue:"Signal pattern in electronics"},
+  {word:"BLOG",clue:"Regularly updated website or journal"},
+  {word:"CHIP",clue:"Integrated circuit on silicon"},
+  {word:"DISK",clue:"Storage medium for data"},
+  {word:"FONT",clue:"Set of printable text characters"},
+  {word:"GRID",clue:"Two-dimensional layout structure"},
+  {word:"ICON",clue:"Small pictorial representation on screen"},
+  {word:"JAVA",clue:"Object-oriented programming language"},
+  {word:"LOOP",clue:"Repeated execution of code block"},
+  {word:"MENU",clue:"List of options in a program"},
+  {word:"PING",clue:"Test network connection to a host"},
+  {word:"SORT",clue:"Arrange items in a specific order"},
+  {word:"WIKI",clue:"Collaborative editable website"},
+  {word:"ZOOM",clue:"Increase magnification or video call app"},
+  {word:"CURSOR",clue:"Pointer showing position on screen"},
+  {word:"DOCKER",clue:"Platform for containerized applications"},
+  {word:"FORMAT",clue:"Structure or layout of data"},
+  {word:"MODULE",clue:"Self-contained unit of code"},
+  {word:"OBJECT",clue:"Instance of a class in programming"},
+  {word:"SCRIPT",clue:"Automated sequence of commands"},
+  {word:"THREAD",clue:"Smallest unit of execution in a process"},
+  {word:"BACKUP",clue:"Copy of data for safekeeping"},
+  {word:"DEVICE",clue:"Piece of electronic equipment"},
+  {word:"DOMAIN",clue:"Web address identifier like .com"},
+  {word:"EDITOR",clue:"Tool for writing and modifying text"},
+  {word:"GITHUB",clue:"Platform for code hosting and version control"},
+  {word:"MATRIX",clue:"Rectangular array of numbers"},
+  {word:"STREAM",clue:"Continuous flow of data"},
+  {word:"TABLET",clue:"Touchscreen portable computing device"},
+  {word:"UPDATE",clue:"Bring software to a newer version"},
+  {word:"VECTOR",clue:"Quantity with magnitude and direction"},
+  {word:"ANCHOR",clue:"HTML element for hyperlinks"},
+  {word:"BRANCH",clue:"Parallel version of a code repository"},
+  {word:"COOKIE",clue:"Small data stored by web browser"},
+  {word:"LAMBDA",clue:"Anonymous function in programming"},
+  {word:"OUTPUT",clue:"Data produced by a computer process"},
+  {word:"SCHEMA",clue:"Blueprint defining data structure"},
+  {word:"SWIFT",clue:"Apple's modern programming language"},
+  {word:"TUPLE",clue:"Immutable ordered sequence of elements"},
+  {word:"CLASS",clue:"Blueprint for creating objects"},
+  {word:"FRAME",clue:"Single image in animation or video"},
+  {word:"IMAGE",clue:"Visual representation in digital form"},
+  {word:"PRINT",clue:"Output text to console or paper"},
+  {word:"TABLE",clue:"Data arranged in rows and columns"},
+  {word:"VALUE",clue:"Data stored in a variable"},
+  {word:"ERROR",clue:"Mistake in code causing unexpected behavior"},
+  {word:"INDEX",clue:"Position indicator in a data structure"},
+  {word:"MERGE",clue:"Combine two data sets into one"},
+  {word:"TRACE",clue:"Follow the execution path of a program"},
+  {word:"DRIVE",clue:"Hardware for storing digital data"},
+  {word:"FETCH",clue:"Retrieve data from a source"},
+  {word:"MOUSE",clue:"Pointing device for computers"},
+  {word:"PANEL",clue:"Section of a user interface"},
+  {word:"SHELL",clue:"Command-line interface to an OS"},
+  {word:"BATCH",clue:"Group of tasks processed together"}
+];
+
+let grid=[], gridSize=0, placedWords=[], activeCell=null, activeDir='across';
+let score=0, hintsUsed=0, wrongChecks=0, totalCells=0, timerInterval=null, seconds=0;
+let difficulty='easy', gameActive=false, completedWords=new Set();
+
+const diffMap={easy:{min:8,max:10},medium:{min:12,max:15},hard:{min:16,max:20}};
+
+document.querySelectorAll('.diff-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');
+    difficulty=btn.dataset.diff;
+  });
+});
+
+function shuffle(arr){
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){const j=Math.random()*i+1|0;[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+
+function generateCrossword(wordCount){
+  const words=shuffle(WORD_BANK).slice(0,wordCount+10);
+  words.sort((a,b)=>b.word.length-a.word.length);
+
+  const size=22;
+  let bestGrid=null, bestPlaced=[];
+
+  for(let attempt=0;attempt<5;attempt++){
+    const g=Array.from({length:size},()=>Array(size).fill(null));
+    const placed=[];
+    const shuffled=attempt===0?words:shuffle(words);
+
+    // Place first word horizontally in center
+    const first=shuffled[0];
+    const startCol=Math.floor((size-first.word.length)/2);
+    const startRow=Math.floor(size/2);
+    for(let i=0;i<first.word.length;i++) g[startRow][startCol+i]=first.word[i];
+    placed.push({...first,row:startRow,col:startCol,dir:'across',num:0});
+
+    for(let wi=1;wi<shuffled.length&&placed.length<wordCount;wi++){
+      const w=shuffled[wi];
+      let bestScore=-1,bestPos=null;
+
+      for(const pw of placed){
+        for(let i=0;i<w.word.length;i++){
+          for(let j=0;j<pw.word.length;j++){
+            if(w.word[i]!==pw.word[j]) continue;
+
+            if(pw.dir==='across'){
+              // Place new word down
+              const nr=pw.row-i;
+              const nc=pw.col+j;
+              if(canPlace(g,w.word,nr,nc,'down',size)){
+                const sc=scorePlacement(g,w.word,nr,nc,'down',size,placed);
+                if(sc>bestScore){bestScore=sc;bestPos={row:nr,col:nc,dir:'down'};}
+              }
+            } else {
+              // Place new word across
+              const nr=pw.row+j;
+              const nc=pw.col-i;
+              if(canPlace(g,w.word,nr,nc,'across',size)){
+                const sc=scorePlacement(g,w.word,nr,nc,'across',size,placed);
+                if(sc>bestScore){bestScore=sc;bestPos={row:nr,col:nc,dir:'across'};}
+              }
+            }
+          }
+        }
+      }
+
+      if(bestPos){
+        placeWord(g,w.word,bestPos.row,bestPos.col,bestPos.dir);
+        placed.push({...w,row:bestPos.row,col:bestPos.col,dir:bestPos.dir,num:0});
+      }
+    }
+
+    if(placed.length>bestPlaced.length){bestGrid=g.map(r=>[...r]);bestPlaced=[...placed];}
+    if(bestPlaced.length>=wordCount) break;
+  }
+
+  return {grid:bestGrid,placed:bestPlaced,size:22};
+}
+
+function canPlace(g,word,row,col,dir,size){
+  const dr=dir==='down'?1:0, dc=dir==='across'?1:0;
+  const len=word.length;
+
+  // Check bounds
+  if(row<0||col<0) return false;
+  if(row+dr*(len-1)>=size||col+dc*(len-1)>=size) return false;
+
+  // Check cell before word
+  const br=row-dr, bc=col-dc;
+  if(br>=0&&bc>=0&&g[br][bc]!==null) return false;
+  // Check cell after word
+  const ar=row+dr*len, ac=col+dc*len;
+  if(ar<size&&ac<size&&g[ar][ac]!==null) return false;
+
+  let intersections=0;
+  for(let i=0;i<len;i++){
+    const r=row+dr*i, c=col+dc*i;
+    const cell=g[r][c];
+
+    if(cell!==null){
+      if(cell!==word[i]) return false;
+      intersections++;
+    } else {
+      // Check adjacent cells perpendicular
+      if(dir==='across'){
+        if(r>0&&g[r-1][c]!==null) return false;
+        if(r<size-1&&g[r+1][c]!==null) return false;
+      } else {
+        if(c>0&&g[r][c-1]!==null) return false;
+        if(c<size-1&&g[r][c+1]!==null) return false;
+      }
+    }
+  }
+
+  return intersections>0;
+}
+
+function scorePlacement(g,word,row,col,dir,size,placed){
+  const dr=dir==='down'?1:0,dc=dir==='across'?1:0;
+  let sc=0;
+  for(let i=0;i<word.length;i++){
+    const r=row+dr*i,c=col+dc*i;
+    if(g[r][c]===word[i]) sc+=10;
+  }
+  // Prefer center placements
+  const cr=row+dr*(word.length/2), cc=col+dc*(word.length/2);
+  const center=size/2;
+  sc-=Math.abs(cr-center)+Math.abs(cc-center);
+  return sc;
+}
+
+function placeWord(g,word,row,col,dir){
+  const dr=dir==='down'?1:0,dc=dir==='across'?1:0;
+  for(let i=0;i<word.length;i++) g[row+dr*i][col+dc*i]=word[i];
+}
+
+function assignNumbers(placed){
+  const positions=new Map();
+  placed.forEach(w=>{
+    const key=`${w.row},${w.col}`;
+    if(!positions.has(key)) positions.set(key,[]);
+    positions.get(key).push(w);
+  });
+
+  const sorted=[...positions.entries()].sort((a,b)=>{
+    const [ar,ac]=a[0].split(',').map(Number);
+    const [br,bc]=b[0].split(',').map(Number);
+    return ar!==br?ar-br:ac-bc;
+  });
+
+  let num=1;
+  sorted.forEach(([,words])=>{
+    words.forEach(w=>w.num=num);
+    num++;
+  });
+}
+
+function trimGrid(g,placed){
+  let minR=g.length,maxR=0,minC=g[0].length,maxC=0;
+  for(let r=0;r<g.length;r++)
+    for(let c=0;c<g[r].length;c++)
+      if(g[r][c]!==null){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,c);maxC=Math.max(maxC,c);}
+
+  minR=Math.max(0,minR-1);minC=Math.max(0,minC-1);
+  maxR=Math.min(g.length-1,maxR+1);maxC=Math.min(g[0].length-1,maxC+1);
+
+  const newGrid=[];
+  for(let r=minR;r<=maxR;r++){
+    const row=[];
+    for(let c=minC;c<=maxC;c++) row.push(g[r][c]);
+    newGrid.push(row);
+  }
+
+  placed.forEach(w=>{w.row-=minR;w.col-=minC;});
+  return newGrid;
+}
+
+function startGame(){
+  const {min,max}=diffMap[difficulty];
+  const count=min+Math.floor(Math.random()*(max-min+1));
+  const result=generateCrossword(count);
+
+  grid=trimGrid(result.grid,result.placed);
+  gridSize=grid.length;
+  placedWords=result.placed;
+  assignNumbers(placedWords);
+
+  score=0;hintsUsed=0;wrongChecks=0;seconds=0;completedWords=new Set();
+  gameActive=true;
+
+  totalCells=0;
+  for(let r=0;r<grid.length;r++)
+    for(let c=0;c<grid[r].length;c++)
+      if(grid[r][c]!==null) totalCells++;
+
+  document.getElementById('title-screen').style.display='none';
+  document.getElementById('game-screen').style.display='block';
+
+  renderGrid();
+  renderClues();
+  updateStats();
+  startTimer();
+  buildMobileKeyboard();
+}
+
+function renderGrid(){
+  const container=document.getElementById('crossword-grid');
+  container.innerHTML='';
+  const cols=grid[0].length;
+  container.style.gridTemplateColumns=`repeat(${cols}, clamp(28px,5vw,38px))`;
+
+  // Build number map
+  const numMap=new Map();
+  placedWords.forEach(w=>{
+    const key=`${w.row},${w.col}`;
+    if(!numMap.has(key)) numMap.set(key,w.num);
+  });
+
+  for(let r=0;r<grid.length;r++){
+    for(let c=0;c<grid[r].length;c++){
+      const cell=document.createElement('div');
+      cell.className='cell';
+      cell.dataset.row=r;
+      cell.dataset.col=c;
+
+      if(grid[r][c]===null){
+        cell.classList.add('empty');
+      } else {
+        cell.classList.add('filled');
+        const key=`${r},${c}`;
+        if(numMap.has(key)){
+          const numEl=document.createElement('span');
+          numEl.className='cell-number';
+          numEl.textContent=numMap.get(key);
+          cell.appendChild(numEl);
+        }
+        cell.addEventListener('click',()=>selectCell(r,c));
+      }
+      container.appendChild(cell);
+    }
+  }
+}
+
+function selectCell(r,c){
+  if(activeCell&&activeCell.row===r&&activeCell.col===c){
+    activeDir=activeDir==='across'?'down':'across';
+  }
+  activeCell={row:r,col:c};
+  highlightCells();
+  updateActiveClueBar();
+
+  // Focus for keyboard on desktop
+  document.addEventListener('keydown',handleKeyDown);
+}
+
+function getWordAtCell(r,c,dir){
+  return placedWords.find(w=>{
+    if(w.dir!==dir) return false;
+    const dr=dir==='down'?1:0, dc=dir==='across'?1:0;
+    for(let i=0;i<w.word.length;i++){
+      if(w.row+dr*i===r&&w.col+dc*i===c) return true;
+    }
+    return false;
+  });
+}
+
+function highlightCells(){
+  document.querySelectorAll('.cell').forEach(c=>{
+    c.classList.remove('active','highlighted');
+  });
+  document.querySelectorAll('.clue-item').forEach(c=>c.classList.remove('active'));
+
+  if(!activeCell) return;
+
+  const {row,col}=activeCell;
+  const word=getWordAtCell(row,col,activeDir)||getWordAtCell(row,col,activeDir==='across'?'down':'across');
+  if(word){
+    if(word.dir!==activeDir) activeDir=word.dir;
+    const dr=activeDir==='down'?1:0,dc=activeDir==='across'?1:0;
+    for(let i=0;i<word.word.length;i++){
+      const cr=word.row+dr*i, cc=word.col+dc*i;
+      const cell=getCellEl(cr,cc);
+      if(cell) cell.classList.add('highlighted');
+    }
+    // Highlight clue
+    const clueEl=document.getElementById(`clue-${word.dir}-${word.num}`);
+    if(clueEl){clueEl.classList.add('active');clueEl.scrollIntoView({block:'nearest'});}
+  }
+
+  const activeEl=getCellEl(row,col);
+  if(activeEl) activeEl.classList.add('active');
+}
+
+function updateActiveClueBar(){
+  const bar=document.getElementById('active-clue-bar');
+  if(!activeCell){bar.style.display='none';return;}
+  const word=getWordAtCell(activeCell.row,activeCell.col,activeDir)||
+             getWordAtCell(activeCell.row,activeCell.col,activeDir==='across'?'down':'across');
+  if(word){
+    bar.style.display='block';
+    document.getElementById('active-dir').textContent=`${word.num} ${word.dir}`;
+    document.getElementById('active-clue-text').textContent=word.clue;
+  }
+}
+
+function getCellEl(r,c){
+  return document.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`);
+}
+
+function getUserLetter(r,c){
+  const el=getCellEl(r,c);
+  if(!el) return '';
+  // Get text content minus the number
+  const numEl=el.querySelector('.cell-number');
+  let text=el.textContent;
+  if(numEl) text=text.replace(numEl.textContent,'');
+  return text.trim().toUpperCase();
+}
+
+function setUserLetter(r,c,letter){
+  const el=getCellEl(r,c);
+  if(!el||el.classList.contains('empty')) return;
+  // Preserve number
+  const numEl=el.querySelector('.cell-number');
+  const numText=numEl?numEl.outerHTML:'';
+  el.innerHTML=numText+(letter||'');
+}
+
+function handleKeyDown(e){
+  if(!activeCell||!gameActive) return;
+  const {row,col}=activeCell;
+
+  if(e.key==='Tab'){
+    e.preventDefault();
+    activeDir=activeDir==='across'?'down':'across';
+    highlightCells();
+    updateActiveClueBar();
+    return;
+  }
+
+  if(e.key==='Backspace'||e.key==='Delete'){
+    e.preventDefault();
+    const current=getUserLetter(row,col);
+    if(current){
+      setUserLetter(row,col,'');
+    } else {
+      moveToPrev();
+      if(activeCell) setUserLetter(activeCell.row,activeCell.col,'');
+    }
+    checkWordCompletion();
+    updateStats();
+    return;
+  }
+
+  if(e.key==='ArrowUp'){e.preventDefault();moveActive(-1,0);return;}
+  if(e.key==='ArrowDown'){e.preventDefault();moveActive(1,0);return;}
+  if(e.key==='ArrowLeft'){e.preventDefault();moveActive(0,-1);return;}
+  if(e.key==='ArrowRight'){e.preventDefault();moveActive(0,1);return;}
+
+  if(/^[a-zA-Z]$/.test(e.key)){
+    e.preventDefault();
+    enterLetter(e.key.toUpperCase());
+  }
+}
+
+function enterLetter(letter){
+  if(!activeCell||!gameActive) return;
+  const {row,col}=activeCell;
+  const el=getCellEl(row,col);
+  if(!el||el.classList.contains('revealed')) return;
+
+  setUserLetter(row,col,letter);
+  checkWordCompletion();
+  updateStats();
+  moveToNext();
+}
+
+function moveToNext(){
+  if(!activeCell) return;
+  const dr=activeDir==='down'?1:0, dc=activeDir==='across'?1:0;
+  let nr=activeCell.row+dr, nc=activeCell.col+dc;
+  if(nr>=0&&nr<grid.length&&nc>=0&&nc<grid[0].length&&grid[nr][nc]!==null){
+    activeCell={row:nr,col:nc};
+    highlightCells();
+    updateActiveClueBar();
+  }
+}
+
+function moveToPrev(){
+  if(!activeCell) return;
+  const dr=activeDir==='down'?1:0, dc=activeDir==='across'?1:0;
+  let nr=activeCell.row-dr, nc=activeCell.col-dc;
+  if(nr>=0&&nr<grid.length&&nc>=0&&nc<grid[0].length&&grid[nr][nc]!==null){
+    activeCell={row:nr,col:nc};
+    highlightCells();
+    updateActiveClueBar();
+  }
+}
+
+function moveActive(dr,dc){
+  if(!activeCell) return;
+  let nr=activeCell.row+dr, nc=activeCell.col+dc;
+  while(nr>=0&&nr<grid.length&&nc>=0&&nc<grid[0].length){
+    if(grid[nr][nc]!==null){
+      activeCell={row:nr,col:nc};
+      if(dr!==0) activeDir='down';
+      if(dc!==0) activeDir='across';
+      highlightCells();
+      updateActiveClueBar();
+      return;
+    }
+    nr+=dr;nc+=dc;
+  }
+}
+
+function checkWordCompletion(){
+  placedWords.forEach(w=>{
+    if(completedWords.has(`${w.dir}-${w.num}`)) return;
+    const dr=w.dir==='down'?1:0,dc=w.dir==='across'?1:0;
+    let complete=true, correct=true;
+    for(let i=0;i<w.word.length;i++){
+      const letter=getUserLetter(w.row+dr*i,w.col+dc*i);
+      if(!letter){complete=false;break;}
+      if(letter!==w.word[i]) correct=false;
+    }
+    if(complete&&correct){
+      completedWords.add(`${w.dir}-${w.num}`);
+      score+=w.word.length*10+50;
+      // Flash cells
+      for(let i=0;i<w.word.length;i++){
+        const el=getCellEl(w.row+dr*i,w.col+dc*i);
+        if(el){el.classList.add('correct');setTimeout(()=>el.classList.remove('correct'),800);}
+      }
+      // Mark clue
+      const clueEl=document.getElementById(`clue-${w.dir}-${w.num}`);
+      if(clueEl) clueEl.classList.add('completed');
+      showToast(`"${w.word}" correct! +${w.word.length*10+50} pts`,'success');
+      checkWin();
+    }
+  });
+}
+
+function checkWin(){
+  if(completedWords.size===placedWords.length){
+    gameActive=false;
+    clearInterval(timerInterval);
+    // Time bonus
+    const timeBonus=Math.max(0,300-seconds)*2;
+    score+=timeBonus;
+    // Hint penalty already applied
+    setTimeout(()=>showWinModal(),500);
+  }
+  updateStats();
+}
+
+function showWinModal(){
+  document.getElementById('final-score').textContent=score;
+  document.getElementById('final-time').textContent=formatTime(seconds);
+  document.getElementById('final-hints').textContent=hintsUsed;
+  const totalLetters=placedWords.reduce((s,w)=>s+w.word.length,0);
+  const wrongPct=Math.max(0,100-Math.round(wrongChecks/Math.max(1,totalLetters)*100));
+  document.getElementById('final-accuracy').textContent=wrongPct+'%';
+  document.getElementById('win-modal').classList.add('show');
+}
+
+function giveHint(){
+  if(!activeCell||!gameActive) return;
+  const word=getWordAtCell(activeCell.row,activeCell.col,activeDir)||
+             getWordAtCell(activeCell.row,activeCell.col,activeDir==='across'?'down':'across');
+  if(!word) return;
+
+  const dr=word.dir==='down'?1:0,dc=word.dir==='across'?1:0;
+  // Find first empty or wrong cell in the word
+  for(let i=0;i<word.word.length;i++){
+    const r=word.row+dr*i, c=word.col+dc*i;
+    const current=getUserLetter(r,c);
+    if(current!==word.word[i]){
+      setUserLetter(r,c,word.word[i]);
+      const el=getCellEl(r,c);
+      if(el) el.classList.add('revealed');
+      hintsUsed++;
+      score=Math.max(0,score-20);
+      showToast('Hint used (-20 pts)','');
+      checkWordCompletion();
+      updateStats();
+      return;
+    }
+  }
+  showToast('This word is already complete!','success');
+}
+
+function checkAnswers(){
+  if(!gameActive) return;
+  let errors=0;
+  for(let r=0;r<grid.length;r++){
+    for(let c=0;c<grid[r].length;c++){
+      if(grid[r][c]===null) continue;
+      const letter=getUserLetter(r,c);
+      if(letter&&letter!==grid[r][c]){
+        errors++;
+        wrongChecks++;
+        const el=getCellEl(r,c);
+        if(el){el.classList.add('wrong');setTimeout(()=>el.classList.remove('wrong'),500);}
+      }
+    }
+  }
+  if(errors===0){
+    showToast('All entered letters are correct!','success');
+  } else {
+    score=Math.max(0,score-errors*5);
+    showToast(`${errors} incorrect letter${errors>1?'s':''} found (-${errors*5} pts)`,'error');
+  }
+  updateStats();
+}
+
+function revealWord(){
+  if(!activeCell||!gameActive) return;
+  const word=getWordAtCell(activeCell.row,activeCell.col,activeDir)||
+             getWordAtCell(activeCell.row,activeCell.col,activeDir==='across'?'down':'across');
+  if(!word) return;
+
+  const dr=word.dir==='down'?1:0,dc=word.dir==='across'?1:0;
+  for(let i=0;i<word.word.length;i++){
+    const r=word.row+dr*i,c=word.col+dc*i;
+    setUserLetter(r,c,word.word[i]);
+    const el=getCellEl(r,c);
+    if(el) el.classList.add('revealed');
+  }
+  score=Math.max(0,score-word.word.length*10);
+  hintsUsed+=word.word.length;
+  showToast(`Word revealed (-${word.word.length*10} pts)`,'error');
+  checkWordCompletion();
+  updateStats();
+}
+
+function renderClues(){
+  const acrossDiv=document.getElementById('across-clues');
+  const downDiv=document.getElementById('down-clues');
+  acrossDiv.innerHTML='<h3>Across</h3>';
+  downDiv.innerHTML='<h3>Down</h3>';
+
+  const across=placedWords.filter(w=>w.dir==='across').sort((a,b)=>a.num-b.num);
+  const down=placedWords.filter(w=>w.dir==='down').sort((a,b)=>a.num-b.num);
+
+  across.forEach(w=>{
+    const el=document.createElement('div');
+    el.className='clue-item';
+    el.id=`clue-across-${w.num}`;
+    el.innerHTML=`<span class="clue-num">${w.num}</span>${w.clue} (${w.word.length})`;
+    el.addEventListener('click',()=>{
+      activeDir='across';
+      activeCell={row:w.row,col:w.col};
+      highlightCells();
+      updateActiveClueBar();
+    });
+    acrossDiv.appendChild(el);
+  });
+
+  down.forEach(w=>{
+    const el=document.createElement('div');
+    el.className='clue-item';
+    el.id=`clue-down-${w.num}`;
+    el.innerHTML=`<span class="clue-num">${w.num}</span>${w.clue} (${w.word.length})`;
+    el.addEventListener('click',()=>{
+      activeDir='down';
+      activeCell={row:w.row,col:w.col};
+      highlightCells();
+      updateActiveClueBar();
+    });
+    downDiv.appendChild(el);
+  });
+}
+
+function updateStats(){
+  document.getElementById('score').textContent=score;
+  document.getElementById('word-count').textContent=`${completedWords.size}/${placedWords.length}`;
+
+  let filledCells=0;
+  for(let r=0;r<grid.length;r++)
+    for(let c=0;c<grid[r].length;c++)
+      if(grid[r][c]!==null&&getUserLetter(r,c)) filledCells++;
+
+  const pct=totalCells>0?Math.round(filledCells/totalCells*100):0;
+  document.getElementById('progress-fill').style.width=pct+'%';
+}
+
+function startTimer(){
+  clearInterval(timerInterval);
+  timerInterval=setInterval(()=>{
+    if(!gameActive) return;
+    seconds++;
+    document.getElementById('timer').textContent=formatTime(seconds);
+  },1000);
+}
+
+function formatTime(s){
+  const m=Math.floor(s/60);
+  return `${m}:${String(s%60).padStart(2,'0')}`;
+}
+
+function showToast(msg,type){
+  const toast=document.getElementById('toast');
+  toast.textContent=msg;
+  toast.className='toast'+(type?' '+type:'');
+  toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'),2500);
+}
+
+function newPuzzle(){
+  document.getElementById('win-modal').classList.remove('show');
+  clearInterval(timerInterval);
+  startGame();
+}
+
+function backToMenu(){
+  document.getElementById('win-modal').classList.remove('show');
+  document.getElementById('game-screen').style.display='none';
+  document.getElementById('title-screen').style.display='flex';
+  clearInterval(timerInterval);
+  gameActive=false;
+}
+
+function buildMobileKeyboard(){
+  const rows=[
+    ['Q','W','E','R','T','Y','U','I','O','P'],
+    ['A','S','D','F','G','H','J','K','L'],
+    ['DEL','Z','X','C','V','B','N','M','TAB']
+  ];
+  rows.forEach((row,i)=>{
+    const rowEl=document.getElementById(`kb-row${i+1}`);
+    rowEl.innerHTML='';
+    row.forEach(key=>{
+      const btn=document.createElement('button');
+      btn.className='kb-key'+(key.length>1?' wide':'');
+      btn.textContent=key==='DEL'?'\u232B':key==='TAB'?'\u21C4':key;
+      btn.addEventListener('click',(e)=>{
+        e.preventDefault();
+        if(key==='DEL'){
+          handleKeyDown({key:'Backspace',preventDefault:()=>{}});
+        } else if(key==='TAB'){
+          handleKeyDown({key:'Tab',preventDefault:()=>{}});
+        } else {
+          enterLetter(key);
+        }
+      });
+      rowEl.appendChild(btn);
+    });
+  });
+}
+
+// Prevent scrolling on mobile when using keyboard
+document.addEventListener('touchmove',e=>{
+  if(e.target.closest('#mobile-keyboard')) e.preventDefault();
+},{passive:false});
+</script>
+</body>
+</html>
