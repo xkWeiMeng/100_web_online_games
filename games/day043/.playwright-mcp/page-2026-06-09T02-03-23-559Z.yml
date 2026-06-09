@@ -1,0 +1,29 @@
+- generic [ref=e19]:
+  - generic [ref=e20]:
+    - generic [ref=e21]:
+      - generic [ref=e22]: You
+      - generic [ref=e23]: "0"
+    - generic [ref=e24]:
+      - generic [ref=e25]: Streak
+      - generic [ref=e26]: "0"
+    - generic [ref=e27]:
+      - generic [ref=e28]: CPU
+      - generic [ref=e29]: "2"
+  - generic [ref=e31]: Round 4 — First to 30
+  - generic [ref=e32]:
+    - generic [ref=e33]: 📄
+    - generic [ref=e34]: VS
+    - generic [ref=e35]: 📄
+  - generic [ref=e36]: IT'S A DRAW
+  - generic [ref=e37]: Streak reset!
+  - generic [ref=e38]:
+    - button "Rock" [ref=e39] [cursor=pointer]:
+      - text: 🪨
+      - generic [ref=e40]: ROCK
+    - button "Paper" [active] [ref=e41] [cursor=pointer]:
+      - text: 📄
+      - generic [ref=e42]: PAPER
+    - button "Scissors" [ref=e43] [cursor=pointer]:
+      - text: ✂️
+      - generic [ref=e44]: SCISSORS
+  - button "RESTART" [ref=e46] [cursor=pointer]

@@ -1,0 +1,25 @@
+- generic [ref=e2]:
+  - generic [ref=e3]: RPS STREAK
+  - generic [ref=e4]: ROCK • PAPER • SCISSORS
+  - generic [ref=e5]:
+    - heading "How To Play" [level=3] [ref=e6]
+    - list [ref=e7]:
+      - listitem [ref=e8]:
+        - text: Pick
+        - strong [ref=e9]: Rock
+        - text: ","
+        - strong [ref=e10]: Paper
+        - text: ", or"
+        - strong [ref=e11]: Scissors
+        - text: to battle the CPU.
+      - listitem [ref=e12]: Win consecutive rounds to build a win streak.
+      - listitem [ref=e13]: Each streak level adds a score multiplier (x2, x3, x4…).
+      - listitem [ref=e14]:
+        - text: Losing or drawing
+        - strong [ref=e15]: resets
+        - text: your streak.
+      - listitem [ref=e16]:
+        - text: First to
+        - strong [ref=e17]: 30 points
+        - text: wins the match!
+  - button "START GAME" [ref=e18] [cursor=pointer]

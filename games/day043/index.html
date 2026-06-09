@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rock Paper Scissors — Streak!</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0f0f1a;--card:#1a1a2e;--accent:#e94560;--accent2:#0f3460;
+    --gold:#f5a623;--green:#27ae60;--red:#e74c3c;--blue:#3498db;
+    --text:#eee;--text-dim:#888;--radius:16px;
+  }
+  html,body{height:100%;overflow:hidden}
+  body{
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    background:var(--bg);color:var(--text);
+    display:flex;align-items:center;justify-content:center;
+    user-select:none;-webkit-user-select:none;
+  }
+
+  /* ---- screens ---- */
+  .screen{display:none;flex-direction:column;align-items:center;
+    justify-content:center;width:100%;max-width:520px;padding:20px;
+    animation:fadeIn .4s ease}
+  .screen.active{display:flex}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+  /* ---- title screen ---- */
+  #title-screen .logo{font-size:3.2rem;font-weight:800;letter-spacing:-1px;
+    background:linear-gradient(135deg,var(--accent),var(--gold));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    background-clip:text;margin-bottom:4px}
+  #title-screen .subtitle{color:var(--text-dim);font-size:1rem;margin-bottom:32px;letter-spacing:2px}
+  .instructions{background:var(--card);border-radius:var(--radius);padding:24px 28px;
+    margin-bottom:32px;line-height:1.7;font-size:.92rem;max-width:420px;text-align:left}
+  .instructions h3{color:var(--gold);margin-bottom:10px;font-size:1rem}
+  .instructions ul{padding-left:18px}
+  .instructions li{margin-bottom:4px}
+  .instructions .streak-info{color:var(--accent);font-weight:600}
+
+  .btn{
+    background:linear-gradient(135deg,var(--accent),#c0392b);
+    border:none;color:#fff;padding:16px 48px;font-size:1.1rem;font-weight:700;
+    border-radius:50px;cursor:pointer;letter-spacing:1px;
+    transition:transform .15s,box-shadow .15s;
+    box-shadow:0 4px 24px rgba(233,69,96,.35)}
+  .btn:hover{transform:scale(1.05);box-shadow:0 6px 32px rgba(233,69,96,.5)}
+  .btn:active{transform:scale(.97)}
+
+  /* ---- game screen ---- */
+  .scoreboard{display:flex;gap:24px;margin-bottom:12px;width:100%;justify-content:center}
+  .score-box{background:var(--card);border-radius:var(--radius);padding:14px 24px;
+    text-align:center;min-width:100px;position:relative}
+  .score-box .label{font-size:.72rem;text-transform:uppercase;letter-spacing:2px;color:var(--text-dim);margin-bottom:4px}
+  .score-box .value{font-size:1.8rem;font-weight:800}
+  .score-box.you .value{color:var(--green)}
+  .score-box.cpu .value{color:var(--red)}
+  .score-box.streak-box .value{color:var(--gold)}
+
+  .streak-bar{width:100%;max-width:400px;height:8px;background:var(--card);
+    border-radius:99px;margin:8px 0 18px;overflow:hidden;position:relative}
+  .streak-fill{height:100%;border-radius:99px;transition:width .4s ease,background .4s ease;width:0}
+
+  .round-label{font-size:.82rem;color:var(--text-dim);margin-bottom:6px;min-height:20px}
+
+  .arena{display:flex;align-items:center;justify-content:center;gap:24px;
+    margin-bottom:18px;min-height:130px;position:relative}
+  .arena-hand{
+    width:100px;height:100px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:3rem;background:var(--card);
+    border:3px solid transparent;transition:all .3s ease;position:relative}
+  .arena-hand.you-hand{border-color:var(--green)}
+  .arena-hand.cpu-hand{border-color:var(--red)}
+  .arena-hand.winner{animation:pulse .5s ease 2;box-shadow:0 0 30px rgba(245,166,35,.5)}
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+  .arena-vs{font-weight:800;font-size:1.4rem;color:var(--text-dim)}
+
+  .result-text{font-size:1.5rem;font-weight:800;min-height:44px;
+    margin-bottom:14px;transition:all .3s ease}
+  .result-text.win{color:var(--green)}
+  .result-text.lose{color:var(--red)}
+  .result-text.draw{color:var(--gold)}
+
+  .streak-display{font-size:.9rem;color:var(--gold);min-height:28px;margin-bottom:16px;
+    font-weight:600;transition:all .3s ease}
+  .streak-display.on-fire{animation:fireGlow 1s ease infinite alternate;font-size:1.05rem}
+  @keyframes fireGlow{from{text-shadow:0 0 8px rgba(245,166,35,.4)}to{text-shadow:0 0 20px rgba(245,166,35,.8)}}
+
+  .choices{display:flex;gap:16px;margin-bottom:24px}
+  .choice-btn{
+    width:96px;height:96px;border-radius:50%;border:3px solid var(--card);
+    background:var(--card);font-size:2.8rem;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:all .2s ease;position:relative}
+  .choice-btn:hover{border-color:var(--accent);transform:translateY(-4px);
+    box-shadow:0 8px 24px rgba(233,69,96,.25)}
+  .choice-btn:active{transform:translateY(0) scale(.93)}
+  .choice-btn.disabled{pointer-events:none;opacity:.4}
+  .choice-btn .tip{position:absolute;bottom:-22px;font-size:.65rem;
+    color:var(--text-dim);letter-spacing:1px}
+
+  .multiplier-badge{
+    display:inline-block;background:linear-gradient(135deg,var(--gold),#e67e22);
+    color:#fff;font-weight:800;font-size:.8rem;padding:3px 10px;
+    border-radius:20px;margin-left:6px;vertical-align:middle;
+    animation:badgePop .3s ease}
+  @keyframes badgePop{from{transform:scale(0)}to{transform:scale(1)}}
+
+  .bonus-popup{
+    position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);
+    font-size:2.5rem;font-weight:800;color:var(--gold);pointer-events:none;
+    text-shadow:0 0 30px rgba(245,166,35,.6);z-index:100;opacity:0}
+  .bonus-popup.show{animation:bonusPop .8s ease forwards}
+  @keyframes bonusPop{
+    0%{transform:translate(-50%,-50%) scale(0);opacity:0}
+    30%{transform:translate(-50%,-50%) scale(1.3);opacity:1}
+    100%{transform:translate(-50%,-60%) scale(1);opacity:0}
+  }
+
+  .game-footer{display:flex;gap:12px;align-items:center}
+  .btn-sm{
+    background:var(--card);border:1px solid #333;color:var(--text-dim);
+    padding:10px 22px;font-size:.82rem;border-radius:50px;cursor:pointer;
+    transition:all .15s;font-weight:600}
+  .btn-sm:hover{border-color:var(--accent);color:var(--text)}
+
+  /* ---- game over ---- */
+  #gameover-screen .go-title{font-size:2.4rem;font-weight:800;margin-bottom:8px}
+  #gameover-screen .go-title.victory{color:var(--green)}
+  #gameover-screen .go-title.defeat{color:var(--red)}
+  .final-stats{background:var(--card);border-radius:var(--radius);padding:24px 32px;
+    margin:20px 0 28px;text-align:left;line-height:2;font-size:.95rem;min-width:280px}
+  .final-stats .stat-row{display:flex;justify-content:space-between}
+  .final-stats .stat-val{font-weight:700}
+  .final-stats .stat-val.gold{color:var(--gold)}
+  .final-stats .stat-val.green{color:var(--green)}
+
+  /* ---- particles ---- */
+  .particles{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:90;overflow:hidden}
+  .particle{
+    position:absolute;border-radius:50%;pointer-events:none;
+    animation:particleFly 1s ease-out forwards}
+  @keyframes particleFly{
+    0%{opacity:1;transform:translate(0,0) scale(1)}
+    100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(0)}
+  }
+
+  /* ---- streak flames ---- */
+  .flame-container{position:fixed;bottom:0;left:0;width:100%;height:120px;
+    pointer-events:none;z-index:80;opacity:0;transition:opacity .5s ease}
+  .flame-container.active{opacity:1}
+  .flame{position:absolute;bottom:-10px;border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;
+    animation:flicker 0.4s ease-in-out infinite alternate;opacity:.6}
+  @keyframes flicker{
+    0%{transform:scaleY(1) scaleX(1);opacity:.5}
+    100%{transform:scaleY(1.2) scaleX(.9);opacity:.8}
+  }
+
+  /* responsive */
+  @media(max-width:480px){
+    #title-screen .logo{font-size:2.4rem}
+    .choice-btn{width:78px;height:78px;font-size:2.2rem}
+    .arena-hand{width:80px;height:80px;font-size:2.4rem}
+    .instructions{padding:18px 20px;font-size:.85rem}
+    .scoreboard{gap:12px}
+    .score-box{padding:10px 16px;min-width:80px}
+    .score-box .value{font-size:1.4rem}
+  }
+</style>
+</head>
+<body>
+
+<!-- TITLE SCREEN -->
+<div id="title-screen" class="screen active">
+  <div class="logo">RPS STREAK</div>
+  <div class="subtitle">ROCK &bull; PAPER &bull; SCISSORS</div>
+  <div class="instructions">
+    <h3>How To Play</h3>
+    <ul>
+      <li>Pick <strong>Rock</strong>, <strong>Paper</strong>, or <strong>Scissors</strong> to battle the CPU.</li>
+      <li>Win consecutive rounds to build a <span class="streak-info">win streak</span>.</li>
+      <li>Each streak level adds a <span class="streak-info">score multiplier</span> (x2, x3, x4…).</li>
+      <li>Losing or drawing <strong>resets</strong> your streak.</li>
+      <li>First to <strong>30 points</strong> wins the match!</li>
+    </ul>
+  </div>
+  <button class="btn" id="start-btn">START GAME</button>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="game-screen" class="screen">
+  <div class="scoreboard">
+    <div class="score-box you"><div class="label">You</div><div class="value" id="p-score">0</div></div>
+    <div class="score-box streak-box"><div class="label">Streak</div><div class="value" id="streak-val">0</div></div>
+    <div class="score-box cpu"><div class="label">CPU</div><div class="value" id="c-score">0</div></div>
+  </div>
+  <div class="streak-bar"><div class="streak-fill" id="streak-fill"></div></div>
+  <div class="round-label" id="round-label">Round 1 &mdash; First to 30</div>
+  <div class="arena">
+    <div class="arena-hand you-hand" id="you-hand">❓</div>
+    <div class="arena-vs">VS</div>
+    <div class="arena-hand cpu-hand" id="cpu-hand">❓</div>
+  </div>
+  <div class="result-text" id="result-text">&nbsp;</div>
+  <div class="streak-display" id="streak-display">&nbsp;</div>
+  <div class="choices" id="choices">
+    <button class="choice-btn" data-choice="rock" aria-label="Rock">🪨<span class="tip">ROCK</span></button>
+    <button class="choice-btn" data-choice="paper" aria-label="Paper">📄<span class="tip">PAPER</span></button>
+    <button class="choice-btn" data-choice="scissors" aria-label="Scissors">✂️<span class="tip">SCISSORS</span></button>
+  </div>
+  <div class="game-footer">
+    <button class="btn-sm" id="reset-btn">RESTART</button>
+  </div>
+</div>
+
+<!-- GAME OVER SCREEN -->
+<div id="gameover-screen" class="screen">
+  <div class="go-title" id="go-title">YOU WIN!</div>
+  <div class="final-stats" id="final-stats"></div>
+  <button class="btn" id="replay-btn">PLAY AGAIN</button>
+</div>
+
+<!-- particles container -->
+<div class="particles" id="particles"></div>
+<!-- flames -->
+<div class="flame-container" id="flames"></div>
+<!-- bonus popup -->
+<div class="bonus-popup" id="bonus-popup"></div>
+
+<script>
+(function(){
+  // ---- constants ----
+  const WINNING_SCORE = 30;
+  const EMOJIS = {rock:'🪨', paper:'📄', scissors:'✂️'};
+  const BEATS = {rock:'scissors', paper:'rock', scissors:'paper'};
+  const CHOICES = ['rock','paper','scissors'];
+
+  // ---- DOM refs ----
+  const $ = id => document.getElementById(id);
+  const titleScreen   = $('title-screen');
+  const gameScreen    = $('game-screen');
+  const gameoverScreen= $('gameover-screen');
+  const pScoreEl      = $('p-score');
+  const cScoreEl      = $('c-score');
+  const streakValEl   = $('streak-val');
+  const streakFill    = $('streak-fill');
+  const roundLabel    = $('round-label');
+  const youHand       = $('you-hand');
+  const cpuHand       = $('cpu-hand');
+  const resultText    = $('result-text');
+  const streakDisplay = $('streak-display');
+  const choicesDiv    = $('choices');
+  const particlesDiv  = $('particles');
+  const flamesDiv     = $('flames');
+  const bonusPopup    = $('bonus-popup');
+
+  // ---- state ----
+  let pScore=0, cScore=0, streak=0, bestStreak=0, round=0, totalWins=0, totalLosses=0, totalDraws=0;
+  let totalBonusPts=0;
+  let playing=false;
+
+  // ---- screens ----
+  function showScreen(s){
+    [titleScreen,gameScreen,gameoverScreen].forEach(el=>el.classList.remove('active'));
+    s.classList.add('active');
+  }
+
+  // ---- init / reset ----
+  function initGame(){
+    pScore=0;cScore=0;streak=0;bestStreak=0;round=0;
+    totalWins=0;totalLosses=0;totalDraws=0;totalBonusPts=0;
+    playing=true;
+    updateUI();
+    youHand.textContent='❓'; cpuHand.textContent='❓';
+    resultText.innerHTML='&nbsp;'; resultText.className='result-text';
+    streakDisplay.innerHTML='&nbsp;'; streakDisplay.className='streak-display';
+    youHand.classList.remove('winner'); cpuHand.classList.remove('winner');
+    flamesDiv.classList.remove('active');
+    flamesDiv.innerHTML='';
+    enableChoices();
+    showScreen(gameScreen);
+  }
+
+  function updateUI(){
+    pScoreEl.textContent=pScore;
+    cScoreEl.textContent=cScore;
+    streakValEl.textContent=streak;
+    roundLabel.textContent=`Round ${round+1} — First to ${WINNING_SCORE}`;
+    // streak bar (max visual at 10)
+    const pct=Math.min(streak/10*100,100);
+    streakFill.style.width=pct+'%';
+    if(streak>=7) streakFill.style.background='linear-gradient(90deg,#e74c3c,#f5a623)';
+    else if(streak>=4) streakFill.style.background='linear-gradient(90deg,#e67e22,#f5a623)';
+    else streakFill.style.background='linear-gradient(90deg,var(--accent),var(--gold))';
+  }
+
+  // ---- CPU strategy (slightly smart) ----
+  let cpuHistory=[];
+  function cpuPick(){
+    // mostly random, slight bias towards countering player's most frequent choice
+    if(cpuHistory.length<3 || Math.random()<0.4){
+      return CHOICES[Math.floor(Math.random()*3)];
+    }
+    // find player's most picked
+    const freq={rock:0,paper:0,scissors:0};
+    cpuHistory.slice(-6).forEach(c=>freq[c]++);
+    let top=CHOICES[0];
+    CHOICES.forEach(c=>{if(freq[c]>freq[top])top=c});
+    // counter it
+    return CHOICES.find(c=>BEATS[c]===top)||CHOICES[Math.floor(Math.random()*3)];
+  }
+
+  // ---- play round ----
+  function playRound(playerChoice){
+    if(!playing) return;
+    disableChoices();
+    cpuHistory.push(playerChoice);
+    const cpu=cpuPick();
+    round++;
+
+    // animate shake
+    youHand.textContent='✊'; cpuHand.textContent='✊';
+    youHand.classList.remove('winner'); cpuHand.classList.remove('winner');
+    resultText.innerHTML='&nbsp;'; resultText.className='result-text';
+
+    let shakeCount=0;
+    const shakeInterval=setInterval(()=>{
+      shakeCount++;
+      youHand.style.transform=shakeCount%2?'rotate(-10deg)':'rotate(10deg)';
+      cpuHand.style.transform=shakeCount%2?'rotate(10deg)':'rotate(-10deg)';
+      if(shakeCount>=4){
+        clearInterval(shakeInterval);
+        youHand.style.transform=''; cpuHand.style.transform='';
+        revealResult(playerChoice,cpu);
+      }
+    },120);
+  }
+
+  function revealResult(p,c){
+    youHand.textContent=EMOJIS[p];
+    cpuHand.textContent=EMOJIS[c];
+
+    let outcome; // 'win','lose','draw'
+    if(p===c){
+      outcome='draw'; totalDraws++;
+      streak=0;
+      resultText.textContent="IT'S A DRAW";
+      resultText.className='result-text draw';
+      streakDisplay.innerHTML='Streak reset!';
+      streakDisplay.className='streak-display';
+    } else if(BEATS[p]===c){
+      outcome='win'; totalWins++;
+      streak++;
+      if(streak>bestStreak) bestStreak=streak;
+      const mult=Math.max(1,streak);
+      const pts=mult;
+      pScore+=pts;
+      if(mult>1) totalBonusPts+=(mult-1);
+      resultText.textContent='YOU WIN!';
+      resultText.className='result-text win';
+      youHand.classList.add('winner');
+
+      if(streak>=2){
+        streakDisplay.innerHTML=`🔥 ${streak} streak! <span class="multiplier-badge">x${mult}</span> (+${pts})`;
+        streakDisplay.className='streak-display'+(streak>=5?' on-fire':'');
+      } else {
+        streakDisplay.innerHTML='+1 point';
+        streakDisplay.className='streak-display';
+      }
+      spawnParticles(youHand,'win');
+      if(streak===3) showBonus('🔥 x3 STREAK!');
+      else if(streak===5) showBonus('🔥🔥 x5 STREAK!');
+      else if(streak===7) showBonus('🔥🔥🔥 x7 ON FIRE!');
+      else if(streak===10) showBonus('💎 x10 LEGENDARY!');
+    } else {
+      outcome='lose'; totalLosses++;
+      streak=0;
+      cScore+=1;
+      resultText.textContent='YOU LOSE';
+      resultText.className='result-text lose';
+      cpuHand.classList.add('winner');
+      streakDisplay.innerHTML='Streak reset!';
+      streakDisplay.className='streak-display';
+      spawnParticles(cpuHand,'lose');
+    }
+
+    // flames
+    updateFlames();
+    updateUI();
+
+    // check game over
+    if(pScore>=WINNING_SCORE||cScore>=WINNING_SCORE){
+      playing=false;
+      setTimeout(()=>showGameOver(pScore>=WINNING_SCORE),800);
+    } else {
+      setTimeout(enableChoices,350);
+    }
+  }
+
+  // ---- game over ----
+  function showGameOver(playerWon){
+    const goTitle=$('go-title');
+    const stats=$('final-stats');
+    goTitle.textContent=playerWon?'VICTORY!':'DEFEAT';
+    goTitle.className='go-title '+(playerWon?'victory':'defeat');
+    stats.innerHTML=`
+      <div class="stat-row"><span>Final Score</span><span class="stat-val green">${pScore} - ${cScore}</span></div>
+      <div class="stat-row"><span>Rounds Played</span><span class="stat-val">${round}</span></div>
+      <div class="stat-row"><span>Wins / Losses / Draws</span><span class="stat-val">${totalWins} / ${totalLosses} / ${totalDraws}</span></div>
+      <div class="stat-row"><span>Best Streak</span><span class="stat-val gold">🔥 ${bestStreak}</span></div>
+      <div class="stat-row"><span>Bonus Points from Streaks</span><span class="stat-val gold">+${totalBonusPts}</span></div>
+    `;
+    if(playerWon) spawnCelebration();
+    flamesDiv.classList.remove('active');
+    flamesDiv.innerHTML='';
+    showScreen(gameoverScreen);
+  }
+
+  // ---- choices enable/disable ----
+  function enableChoices(){choicesDiv.querySelectorAll('.choice-btn').forEach(b=>b.classList.remove('disabled'))}
+  function disableChoices(){choicesDiv.querySelectorAll('.choice-btn').forEach(b=>b.classList.add('disabled'))}
+
+  // ---- particles ----
+  function spawnParticles(anchor, type){
+    const rect=anchor.getBoundingClientRect();
+    const cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
+    const colors=type==='win'?['#27ae60','#2ecc71','#f5a623']:['#e74c3c','#c0392b','#e67e22'];
+    for(let i=0;i<12;i++){
+      const p=document.createElement('div');
+      p.className='particle';
+      const size=4+Math.random()*6;
+      const angle=Math.random()*Math.PI*2;
+      const dist=40+Math.random()*60;
+      p.style.cssText=`width:${size}px;height:${size}px;left:${cx}px;top:${cy}px;
+        background:${colors[i%colors.length]};
+        --dx:${Math.cos(angle)*dist}px;--dy:${Math.sin(angle)*dist}px`;
+      particlesDiv.appendChild(p);
+      setTimeout(()=>p.remove(),1000);
+    }
+  }
+
+  function spawnCelebration(){
+    for(let w=0;w<3;w++){
+      setTimeout(()=>{
+        for(let i=0;i<20;i++){
+          const p=document.createElement('div');
+          p.className='particle';
+          const size=5+Math.random()*8;
+          const cx=Math.random()*window.innerWidth;
+          const cy=Math.random()*window.innerHeight;
+          const angle=Math.random()*Math.PI*2;
+          const dist=60+Math.random()*100;
+          const colors=['#27ae60','#f5a623','#3498db','#e94560','#9b59b6'];
+          p.style.cssText=`width:${size}px;height:${size}px;left:${cx}px;top:${cy}px;
+            background:${colors[i%colors.length]};
+            --dx:${Math.cos(angle)*dist}px;--dy:${Math.sin(angle)*dist}px`;
+          particlesDiv.appendChild(p);
+          setTimeout(()=>p.remove(),1000);
+        }
+      },w*400);
+    }
+  }
+
+  // ---- bonus popup ----
+  function showBonus(text){
+    bonusPopup.textContent=text;
+    bonusPopup.classList.remove('show');
+    void bonusPopup.offsetWidth; // reflow
+    bonusPopup.classList.add('show');
+    setTimeout(()=>bonusPopup.classList.remove('show'),900);
+  }
+
+  // ---- streak flames ----
+  function updateFlames(){
+    if(streak>=3){
+      flamesDiv.classList.add('active');
+      flamesDiv.innerHTML='';
+      const count=Math.min(streak*3,30);
+      for(let i=0;i<count;i++){
+        const f=document.createElement('div');
+        f.className='flame';
+        const w=20+Math.random()*30;
+        const h=30+Math.random()*50+(streak*4);
+        const left=Math.random()*100;
+        const hue=streak>=7?Math.random()*30:20+Math.random()*20;
+        const delay=Math.random()*0.5;
+        f.style.cssText=`width:${w}px;height:${h}px;left:${left}%;
+          background:hsla(${hue},90%,55%,.6);
+          animation-delay:${delay}s;animation-duration:${0.3+Math.random()*0.3}s`;
+        flamesDiv.appendChild(f);
+      }
+    } else {
+      flamesDiv.classList.remove('active');
+      flamesDiv.innerHTML='';
+    }
+  }
+
+  // ---- event listeners ----
+  $('start-btn').addEventListener('click',initGame);
+  $('reset-btn').addEventListener('click',initGame);
+  $('replay-btn').addEventListener('click',initGame);
+
+  choicesDiv.addEventListener('click',e=>{
+    const btn=e.target.closest('.choice-btn');
+    if(!btn||btn.classList.contains('disabled')) return;
+    playRound(btn.dataset.choice);
+  });
+
+  // keyboard support
+  document.addEventListener('keydown',e=>{
+    if(!playing) return;
+    if(e.key==='1'||e.key.toLowerCase()==='r') playRound('rock');
+    else if(e.key==='2'||e.key.toLowerCase()==='p') playRound('paper');
+    else if(e.key==='3'||e.key.toLowerCase()==='s') playRound('scissors');
+  });
+})();
+</script>
+</body>
+</html>
