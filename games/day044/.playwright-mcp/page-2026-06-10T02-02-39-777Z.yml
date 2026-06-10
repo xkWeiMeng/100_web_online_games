@@ -1,0 +1,13 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]: "Y"
+    - generic [ref=e5]: A
+    - generic [ref=e6]: H
+    - generic [ref=e7]: T
+    - generic [ref=e8]: Z
+  - generic [ref=e9]: YAHTZEE!
+  - generic [ref=e10]: The Classic Dice Game
+  - button "Roll the Dice" [ref=e11] [cursor=pointer]
+  - generic [ref=e12]:
+    - heading "How to Play" [level=3] [ref=e13]
+    - paragraph [ref=e14]: Roll 5 dice up to 3 times per turn. Tap dice to hold them between rolls. After rolling, choose a scoring category on the scorecard. Fill all 13 categories to finish. Score 63+ in the upper section for a 35-point bonus. Roll five of a kind for a Yahtzee worth 50 points!

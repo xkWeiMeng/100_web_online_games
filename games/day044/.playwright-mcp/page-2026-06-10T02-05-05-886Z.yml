@@ -1,0 +1,90 @@
+- generic [ref=e15]:
+  - generic [ref=e16]:
+    - heading "YAHTZEE!" [level=1] [ref=e17]
+    - generic [ref=e18]:
+      - button "?" [ref=e19] [cursor=pointer]
+      - button "New Game" [ref=e20] [cursor=pointer]
+  - generic [ref=e21]:
+    - generic [ref=e22]:
+      - generic [ref=e23]: Turn 13 / 13
+      - generic [ref=e24]: 2 rolls left
+    - button "Roll Again (2)" [active] [ref=e205] [cursor=pointer]
+  - generic [ref=e37]:
+    - generic [ref=e206]:
+      - generic [ref=e207]: Scorecard
+      - generic [ref=e208]: Score
+    - generic [ref=e209]: Upper Section
+    - generic [ref=e210]:
+      - generic [ref=e211]:
+        - text: Ones
+        - generic [ref=e212]: Sum of 1s
+      - generic [ref=e213]: "3"
+    - generic [ref=e214]:
+      - generic [ref=e215]:
+        - text: Twos
+        - generic [ref=e216]: Sum of 2s
+      - generic [ref=e217]: "6"
+    - generic [ref=e218]:
+      - generic [ref=e219]:
+        - text: Threes
+        - generic [ref=e220]: Sum of 3s
+      - generic [ref=e221]: "9"
+    - generic [ref=e222]:
+      - generic [ref=e223]:
+        - text: Fours
+        - generic [ref=e224]: Sum of 4s
+      - generic [ref=e225]: "12"
+    - generic [ref=e226]:
+      - generic [ref=e227]:
+        - text: Fives
+        - generic [ref=e228]: Sum of 5s
+      - generic [ref=e229]: "15"
+    - generic [ref=e230]:
+      - generic [ref=e231]:
+        - text: Sixes
+        - generic [ref=e232]: Sum of 6s
+      - generic [ref=e233]: "18"
+    - generic [ref=e234]:
+      - generic [ref=e235]:
+        - text: Upper Bonus
+        - generic [ref=e236]: 63/63
+      - generic [ref=e237]: "35"
+    - generic [ref=e238]: Lower Section
+    - generic [ref=e239]:
+      - generic [ref=e240]:
+        - text: 3 of a Kind
+        - generic [ref=e241]: Sum all dice
+      - generic [ref=e242]: "22"
+    - generic [ref=e243]:
+      - generic [ref=e244]:
+        - text: 4 of a Kind
+        - generic [ref=e245]: Sum all dice
+      - generic [ref=e246]: "20"
+    - generic [ref=e247]:
+      - generic [ref=e248]:
+        - text: Full House
+        - generic [ref=e249]: 25 pts
+      - generic [ref=e250]: "25"
+    - generic [ref=e251]:
+      - generic [ref=e252]:
+        - text: Sm. Straight
+        - generic [ref=e253]: 30 pts
+      - generic [ref=e254]: "30"
+    - generic [ref=e255]:
+      - generic [ref=e256]:
+        - text: Lg. Straight
+        - generic [ref=e257]: 40 pts
+      - generic [ref=e258]: "40"
+    - generic [ref=e259]:
+      - generic [ref=e260]:
+        - text: YAHTZEE
+        - generic [ref=e261]: 50 pts
+      - generic [ref=e262]: "50"
+    - generic [ref=e263] [cursor=pointer]:
+      - generic [ref=e264]:
+        - text: Chance
+        - generic [ref=e265]: Sum all dice
+      - generic [ref=e266]: "19"
+    - generic [ref=e267]:
+      - generic [ref=e268]: TOTAL
+      - generic [ref=e269]: "285"

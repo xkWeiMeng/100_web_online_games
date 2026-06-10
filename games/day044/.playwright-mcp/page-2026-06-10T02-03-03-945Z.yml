@@ -1,0 +1,90 @@
+- generic [ref=e15]:
+  - generic [ref=e16]:
+    - heading "YAHTZEE!" [level=1] [ref=e17]
+    - generic [ref=e18]:
+      - button "?" [ref=e19] [cursor=pointer]
+      - button "New Game" [ref=e20] [cursor=pointer]
+  - generic [ref=e21]:
+    - generic [ref=e22]:
+      - generic [ref=e23]: Turn 1 / 13
+      - generic [ref=e24]: 2 rolls left
+    - button "Roll Again (2)" [active] [ref=e130] [cursor=pointer]
+  - generic [ref=e37]:
+    - generic [ref=e131]:
+      - generic [ref=e132]: Scorecard
+      - generic [ref=e133]: Score
+    - generic [ref=e134]: Upper Section
+    - generic [ref=e135] [cursor=pointer]:
+      - generic [ref=e136]:
+        - text: Ones
+        - generic [ref=e137]: Sum of 1s
+      - generic [ref=e138]: "1"
+    - generic [ref=e139] [cursor=pointer]:
+      - generic [ref=e140]:
+        - text: Twos
+        - generic [ref=e141]: Sum of 2s
+      - generic [ref=e142]: "0"
+    - generic [ref=e143] [cursor=pointer]:
+      - generic [ref=e144]:
+        - text: Threes
+        - generic [ref=e145]: Sum of 3s
+      - generic [ref=e146]: "3"
+    - generic [ref=e147] [cursor=pointer]:
+      - generic [ref=e148]:
+        - text: Fours
+        - generic [ref=e149]: Sum of 4s
+      - generic [ref=e150]: "8"
+    - generic [ref=e151] [cursor=pointer]:
+      - generic [ref=e152]:
+        - text: Fives
+        - generic [ref=e153]: Sum of 5s
+      - generic [ref=e154]: "0"
+    - generic [ref=e155] [cursor=pointer]:
+      - generic [ref=e156]:
+        - text: Sixes
+        - generic [ref=e157]: Sum of 6s
+      - generic [ref=e158]: "6"
+    - generic [ref=e159]:
+      - generic [ref=e160]:
+        - text: Upper Bonus
+        - generic [ref=e161]: 0/63
+      - generic [ref=e162]: —
+    - generic [ref=e163]: Lower Section
+    - generic [ref=e164] [cursor=pointer]:
+      - generic [ref=e165]:
+        - text: 3 of a Kind
+        - generic [ref=e166]: Sum all dice
+      - generic [ref=e167]: "0"
+    - generic [ref=e168] [cursor=pointer]:
+      - generic [ref=e169]:
+        - text: 4 of a Kind
+        - generic [ref=e170]: Sum all dice
+      - generic [ref=e171]: "0"
+    - generic [ref=e172] [cursor=pointer]:
+      - generic [ref=e173]:
+        - text: Full House
+        - generic [ref=e174]: 25 pts
+      - generic [ref=e175]: "0"
+    - generic [ref=e176] [cursor=pointer]:
+      - generic [ref=e177]:
+        - text: Sm. Straight
+        - generic [ref=e178]: 30 pts
+      - generic [ref=e179]: "0"
+    - generic [ref=e180] [cursor=pointer]:
+      - generic [ref=e181]:
+        - text: Lg. Straight
+        - generic [ref=e182]: 40 pts
+      - generic [ref=e183]: "0"
+    - generic [ref=e184] [cursor=pointer]:
+      - generic [ref=e185]:
+        - text: YAHTZEE
+        - generic [ref=e186]: 50 pts
+      - generic [ref=e187]: "0"
+    - generic [ref=e188] [cursor=pointer]:
+      - generic [ref=e189]:
+        - text: Chance
+        - generic [ref=e190]: Sum all dice
+      - generic [ref=e191]: "18"
+    - generic [ref=e192]:
+      - generic [ref=e193]: TOTAL
+      - generic [ref=e194]: "0"
