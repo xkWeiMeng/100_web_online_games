@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Chess Clock & Timer</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0f1117;--surface:#1a1d27;--surface2:#252836;--border:#2e3240;
+    --white-clr:#e8dfd0;--black-clr:#3a3632;
+    --accent:#c9a84c;--accent2:#a67c32;
+    --green:#4caf50;--red:#e74c3c;--orange:#f39c12;
+    --text:#e4e4e8;--text2:#9a9bab;--text3:#5c5d6e;
+    --radius:16px;
+  }
+  html,body{height:100%;overflow:hidden}
+  body{
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    background:var(--bg);color:var(--text);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    -webkit-user-select:none;user-select:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  /* ─── Title Screen ─── */
+  #title-screen{
+    position:fixed;inset:0;z-index:100;
+    background:var(--bg);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:20px;
+    transition:opacity .5s,transform .5s;
+  }
+  #title-screen.hidden{opacity:0;pointer-events:none;transform:scale(1.05)}
+  .logo{margin-bottom:8px}
+  .logo svg{width:80px;height:80px}
+  #title-screen h1{
+    font-size:2.2rem;font-weight:800;letter-spacing:-1px;
+    background:linear-gradient(135deg,var(--accent),#f0d878);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    margin-bottom:4px;
+  }
+  #title-screen .subtitle{color:var(--text2);font-size:.95rem;margin-bottom:28px}
+
+  /* Preset Grid */
+  .presets{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
+    width:100%;max-width:400px;margin-bottom:20px;
+  }
+  .preset-btn{
+    background:var(--surface2);border:2px solid var(--border);
+    color:var(--text);border-radius:12px;padding:14px 8px;
+    cursor:pointer;text-align:center;transition:all .2s;
+    font-family:inherit;
+  }
+  .preset-btn:hover,.preset-btn:active{border-color:var(--accent);background:var(--surface)}
+  .preset-btn.active{border-color:var(--accent);background:#2a2520}
+  .preset-btn .time{font-size:1.3rem;font-weight:700;display:block}
+  .preset-btn .label{font-size:.7rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+  .preset-btn .inc{font-size:.75rem;color:var(--accent);margin-top:2px}
+
+  /* Custom Time */
+  .custom-section{
+    width:100%;max-width:400px;margin-bottom:20px;
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:14px;overflow:hidden;
+  }
+  .custom-toggle{
+    width:100%;background:none;border:none;color:var(--text2);
+    padding:12px;cursor:pointer;font-size:.9rem;font-family:inherit;
+    display:flex;align-items:center;justify-content:center;gap:6px;
+  }
+  .custom-toggle .arrow{transition:transform .3s;font-size:.7rem}
+  .custom-toggle.open .arrow{transform:rotate(180deg)}
+  .custom-body{
+    max-height:0;overflow:hidden;transition:max-height .35s ease;
+    padding:0 16px;
+  }
+  .custom-body.open{max-height:300px;padding:0 16px 16px}
+  .custom-row{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .custom-row label{flex:0 0 80px;font-size:.85rem;color:var(--text2)}
+  .custom-row input{
+    flex:1;background:var(--surface2);border:1px solid var(--border);
+    color:var(--text);border-radius:8px;padding:10px 12px;
+    font-size:1rem;font-family:inherit;text-align:center;
+    width:60px;
+  }
+  .custom-row input:focus{outline:none;border-color:var(--accent)}
+  .custom-row span{color:var(--text3);font-size:.8rem;flex:0 0 30px}
+
+  /* Start Button */
+  .start-btn{
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    color:#1a1a1a;border:none;border-radius:14px;
+    padding:16px 60px;font-size:1.15rem;font-weight:700;
+    cursor:pointer;font-family:inherit;letter-spacing:.5px;
+    transition:transform .15s,box-shadow .15s;
+    box-shadow:0 4px 20px rgba(201,168,76,.3);
+  }
+  .start-btn:hover{transform:translateY(-2px);box-shadow:0 6px 28px rgba(201,168,76,.45)}
+  .start-btn:active{transform:translateY(0)}
+
+  .instructions{
+    margin-top:20px;color:var(--text3);font-size:.78rem;
+    text-align:center;line-height:1.6;max-width:340px;
+  }
+  .instructions kbd{
+    background:var(--surface2);padding:2px 7px;border-radius:4px;
+    border:1px solid var(--border);font-size:.72rem;
+  }
+
+  /* ─── Clock Screen ─── */
+  #clock-screen{
+    display:none;flex-direction:column;
+    width:100%;height:100%;position:relative;
+  }
+  #clock-screen.visible{display:flex}
+
+  .player-zone{
+    flex:1;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    cursor:pointer;position:relative;
+    transition:background .3s,opacity .3s;
+    min-height:0;
+  }
+  .player-zone.top{border-bottom:2px solid var(--border)}
+  .player-zone.top .zone-inner{transform:rotate(180deg)}
+
+  /* Active / Inactive states */
+  .player-zone.active{background:var(--surface)}
+  .player-zone.inactive{opacity:.5}
+  .player-zone.flagged{opacity:.35}
+
+  .zone-inner{
+    display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:4px;
+  }
+  .player-label{
+    font-size:.85rem;font-weight:600;text-transform:uppercase;
+    letter-spacing:2px;color:var(--text2);
+  }
+  .player-icon{
+    width:28px;height:28px;border-radius:50%;margin-bottom:4px;
+    border:2px solid var(--text3);
+  }
+  .player-icon.white-icon{background:var(--white-clr);border-color:#bbb}
+  .player-icon.black-icon{background:var(--black-clr);border-color:#666}
+  .timer-display{
+    font-size:4.5rem;font-weight:800;letter-spacing:-2px;
+    font-variant-numeric:tabular-nums;line-height:1;
+    transition:color .3s;
+  }
+  .timer-display.low-time{color:var(--orange)}
+  .timer-display.critical{color:var(--red);animation:pulse .6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+  .move-count{
+    font-size:.85rem;color:var(--text3);margin-top:6px;
+  }
+  .increment-badge{
+    font-size:.72rem;color:var(--accent);
+    background:rgba(201,168,76,.1);padding:2px 10px;border-radius:20px;
+    margin-top:4px;
+  }
+
+  /* Flag overlay */
+  .flag-overlay{
+    position:absolute;inset:0;display:none;
+    align-items:center;justify-content:center;
+    background:rgba(231,76,60,.12);
+    flex-direction:column;gap:8px;
+  }
+  .player-zone.top .flag-overlay{transform:rotate(180deg)}
+  .flagged .flag-overlay{display:flex}
+  .flag-icon{font-size:3rem}
+  .flag-text{font-size:1.1rem;font-weight:700;color:var(--red)}
+
+  /* Middle controls bar */
+  .controls-bar{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    z-index:10;display:flex;gap:8px;
+  }
+  .ctrl-btn{
+    width:48px;height:48px;border-radius:50%;border:2px solid var(--border);
+    background:var(--surface2);color:var(--text);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:all .2s;font-size:1.1rem;
+  }
+  .ctrl-btn:hover{border-color:var(--accent);background:var(--surface)}
+  .ctrl-btn:active{transform:scale(.92)}
+  .ctrl-btn svg{width:20px;height:20px;fill:currentColor}
+  .ctrl-btn.pause-btn{width:56px;height:56px}
+  .ctrl-btn.pause-btn svg{width:24px;height:24px}
+
+  /* Paused overlay */
+  .paused-overlay{
+    position:fixed;inset:0;z-index:50;
+    background:rgba(15,17,23,.85);
+    display:none;align-items:center;justify-content:center;
+    flex-direction:column;gap:16px;backdrop-filter:blur(4px);
+  }
+  .paused-overlay.visible{display:flex}
+  .paused-text{font-size:1.8rem;font-weight:800;color:var(--accent);letter-spacing:2px}
+  .paused-sub{color:var(--text2);font-size:.9rem}
+  .resume-btn{
+    margin-top:8px;background:var(--accent);color:#1a1a1a;
+    border:none;border-radius:12px;padding:14px 48px;
+    font-size:1.05rem;font-weight:700;cursor:pointer;font-family:inherit;
+  }
+
+  /* Game-over overlay */
+  .gameover-overlay{
+    position:fixed;inset:0;z-index:60;
+    background:rgba(15,17,23,.9);
+    display:none;align-items:center;justify-content:center;
+    flex-direction:column;gap:12px;backdrop-filter:blur(6px);
+  }
+  .gameover-overlay.visible{display:flex}
+  .gameover-title{font-size:1.6rem;font-weight:800;color:var(--red)}
+  .gameover-detail{color:var(--text2);font-size:1rem;text-align:center;line-height:1.5}
+  .gameover-stats{
+    display:flex;gap:32px;margin:8px 0;
+  }
+  .stat-box{text-align:center}
+  .stat-box .val{font-size:1.8rem;font-weight:700;color:var(--text)}
+  .stat-box .lbl{font-size:.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px}
+  .new-game-btn{
+    margin-top:8px;background:var(--accent);color:#1a1a1a;
+    border:none;border-radius:12px;padding:14px 48px;
+    font-size:1.05rem;font-weight:700;cursor:pointer;font-family:inherit;
+  }
+
+  /* Delay flash */
+  .delay-indicator{
+    position:absolute;bottom:12px;right:16px;
+    font-size:.75rem;color:var(--accent);opacity:0;
+    transition:opacity .2s;
+  }
+  .player-zone.top .delay-indicator{top:12px;bottom:auto;transform:rotate(180deg)}
+  .delay-indicator.show{opacity:1}
+
+  /* Sound toggle */
+  .sound-toggle{
+    position:absolute;top:12px;right:12px;z-index:20;
+    background:none;border:none;color:var(--text3);cursor:pointer;
+    font-size:1.2rem;padding:8px;
+  }
+
+  /* Responsive */
+  @media(max-width:480px){
+    .timer-display{font-size:3.5rem}
+    .presets{grid-template-columns:repeat(3,1fr);gap:8px}
+    .preset-btn{padding:10px 6px}
+    .preset-btn .time{font-size:1.1rem}
+    #title-screen h1{font-size:1.8rem}
+  }
+  @media(min-width:768px){
+    .timer-display{font-size:6rem}
+    .player-label{font-size:1rem}
+  }
+  @media(min-height:800px){
+    .timer-display{font-size:5.5rem}
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ TITLE SCREEN ═══════════ -->
+<div id="title-screen">
+  <div class="logo">
+    <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="4" y="4" width="72" height="72" rx="16" fill="#1a1d27" stroke="#c9a84c" stroke-width="3"/>
+      <circle cx="28" cy="40" r="14" fill="none" stroke="#e8dfd0" stroke-width="2.5"/>
+      <line x1="28" y1="30" x2="28" y2="40" stroke="#e8dfd0" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="28" y1="40" x2="35" y2="43" stroke="#e8dfd0" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="52" cy="40" r="14" fill="none" stroke="#3a3632" stroke-width="2.5"/>
+      <line x1="52" y1="30" x2="52" y2="40" stroke="#3a3632" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="52" y1="40" x2="59" y2="37" stroke="#3a3632" stroke-width="2.5" stroke-linecap="round"/>
+      <rect x="38" y="28" width="4" height="24" rx="2" fill="#c9a84c"/>
+    </svg>
+  </div>
+  <h1>Chess Clock</h1>
+  <div class="subtitle">Timer & Move Counter</div>
+
+  <div class="presets" id="presets"></div>
+
+  <div class="custom-section">
+    <button class="custom-toggle" id="customToggle">
+      Custom Time <span class="arrow">&#9660;</span>
+    </button>
+    <div class="custom-body" id="customBody">
+      <div class="custom-row">
+        <label>Minutes</label>
+        <input type="number" id="customMin" value="10" min="0" max="300" step="1">
+        <span>min</span>
+      </div>
+      <div class="custom-row">
+        <label>Seconds</label>
+        <input type="number" id="customSec" value="0" min="0" max="59" step="1">
+        <span>sec</span>
+      </div>
+      <div class="custom-row">
+        <label>Increment</label>
+        <input type="number" id="customInc" value="0" min="0" max="60" step="1">
+        <span>sec</span>
+      </div>
+    </div>
+  </div>
+
+  <button class="start-btn" id="startBtn">Start Game</button>
+
+  <div class="instructions">
+    Tap a player's side to end their turn.<br>
+    Top player is rotated for face-to-face play.<br>
+    <kbd>Space</kbd> to switch &middot; <kbd>P</kbd> to pause &middot; <kbd>R</kbd> to reset
+  </div>
+</div>
+
+<!-- ═══════════ CLOCK SCREEN ═══════════ -->
+<div id="clock-screen">
+  <!-- Black (top, rotated) -->
+  <div class="player-zone top" id="zone-black" data-player="black">
+    <div class="zone-inner">
+      <div class="player-icon black-icon"></div>
+      <div class="player-label">Black</div>
+      <div class="timer-display" id="timer-black">10:00</div>
+      <div class="move-count" id="moves-black">Moves: 0</div>
+      <div class="increment-badge" id="inc-badge-black" style="display:none">+0s</div>
+    </div>
+    <div class="delay-indicator" id="delay-black">+0s</div>
+    <div class="flag-overlay">
+      <div class="flag-icon">&#9873;</div>
+      <div class="flag-text">TIME'S UP</div>
+    </div>
+  </div>
+
+  <!-- White (bottom) -->
+  <div class="player-zone bottom" id="zone-white" data-player="white">
+    <div class="zone-inner">
+      <div class="player-icon white-icon"></div>
+      <div class="player-label">White</div>
+      <div class="timer-display" id="timer-white">10:00</div>
+      <div class="move-count" id="moves-white">Moves: 0</div>
+      <div class="increment-badge" id="inc-badge-white" style="display:none">+0s</div>
+    </div>
+    <div class="delay-indicator" id="delay-white">+0s</div>
+    <div class="flag-overlay">
+      <div class="flag-icon">&#9873;</div>
+      <div class="flag-text">TIME'S UP</div>
+    </div>
+  </div>
+
+  <!-- Center controls -->
+  <div class="controls-bar">
+    <button class="ctrl-btn" id="resetBtn" title="Reset">
+      <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0012 4a8 8 0 108 8h-2a6 6 0 11-1.76-4.24L14 10h7V3l-3.35 3.35z"/></svg>
+    </button>
+    <button class="ctrl-btn pause-btn" id="pauseBtn" title="Pause">
+      <svg viewBox="0 0 24 24" id="pauseIcon"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+    </button>
+    <button class="ctrl-btn" id="settingsBtn" title="Settings">
+      <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96a7.04 7.04 0 00-1.62-.94l-.36-2.54a.48.48 0 00-.48-.41h-3.84a.48.48 0 00-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 9.87a.48.48 0 00.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.03.7 1.62.94l.36 2.54c.05.24.26.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1115.6 12 3.6 3.6 0 0112 15.6z"/></svg>
+    </button>
+  </div>
+
+  <button class="sound-toggle" id="soundToggle" title="Toggle Sound">&#128264;</button>
+</div>
+
+<!-- Paused overlay -->
+<div class="paused-overlay" id="pausedOverlay">
+  <div class="paused-text">PAUSED</div>
+  <div class="paused-sub">Game is paused</div>
+  <button class="resume-btn" id="resumeBtn">Resume</button>
+</div>
+
+<!-- Game over overlay -->
+<div class="gameover-overlay" id="gameoverOverlay">
+  <div class="gameover-title" id="goTitle">Time's Up!</div>
+  <div class="gameover-detail" id="goDetail"></div>
+  <div class="gameover-stats">
+    <div class="stat-box">
+      <div class="val" id="goWhiteMoves">0</div>
+      <div class="lbl">White Moves</div>
+    </div>
+    <div class="stat-box">
+      <div class="val" id="goWhiteTime">0:00</div>
+      <div class="lbl">White Remaining</div>
+    </div>
+    <div class="stat-box">
+      <div class="val" id="goBlackMoves">0</div>
+      <div class="lbl">Black Moves</div>
+    </div>
+    <div class="stat-box">
+      <div class="val" id="goBlackTime">0:00</div>
+      <div class="lbl">Black Remaining</div>
+    </div>
+  </div>
+  <button class="new-game-btn" id="newGameBtn">New Game</button>
+</div>
+
+<script>
+// ─── Audio Engine (Web Audio API) ───
+const AudioEngine = (() => {
+  let ctx = null;
+  let enabled = true;
+  const getCtx = () => {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  };
+  const play = (freq, dur, type = 'sine', vol = 0.12) => {
+    if (!enabled) return;
+    try {
+      const c = getCtx();
+      const o = c.createOscillator();
+      const g = c.createGain();
+      o.type = type;
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, c.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
+      o.connect(g);
+      g.connect(c.destination);
+      o.start();
+      o.stop(c.currentTime + dur);
+    } catch(e) {}
+  };
+  return {
+    tick: () => play(800, 0.04, 'sine', 0.06),
+    switch: () => play(600, 0.08, 'triangle', 0.15),
+    warning: () => play(440, 0.15, 'square', 0.1),
+    critical: () => { play(330, 0.12, 'square', 0.12); setTimeout(() => play(280, 0.15, 'square', 0.12), 150); },
+    flag: () => { play(220, 0.3, 'sawtooth', 0.15); setTimeout(() => play(180, 0.4, 'sawtooth', 0.12), 200); },
+    start: () => { play(523, 0.08, 'sine', 0.1); setTimeout(() => play(659, 0.08, 'sine', 0.1), 80); setTimeout(() => play(784, 0.12, 'sine', 0.12), 160); },
+    toggle: () => { enabled = !enabled; return enabled; },
+    isEnabled: () => enabled,
+  };
+})();
+
+// ─── Presets ───
+const PRESETS = [
+  { min: 1, sec: 0, inc: 0, label: 'Bullet' },
+  { min: 2, sec: 0, inc: 1, label: 'Bullet' },
+  { min: 3, sec: 0, inc: 0, label: 'Blitz' },
+  { min: 3, sec: 0, inc: 2, label: 'Blitz' },
+  { min: 5, sec: 0, inc: 0, label: 'Blitz' },
+  { min: 5, sec: 0, inc: 3, label: 'Blitz' },
+  { min: 10, sec: 0, inc: 0, label: 'Rapid' },
+  { min: 15, sec: 0, inc: 10, label: 'Rapid' },
+  { min: 30, sec: 0, inc: 0, label: 'Classical' },
+];
+
+// ─── State ───
+let state = {
+  totalMs: 600000,
+  incrementMs: 0,
+  white: { timeMs: 600000, moves: 0 },
+  black: { timeMs: 600000, moves: 0 },
+  turn: null, // 'white' | 'black' | null
+  running: false,
+  paused: false,
+  gameOver: false,
+  started: false,
+  lastTick: 0,
+  selectedPreset: 6, // 10+0
+  tickSoundCounter: 0,
+};
+
+// ─── DOM ───
+const $ = id => document.getElementById(id);
+const titleScreen = $('title-screen');
+const clockScreen = $('clock-screen');
+const presetsEl = $('presets');
+const customToggle = $('customToggle');
+const customBody = $('customBody');
+const customMin = $('customMin');
+const customSec = $('customSec');
+const customInc = $('customInc');
+const startBtn = $('startBtn');
+const zoneWhite = $('zone-white');
+const zoneBlack = $('zone-black');
+const timerWhite = $('timer-white');
+const timerBlack = $('timer-black');
+const movesWhite = $('moves-white');
+const movesBlack = $('moves-black');
+const incBadgeWhite = $('inc-badge-white');
+const incBadgeBlack = $('inc-badge-black');
+const delayWhite = $('delay-white');
+const delayBlack = $('delay-black');
+const pauseBtn = $('pauseBtn');
+const resetBtn = $('resetBtn');
+const settingsBtn = $('settingsBtn');
+const soundToggle = $('soundToggle');
+const pausedOverlay = $('pausedOverlay');
+const resumeBtn = $('resumeBtn');
+const gameoverOverlay = $('gameoverOverlay');
+const newGameBtn = $('newGameBtn');
+
+// ─── Build Presets ───
+function buildPresets() {
+  presetsEl.innerHTML = '';
+  PRESETS.forEach((p, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn' + (i === state.selectedPreset ? ' active' : '');
+    const timeStr = p.min + (p.sec > 0 ? ':' + String(p.sec).padStart(2, '0') : '');
+    btn.innerHTML = `<span class="time">${timeStr}</span><span class="label">${p.label}</span>` +
+      (p.inc > 0 ? `<span class="inc">+${p.inc}s</span>` : '');
+    btn.addEventListener('click', () => selectPreset(i));
+    presetsEl.appendChild(btn);
+  });
+}
+
+function selectPreset(idx) {
+  state.selectedPreset = idx;
+  const p = PRESETS[idx];
+  customMin.value = p.min;
+  customSec.value = p.sec;
+  customInc.value = p.inc;
+  document.querySelectorAll('.preset-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
+}
+
+// ─── Custom toggle ───
+customToggle.addEventListener('click', () => {
+  customToggle.classList.toggle('open');
+  customBody.classList.toggle('open');
+});
+
+[customMin, customSec, customInc].forEach(inp => {
+  inp.addEventListener('input', () => {
+    state.selectedPreset = -1;
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  });
+});
+
+// ─── Format time ───
+function formatTime(ms) {
+  if (ms <= 0) return '0:00';
+  const totalSec = Math.ceil(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+function formatTimeMs(ms) {
+  if (ms <= 0) return '0:00.0';
+  const totalSec = ms / 1000;
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  if (ms < 20000) return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1);
+  return formatTime(ms);
+}
+
+// ─── Render ───
+function render() {
+  const wMs = Math.max(0, state.white.timeMs);
+  const bMs = Math.max(0, state.black.timeMs);
+  timerWhite.textContent = formatTimeMs(wMs);
+  timerBlack.textContent = formatTimeMs(bMs);
+  movesWhite.textContent = 'Moves: ' + state.white.moves;
+  movesBlack.textContent = 'Moves: ' + state.black.moves;
+
+  // Low time classes
+  timerWhite.classList.toggle('low-time', wMs > 0 && wMs <= 30000 && wMs > 10000);
+  timerWhite.classList.toggle('critical', wMs > 0 && wMs <= 10000);
+  timerBlack.classList.toggle('low-time', bMs > 0 && bMs <= 30000 && bMs > 10000);
+  timerBlack.classList.toggle('critical', bMs > 0 && bMs <= 10000);
+
+  // Active states
+  zoneWhite.classList.toggle('active', state.turn === 'white' && state.running);
+  zoneWhite.classList.toggle('inactive', state.turn !== 'white' && state.started);
+  zoneBlack.classList.toggle('active', state.turn === 'black' && state.running);
+  zoneBlack.classList.toggle('inactive', state.turn !== 'black' && state.started);
+  zoneWhite.classList.toggle('flagged', wMs <= 0 && state.gameOver);
+  zoneBlack.classList.toggle('flagged', bMs <= 0 && state.gameOver);
+}
+
+// ─── Game logic ───
+function initGame() {
+  const min = parseInt(customMin.value) || 0;
+  const sec = parseInt(customSec.value) || 0;
+  const inc = parseInt(customInc.value) || 0;
+  const totalMs = (min * 60 + sec) * 1000;
+  if (totalMs <= 0) { customMin.value = 1; return initGame(); }
+
+  state.totalMs = totalMs;
+  state.incrementMs = inc * 1000;
+  state.white = { timeMs: totalMs, moves: 0 };
+  state.black = { timeMs: totalMs, moves: 0 };
+  state.turn = null;
+  state.running = false;
+  state.paused = false;
+  state.gameOver = false;
+  state.started = false;
+  state.lastTick = 0;
+
+  // Increment badges
+  if (inc > 0) {
+    incBadgeWhite.style.display = '';
+    incBadgeWhite.textContent = '+' + inc + 's';
+    incBadgeBlack.style.display = '';
+    incBadgeBlack.textContent = '+' + inc + 's';
+  } else {
+    incBadgeWhite.style.display = 'none';
+    incBadgeBlack.style.display = 'none';
+  }
+
+  pausedOverlay.classList.remove('visible');
+  gameoverOverlay.classList.remove('visible');
+  render();
+}
+
+function startGame() {
+  initGame();
+  titleScreen.classList.add('hidden');
+  clockScreen.classList.add('visible');
+  AudioEngine.start();
+  render();
+}
+
+function switchTurn(clickedPlayer) {
+  if (state.gameOver) return;
+
+  // First move: whoever clicks their zone starts the OTHER player's clock
+  if (!state.started) {
+    state.started = true;
+    state.running = true;
+    // If white zone is clicked, white made their "move" -> black's turn
+    state.turn = clickedPlayer === 'white' ? 'black' : 'white';
+    state.white.moves = clickedPlayer === 'white' ? 1 : 0;
+    state.black.moves = clickedPlayer === 'black' ? 1 : 0;
+    state.lastTick = performance.now();
+    AudioEngine.switch();
+    requestAnimationFrame(tick);
+    render();
+    return;
+  }
+
+  // Only the active player can switch
+  if (state.turn !== clickedPlayer || !state.running) return;
+
+  // Add increment
+  if (state.incrementMs > 0) {
+    state[clickedPlayer].timeMs += state.incrementMs;
+    showDelay(clickedPlayer);
+  }
+
+  // Switch
+  state[clickedPlayer === 'white' ? 'white' : 'white']; // noop
+  const other = clickedPlayer === 'white' ? 'black' : 'white';
+  state[other].moves += (other === state.turn ? 0 : 0); // managed below
+  state.turn = other;
+  // The player who pressed gets +1 move (they just moved)
+  state[clickedPlayer].moves += 1;
+  state.lastTick = performance.now();
+  AudioEngine.switch();
+  render();
+}
+
+function showDelay(player) {
+  const el = player === 'white' ? delayWhite : delayBlack;
+  el.textContent = '+' + (state.incrementMs / 1000) + 's';
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 800);
+}
+
+function tick(now) {
+  if (!state.running || state.paused || state.gameOver) return;
+
+  const dt = now - state.lastTick;
+  state.lastTick = now;
+
+  if (state.turn) {
+    state[state.turn].timeMs -= dt;
+
+    // Tick sound every second
+    const prevSec = Math.ceil((state[state.turn].timeMs + dt) / 1000);
+    const curSec = Math.ceil(state[state.turn].timeMs / 1000);
+    if (prevSec !== curSec && curSec > 0 && curSec <= 10) {
+      AudioEngine.critical();
+    } else if (prevSec !== curSec && curSec > 0 && curSec <= 30) {
+      AudioEngine.warning();
+    }
+
+    if (state[state.turn].timeMs <= 0) {
+      state[state.turn].timeMs = 0;
+      state.gameOver = true;
+      state.running = false;
+      AudioEngine.flag();
+      render();
+      showGameOver();
+      return;
+    }
+  }
+
+  render();
+  requestAnimationFrame(tick);
+}
+
+function showGameOver() {
+  const loser = state.white.timeMs <= 0 ? 'White' : 'Black';
+  const winner = loser === 'White' ? 'Black' : 'White';
+  $('goTitle').textContent = loser + "'s Flag Falls!";
+  $('goDetail').textContent = winner + ' wins on time.';
+  $('goWhiteMoves').textContent = state.white.moves;
+  $('goBlackMoves').textContent = state.black.moves;
+  $('goWhiteTime').textContent = formatTime(Math.max(0, state.white.timeMs));
+  $('goBlackTime').textContent = formatTime(Math.max(0, state.black.timeMs));
+  gameoverOverlay.classList.add('visible');
+}
+
+function togglePause() {
+  if (state.gameOver || !state.started) return;
+  state.paused = !state.paused;
+  if (state.paused) {
+    state.running = false;
+    pausedOverlay.classList.add('visible');
+  } else {
+    state.running = true;
+    state.lastTick = performance.now();
+    pausedOverlay.classList.remove('visible');
+    requestAnimationFrame(tick);
+  }
+}
+
+function resetGame() {
+  state.running = false;
+  state.paused = false;
+  state.gameOver = false;
+  pausedOverlay.classList.remove('visible');
+  gameoverOverlay.classList.remove('visible');
+  initGame();
+}
+
+function goToSettings() {
+  state.running = false;
+  state.paused = false;
+  pausedOverlay.classList.remove('visible');
+  gameoverOverlay.classList.remove('visible');
+  clockScreen.classList.remove('visible');
+  titleScreen.classList.remove('hidden');
+}
+
+// ─── Events ───
+buildPresets();
+startBtn.addEventListener('click', startGame);
+
+zoneWhite.addEventListener('click', () => switchTurn('white'));
+zoneBlack.addEventListener('click', () => switchTurn('black'));
+
+pauseBtn.addEventListener('click', togglePause);
+resumeBtn.addEventListener('click', togglePause);
+resetBtn.addEventListener('click', resetGame);
+settingsBtn.addEventListener('click', goToSettings);
+newGameBtn.addEventListener('click', goToSettings);
+
+soundToggle.addEventListener('click', () => {
+  const on = AudioEngine.toggle();
+  soundToggle.textContent = on ? '\u{1F50A}' : '\u{1F507}';
+});
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (titleScreen.classList.contains('hidden')) {
+    if (e.code === 'Space') { e.preventDefault(); if (state.started && state.turn) switchTurn(state.turn); }
+    if (e.code === 'KeyP' || e.code === 'Escape') togglePause();
+    if (e.code === 'KeyR') resetGame();
+  } else {
+    if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); startGame(); }
+  }
+});
+
+// Prevent double-tap zoom on mobile
+document.addEventListener('touchend', e => {
+  if (e.target.closest('.player-zone')) e.preventDefault();
+}, { passive: false });
+
+// Select preset 10+0 by default
+selectPreset(6);
+render();
+</script>
+</body>
+</html>

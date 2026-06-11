@@ -1,0 +1,54 @@
+- generic [ref=e2]:
+  - img [ref=e4]
+  - heading "Chess Clock" [level=1] [ref=e11]
+  - generic [ref=e12]: Timer & Move Counter
+  - generic [ref=e13]:
+    - button "1 Bullet" [ref=e14] [cursor=pointer]:
+      - generic [ref=e15]: "1"
+      - text: Bullet
+    - button "2 Bullet+1s" [ref=e16] [cursor=pointer]:
+      - generic [ref=e17]: "2"
+      - text: Bullet+1s
+    - button "3 Blitz" [ref=e18] [cursor=pointer]:
+      - generic [ref=e19]: "3"
+      - text: Blitz
+    - button "3 Blitz+2s" [ref=e20] [cursor=pointer]:
+      - generic [ref=e21]: "3"
+      - text: Blitz+2s
+    - button "5 Blitz" [ref=e22] [cursor=pointer]:
+      - generic [ref=e23]: "5"
+      - text: Blitz
+    - button "5 Blitz+3s" [ref=e24] [cursor=pointer]:
+      - generic [ref=e25]: "5"
+      - text: Blitz+3s
+    - button "10 Rapid" [ref=e26] [cursor=pointer]:
+      - generic [ref=e27]: "10"
+      - text: Rapid
+    - button "15 Rapid+10s" [ref=e28] [cursor=pointer]:
+      - generic [ref=e29]: "15"
+      - text: Rapid+10s
+    - button "30 Classical" [ref=e30] [cursor=pointer]:
+      - generic [ref=e31]: "30"
+      - text: Classical
+  - generic [ref=e32]:
+    - button "Custom Time ▼" [ref=e33] [cursor=pointer]:
+      - text: Custom Time
+      - generic [ref=e34]: ▼
+    - generic:
+      - generic [ref=e35]:
+        - generic [ref=e36]: Minutes
+        - spinbutton [ref=e37]: "10"
+        - generic [ref=e38]: min
+      - generic [ref=e39]:
+        - generic [ref=e40]: Seconds
+        - spinbutton [ref=e41]: "0"
+        - generic [ref=e42]: sec
+      - generic [ref=e43]:
+        - generic [ref=e44]: Increment
+        - spinbutton [ref=e45]: "0"
+        - generic [ref=e46]: sec
+  - button "Start Game" [ref=e47] [cursor=pointer]
+  - generic [ref=e48]:
+    - text: Tap a player's side to end their turn.
+    - text: Top player is rotated for face-to-face play.
+    - text: Space to switch · P to pause · R to reset
