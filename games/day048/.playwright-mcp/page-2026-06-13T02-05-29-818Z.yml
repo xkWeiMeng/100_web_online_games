@@ -1,0 +1,8 @@
+- generic [ref=e2]:
+  - heading "Jewel Crush" [level=1] [ref=e9]
+  - paragraph [ref=e10]: Match-3 Puzzle
+  - button "Play" [ref=e11] [cursor=pointer]
+  - paragraph [ref=e12]:
+    - text: Swap adjacent jewels to make rows or columns of 3 or more.
+    - text: Chain combos for bonus points! Clear the target score before moves run out to advance levels.
+    - text: Tap or click a jewel, then tap its neighbor to swap.
