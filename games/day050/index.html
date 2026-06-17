@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Tower Stack — Balance Game</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #1a1a2e;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  canvas {
+    display: block;
+    width: 100%; height: 100%;
+  }
+  #ui {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    display: flex; flex-direction: column;
+    align-items: center;
+  }
+
+  /* ── Score HUD ───────────────────────────── */
+  #hud {
+    width: 100%;
+    padding: 18px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+    opacity: 0; transition: opacity .4s;
+  }
+  #hud.visible { opacity: 1; }
+  #hud .score-box {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    text-shadow: 0 2px 12px rgba(0,0,0,.5);
+  }
+  #hud .score-box span { font-size: 32px; }
+
+  /* ── Combo / perfect overlay ─────────────── */
+  #combo {
+    position: absolute; top: 38%; left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    font-size: 36px; font-weight: 800;
+    color: #ffdd57;
+    text-shadow: 0 0 20px rgba(255,221,87,.6), 0 4px 20px rgba(0,0,0,.4);
+    transition: transform .2s cubic-bezier(.3,1.6,.5,1), opacity .3s;
+    opacity: 0;
+    white-space: nowrap;
+  }
+
+  /* ── Title / Start screen ───────────────── */
+  #title-screen {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: linear-gradient(160deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+    z-index: 10;
+    transition: opacity .5s;
+  }
+  #title-screen.hidden { opacity: 0; pointer-events: none; }
+  #title-screen h1 {
+    font-size: clamp(36px, 8vw, 64px);
+    font-weight: 900;
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+    letter-spacing: -1px;
+  }
+  #title-screen .subtitle {
+    color: rgba(255,255,255,.55);
+    font-size: clamp(14px, 3vw, 18px);
+    margin-bottom: 40px;
+  }
+  #title-screen .instructions {
+    color: rgba(255,255,255,.7);
+    font-size: clamp(13px, 2.8vw, 16px);
+    text-align: center;
+    line-height: 1.8;
+    max-width: 340px;
+    margin-bottom: 48px;
+    padding: 0 20px;
+  }
+  #title-screen .instructions strong { color: #ffd200; }
+  #start-btn {
+    pointer-events: auto;
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    color: #1a1a2e;
+    border: none;
+    padding: 16px 56px;
+    font-size: 20px;
+    font-weight: 800;
+    border-radius: 50px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 30px rgba(255,210,0,.35);
+    transition: transform .15s, box-shadow .15s;
+  }
+  #start-btn:hover { transform: scale(1.05); box-shadow: 0 6px 40px rgba(255,210,0,.5); }
+  #start-btn:active { transform: scale(.97); }
+
+  /* ── Game Over overlay ──────────────────── */
+  #game-over {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: rgba(10,10,25,.88);
+    z-index: 10;
+    opacity: 0; pointer-events: none;
+    transition: opacity .4s;
+  }
+  #game-over.visible { opacity: 1; pointer-events: auto; }
+  #game-over h2 {
+    font-size: clamp(32px, 7vw, 52px);
+    font-weight: 900;
+    color: #ff6b6b;
+    margin-bottom: 12px;
+  }
+  #game-over .final-score {
+    font-size: clamp(18px, 4vw, 26px);
+    color: rgba(255,255,255,.7);
+    margin-bottom: 6px;
+  }
+  #game-over .final-score span {
+    color: #ffd200;
+    font-weight: 800;
+    font-size: clamp(26px, 5vw, 38px);
+  }
+  #game-over .best-score {
+    font-size: 14px; color: rgba(255,255,255,.4);
+    margin-bottom: 40px;
+  }
+  #game-over .best-score span { color: rgba(255,210,0,.7); font-weight: 700; }
+  #restart-btn {
+    pointer-events: auto;
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    color: #1a1a2e;
+    border: none;
+    padding: 14px 48px;
+    font-size: 18px;
+    font-weight: 800;
+    border-radius: 50px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 30px rgba(255,210,0,.35);
+    transition: transform .15s, box-shadow .15s;
+  }
+  #restart-btn:hover { transform: scale(1.05); }
+  #restart-btn:active { transform: scale(.97); }
+
+  /* ── Tap hint ───────────────────────────── */
+  #tap-hint {
+    position: absolute; bottom: 12%;
+    color: rgba(255,255,255,.35);
+    font-size: 15px;
+    animation: pulse-hint 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse-hint {
+    0%,100% { opacity: .35; transform: translateY(0); }
+    50% { opacity: .7; transform: translateY(-4px); }
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="ui">
+  <div id="hud">
+    <div class="score-box">SCORE <span id="score-val">0</span></div>
+    <div class="score-box">BEST <span id="best-val">0</span></div>
+  </div>
+  <div id="combo"></div>
+  <div id="tap-hint">Tap or Click to stack</div>
+</div>
+
+<!-- Title Screen -->
+<div id="title-screen">
+  <h1>Tower Stack</h1>
+  <div class="subtitle">A balance stacking game</div>
+  <div class="instructions">
+    A block swings back and forth.<br>
+    <strong>Tap</strong> or <strong>click</strong> to place it!<br><br>
+    Line it up perfectly for <strong>bonus points</strong>.<br>
+    Miss the overlap and it's <strong>game over</strong>!<br><br>
+    How high can you build?
+  </div>
+  <button id="start-btn">START GAME</button>
+</div>
+
+<!-- Game Over -->
+<div id="game-over">
+  <h2>GAME OVER</h2>
+  <div class="final-score">Score: <span id="final-score-val">0</span></div>
+  <div class="best-score">Best: <span id="best-score-val">0</span></div>
+  <button id="restart-btn">PLAY AGAIN</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  Tower Stack – Balance Game
+// ═══════════════════════════════════════════
+
+(() => {
+  'use strict';
+
+  // ── Canvas setup ─────────────────────────
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ── DOM refs ────────────────────────────
+  const $hud        = document.getElementById('hud');
+  const $scoreVal   = document.getElementById('score-val');
+  const $bestVal    = document.getElementById('best-val');
+  const $combo      = document.getElementById('combo');
+  const $tapHint    = document.getElementById('tap-hint');
+  const $titleScreen= document.getElementById('title-screen');
+  const $gameOver   = document.getElementById('game-over');
+  const $finalScore = document.getElementById('final-score-val');
+  const $bestScore  = document.getElementById('best-score-val');
+  const $startBtn   = document.getElementById('start-btn');
+  const $restartBtn = document.getElementById('restart-btn');
+
+  // ── Palette (hue shifts as tower grows) ──
+  function blockColor(index) {
+    const hue = (200 + index * 12) % 360;
+    return {
+      top:  `hsl(${hue}, 65%, 62%)`,
+      front:`hsl(${hue}, 55%, 42%)`,
+      right:`hsl(${hue}, 50%, 35%)`
+    };
+  }
+
+  // ── Constants ───────────────────────────
+  const BLOCK_HEIGHT  = 28;
+  const ISO_X = 0.72;   // isometric scale x
+  const ISO_Y = 0.36;   // isometric scale y
+  const PERFECT_THRESHOLD = 6;    // pixels tolerance for "perfect"
+  const INITIAL_WIDTH = 160;
+  const INITIAL_DEPTH = 160;
+  const BASE_SPEED = 2.0;
+  const MAX_SPEED  = 6;
+
+  // ── State ──────────────────────────────
+  let stack = [];       // placed blocks
+  let moving = null;    // current moving block
+  let falling = [];     // falling sliced-off pieces
+  let particles = [];
+  let score = 0;
+  let combo = 0;
+  let best = parseInt(localStorage.getItem('tower_best') || '0', 10);
+  let cameraY = 0;
+  let targetCamY = 0;
+  let gameState = 'title'; // title | playing | over
+  let direction = 'x';     // alternates x / z
+  let animFrame = 0;
+  let inputCooldown = 0;   // prevents accidental instant placement after restart
+  let screenShake = 0;     // screen shake on game over
+
+  // ── Helpers ────────────────────────────
+  function lerp(a, b, t) { return a + (b - a) * t; }
+
+  function isoProject(x, y, z) {
+    return {
+      sx: (x - z) * ISO_X,
+      sy: (x + z) * ISO_Y - y
+    };
+  }
+
+  // ── Block structure ────────────────────
+  // { x, z, w, d, y(height index) }
+  function createBlock(index, w, d) {
+    const speed = Math.min(BASE_SPEED + index * 0.1, MAX_SPEED);
+    const swing = Math.max(w * 1.1 + index * 3, 140);
+    const dir = index % 2 === 0 ? 'x' : 'z';
+    const prev = stack[stack.length - 1];
+    const b = {
+      x: dir === 'x' ? -swing : prev.x,
+      z: dir === 'z' ? -swing : prev.z,
+      w, d,
+      y: index,
+      speed,
+      swing,
+      dir,
+      time: 0
+    };
+    return b;
+  }
+
+  // ── Drawing helpers ────────────────────
+  function drawBlock(bx, bz, bw, bd, by, colors, alpha) {
+    ctx.globalAlpha = alpha != null ? alpha : 1;
+    const h = BLOCK_HEIGHT;
+    const yOff = by * h;
+
+    // 8 corners
+    const tfl = isoProject(bx,        yOff + h, bz);
+    const tfr = isoProject(bx + bw,   yOff + h, bz);
+    const tbl = isoProject(bx,        yOff + h, bz + bd);
+    const tbr = isoProject(bx + bw,   yOff + h, bz + bd);
+    const bfl = isoProject(bx,        yOff,     bz);
+    const bfr = isoProject(bx + bw,   yOff,     bz);
+    const bbl = isoProject(bx,        yOff,     bz + bd);
+    const bbr = isoProject(bx + bw,   yOff,     bz + bd);
+
+    // Translate to center
+    const cx = W / 2;
+    const cy = H * 0.72 + cameraY;
+
+    function tx(p) { return cx + p.sx; }
+    function ty(p) { return cy - p.sy; }
+
+    // Top face
+    ctx.fillStyle = colors.top;
+    ctx.beginPath();
+    ctx.moveTo(tx(tfl), ty(tfl));
+    ctx.lineTo(tx(tfr), ty(tfr));
+    ctx.lineTo(tx(tbr), ty(tbr));
+    ctx.lineTo(tx(tbl), ty(tbl));
+    ctx.closePath();
+    ctx.fill();
+
+    // Front face (right side in iso)
+    ctx.fillStyle = colors.front;
+    ctx.beginPath();
+    ctx.moveTo(tx(tfr), ty(tfr));
+    ctx.lineTo(tx(tbr), ty(tbr));
+    ctx.lineTo(tx(bbr), ty(bbr));
+    ctx.lineTo(tx(bfr), ty(bfr));
+    ctx.closePath();
+    ctx.fill();
+
+    // Right face (left side in iso)
+    ctx.fillStyle = colors.right;
+    ctx.beginPath();
+    ctx.moveTo(tx(tfl), ty(tfl));
+    ctx.lineTo(tx(tbl), ty(tbl));
+    ctx.lineTo(tx(bbl), ty(bbl));
+    ctx.lineTo(tx(bfl), ty(bfl));
+    ctx.closePath();
+    ctx.fill();
+
+    // Edge outlines for depth
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 1;
+
+    // Top face outline
+    ctx.beginPath();
+    ctx.moveTo(tx(tfl), ty(tfl));
+    ctx.lineTo(tx(tfr), ty(tfr));
+    ctx.lineTo(tx(tbr), ty(tbr));
+    ctx.lineTo(tx(tbl), ty(tbl));
+    ctx.closePath();
+    ctx.stroke();
+
+    // Front face outline
+    ctx.beginPath();
+    ctx.moveTo(tx(tfr), ty(tfr));
+    ctx.lineTo(tx(tbr), ty(tbr));
+    ctx.lineTo(tx(bbr), ty(bbr));
+    ctx.lineTo(tx(bfr), ty(bfr));
+    ctx.closePath();
+    ctx.stroke();
+
+    // Left face outline
+    ctx.beginPath();
+    ctx.moveTo(tx(tfl), ty(tfl));
+    ctx.lineTo(tx(tbl), ty(tbl));
+    ctx.lineTo(tx(bbl), ty(bbl));
+    ctx.lineTo(tx(bfl), ty(bfl));
+    ctx.closePath();
+    ctx.stroke();
+
+    ctx.globalAlpha = 1;
+  }
+
+  // ── Particles ──────────────────────────
+  function spawnParticles(x, z, w, d, y, col, count) {
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        x: x + Math.random() * w,
+        z: z + Math.random() * d,
+        y: y * BLOCK_HEIGHT + BLOCK_HEIGHT,
+        vx: (Math.random() - .5) * 4,
+        vz: (Math.random() - .5) * 4,
+        vy: 2 + Math.random() * 4,
+        life: 1,
+        size: 2 + Math.random() * 3,
+        col
+      });
+    }
+  }
+
+  function updateParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.z += p.vz;
+      p.y += p.vy;
+      p.vy -= 0.18;
+      p.life -= 0.025;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+  }
+
+  function drawParticles() {
+    const cx = W / 2;
+    const cy = H * 0.72 + cameraY;
+    for (const p of particles) {
+      const proj = isoProject(p.x, p.y, p.z);
+      ctx.globalAlpha = p.life * 0.8;
+      ctx.fillStyle = p.col;
+      ctx.fillRect(cx + proj.sx - p.size/2, cy - proj.sy - p.size/2, p.size, p.size);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ── Falling pieces ─────────────────────
+  function updateFalling(dt) {
+    for (let i = falling.length - 1; i >= 0; i--) {
+      const f = falling[i];
+      f.vy -= 0.22;
+      f.y += f.vy;
+      f.rot += f.rotSpeed;
+      f.alpha -= 0.012;
+      if (f.alpha <= 0) falling.splice(i, 1);
+    }
+  }
+
+  function drawFalling() {
+    for (const f of falling) {
+      drawBlock(f.x, f.z, f.w, f.d, f.y / BLOCK_HEIGHT, blockColor(f.colorIdx), Math.max(0, f.alpha));
+    }
+  }
+
+  // ── Background ─────────────────────────
+  function drawBackground() {
+    const topHue = (220 + stack.length * 2) % 360;
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, `hsl(${topHue}, 30%, 8%)`);
+    grad.addColorStop(0.6, `hsl(${(topHue + 20) % 360}, 25%, 14%)`);
+    grad.addColorStop(1, `hsl(${(topHue + 40) % 360}, 20%, 20%)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Stars
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    const seed = 42;
+    for (let i = 0; i < 60; i++) {
+      const sx = ((seed * (i+1) * 7919) % 10000) / 10000 * W;
+      const rawSy = ((seed * (i+1) * 104729) % 10000) / 10000 * H;
+      const sy = rawSy + cameraY * 0.05;
+      const r = ((i * 3 + 7) % 3) * 0.4 + 0.5;
+      const flicker = 0.15 + 0.85 * (0.5 + 0.5 * Math.sin(animFrame * 0.02 + i));
+      ctx.globalAlpha = flicker * 0.4;
+      ctx.beginPath();
+      ctx.arc(sx, sy % H, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ── Combo display ──────────────────────
+  let comboTimeout = null;
+  function showCombo(text) {
+    $combo.textContent = text;
+    $combo.style.transform = 'translate(-50%,-50%) scale(1)';
+    $combo.style.opacity = '1';
+    clearTimeout(comboTimeout);
+    comboTimeout = setTimeout(() => {
+      $combo.style.transform = 'translate(-50%,-50%) scale(0.6)';
+      $combo.style.opacity = '0';
+    }, 800);
+  }
+
+  // ── Score update ───────────────────────
+  function setScore(v) {
+    score = v;
+    $scoreVal.textContent = score;
+    if (score > best) {
+      best = score;
+      localStorage.setItem('tower_best', best);
+    }
+    $bestVal.textContent = best;
+  }
+
+  // ── Place block ────────────────────────
+  function placeBlock() {
+    if (!moving) return;
+
+    // Always hide tap hint on first interaction
+    $tapHint.style.display = 'none';
+
+    const prev = stack[stack.length - 1];
+    const m = moving;
+    moving = null;
+
+    let overlap, newX = m.x, newZ = m.z, newW = m.w, newD = m.d;
+    let cutX, cutZ, cutW, cutD;
+
+    if (m.dir === 'x') {
+      const delta = m.x - prev.x;
+      if (Math.abs(delta) < PERFECT_THRESHOLD) {
+        // Perfect!
+        newX = prev.x;
+        newW = prev.w;
+        overlap = prev.w;
+      } else {
+        if (delta > 0) {
+          overlap = prev.w - delta;
+          cutX = m.x + overlap;
+          cutW = delta;
+          cutZ = m.z; cutD = m.d;
+        } else {
+          overlap = m.w + delta;
+          newX = prev.x;
+          cutX = m.x;
+          cutW = -delta;
+          cutZ = m.z; cutD = m.d;
+        }
+        newW = Math.max(0, overlap);
+      }
+    } else {
+      const delta = m.z - prev.z;
+      if (Math.abs(delta) < PERFECT_THRESHOLD) {
+        newZ = prev.z;
+        newD = prev.d;
+        overlap = prev.d;
+      } else {
+        if (delta > 0) {
+          overlap = prev.d - delta;
+          cutZ = m.z + overlap;
+          cutD = delta;
+          cutX = m.x; cutW = m.w;
+        } else {
+          overlap = m.d + delta;
+          newZ = prev.z;
+          cutZ = m.z;
+          cutD = -delta;
+          cutX = m.x; cutW = m.w;
+        }
+        newD = Math.max(0, overlap);
+      }
+    }
+
+    // Missed entirely
+    if (overlap <= 0) {
+      // All falls
+      falling.push({
+        x: m.x, z: m.z, w: m.w, d: m.d,
+        y: m.y * BLOCK_HEIGHT,
+        vy: 0, rot: 0, rotSpeed: (Math.random() - .5) * .1,
+        alpha: 1, colorIdx: m.y
+      });
+      gameOver();
+      return;
+    }
+
+    // Place the overlapping part
+    const placed = { x: newX, z: newZ, w: newW, d: newD, y: m.y };
+    stack.push(placed);
+
+    // Falling cut-off piece
+    const isPerfect = (m.dir === 'x' ? Math.abs(m.x - prev.x) : Math.abs(m.z - prev.z)) < PERFECT_THRESHOLD;
+
+    if (!isPerfect && cutW > 0 && cutD > 0) {
+      falling.push({
+        x: cutX, z: cutZ, w: cutW, d: cutD,
+        y: m.y * BLOCK_HEIGHT,
+        vy: 0, rot: 0, rotSpeed: (Math.random() - .5) * .08,
+        alpha: 1, colorIdx: m.y
+      });
+    }
+
+    // Scoring
+    if (isPerfect) {
+      combo++;
+      const bonus = 10 + combo * 5;
+      setScore(score + bonus);
+      const colors = blockColor(m.y);
+      spawnParticles(newX, newZ, newW, newD, m.y, colors.top, 20 + combo * 4);
+      if (combo >= 7)      showCombo(`GODLIKE x${combo}! +${bonus}`);
+      else if (combo >= 5) showCombo(`AMAZING x${combo}! +${bonus}`);
+      else if (combo >= 3) showCombo(`GREAT x${combo}! +${bonus}`);
+      else                 showCombo(`PERFECT! +${bonus}`);
+
+      // Regrow block slightly on perfect
+      if (m.dir === 'x') {
+        placed.w = Math.min(placed.w + 2, INITIAL_WIDTH);
+      } else {
+        placed.d = Math.min(placed.d + 2, INITIAL_DEPTH);
+      }
+    } else {
+      combo = 0;
+      setScore(score + 10);
+    }
+
+    // Camera target
+    targetCamY = Math.max(0, (stack.length - 6) * BLOCK_HEIGHT * (ISO_Y * 2));
+
+    // Next block
+    if (placed.w < 3 || placed.d < 3) {
+      // Too thin → game over next frame visually
+      setTimeout(gameOver, 300);
+      return;
+    }
+    nextBlock();
+  }
+
+  function nextBlock() {
+    const idx = stack.length;
+    const prev = stack[stack.length - 1];
+    moving = createBlock(idx, prev.w, prev.d);
+  }
+
+  // ── Game Over ──────────────────────────
+  function gameOver() {
+    gameState = 'over';
+    moving = null;
+    screenShake = 12;
+    $finalScore.textContent = score;
+    $bestScore.textContent = best;
+    setTimeout(() => $gameOver.classList.add('visible'), 600);
+  }
+
+  // ── Start / Restart ────────────────────
+  function startGame() {
+    stack = [];
+    falling = [];
+    particles = [];
+    score = 0;
+    combo = 0;
+    cameraY = 0;
+    targetCamY = 0;
+    screenShake = 0;
+    inputCooldown = 30; // ~500ms cooldown (30 frames)
+    setScore(0);
+    $bestVal.textContent = best;
+
+    // Base block
+    stack.push({
+      x: -INITIAL_WIDTH / 2,
+      z: -INITIAL_DEPTH / 2,
+      w: INITIAL_WIDTH,
+      d: INITIAL_DEPTH,
+      y: 0
+    });
+
+    nextBlock();
+    gameState = 'playing';
+    $hud.classList.add('visible');
+    $tapHint.style.display = '';
+    $titleScreen.classList.add('hidden');
+    $gameOver.classList.remove('visible');
+  }
+
+  // ── Input ──────────────────────────────
+  function handleInput() {
+    if (gameState === 'playing' && moving && inputCooldown <= 0) {
+      placeBlock();
+    }
+  }
+
+  function handleTapOrKey() {
+    if (gameState === 'title') startGame();
+    else if (gameState === 'over') startGame();
+    else handleInput();
+  }
+
+  canvas.addEventListener('pointerdown', handleTapOrKey);
+  $startBtn.addEventListener('click', (e) => { e.stopPropagation(); startGame(); });
+  $restartBtn.addEventListener('click', (e) => { e.stopPropagation(); startGame(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.code === 'Enter') {
+      e.preventDefault();
+      handleTapOrKey();
+    }
+  });
+
+  // ── Main loop ──────────────────────────
+  let lastTime = 0;
+
+  function loop(time) {
+    const dt = Math.min((time - lastTime) / 16.67, 3);
+    lastTime = time;
+    animFrame++;
+
+    // Cooldown timer
+    if (inputCooldown > 0) inputCooldown -= dt;
+
+    // Screen shake decay
+    if (screenShake > 0) screenShake *= 0.88;
+    if (screenShake < 0.3) screenShake = 0;
+
+    // Camera smoothing
+    cameraY = lerp(cameraY, targetCamY, 0.06);
+
+    // Move current block
+    if (moving && gameState === 'playing') {
+      moving.time += moving.speed * dt;
+      const swing = moving.swing;
+      const offset = Math.sin(moving.time * 0.04) * swing;
+      if (moving.dir === 'x') {
+        const prev = stack[stack.length - 1];
+        moving.x = prev.x + (prev.w / 2 - moving.w / 2) + offset;
+      } else {
+        const prev = stack[stack.length - 1];
+        moving.z = prev.z + (prev.d / 2 - moving.d / 2) + offset;
+      }
+    }
+
+    // Update
+    updateFalling(dt);
+    updateParticles(dt);
+
+    // ── Draw ──────────────────────────────
+    ctx.save();
+    // Apply screen shake
+    if (screenShake > 0) {
+      const sx = (Math.random() - 0.5) * screenShake * 2;
+      const sy = (Math.random() - 0.5) * screenShake * 2;
+      ctx.translate(sx, sy);
+    }
+
+    drawBackground();
+
+    // Draw shadow / ground plane hint
+    const cx = W / 2;
+    const cy = H * 0.72 + cameraY;
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 14, 120, 16, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw stack
+    for (let i = 0; i < stack.length; i++) {
+      const b = stack[i];
+      drawBlock(b.x, b.z, b.w, b.d, b.y, blockColor(i), 1);
+    }
+
+    // Draw falling pieces
+    drawFalling();
+
+    // Draw moving block
+    if (moving && gameState === 'playing') {
+      const c = blockColor(moving.y);
+      drawBlock(moving.x, moving.z, moving.w, moving.d, moving.y, c, 1);
+
+      // Draw guide shadow on top of previous block
+      const prev = stack[stack.length - 1];
+      ctx.globalAlpha = 0.12;
+      drawBlock(moving.x, moving.z, moving.w, moving.d, prev.y, {
+        top: '#fff', front: '#fff', right: '#fff'
+      }, 0.08);
+      ctx.globalAlpha = 1;
+    }
+
+    // Draw particles on top
+    drawParticles();
+
+    // Draw floor indicator
+    if (gameState === 'playing' && stack.length > 1) {
+      ctx.fillStyle = 'rgba(255,255,255,0.15)';
+      ctx.font = '600 14px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`Floor ${stack.length - 1}`, W / 2, 60);
+    }
+
+    ctx.restore();
+
+    requestAnimationFrame(loop);
+  }
+
+  requestAnimationFrame(loop);
+
+  // ── Title animation (floating blocks) ──
+  (function titleAnim() {
+    // The main loop handles background rendering even on title screen
+  })();
+
+})();
+</script>
+</body>
+</html>

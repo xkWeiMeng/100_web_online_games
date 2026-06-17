@@ -1,0 +1,28 @@
+- generic [active] [ref=e1]:
+  - generic:
+    - generic:
+      - generic: SCORE 0
+      - generic: BEST 0
+    - generic: Tap or Click to stack
+  - generic [ref=e3]:
+    - heading "Tower Stack" [level=1] [ref=e4]
+    - generic [ref=e5]: A balance stacking game
+    - generic [ref=e6]:
+      - text: A block swings back and forth.
+      - strong [ref=e7]: Tap
+      - text: or
+      - strong [ref=e8]: click
+      - text: to place it!
+      - text: Line it up perfectly for
+      - strong [ref=e9]: bonus points
+      - text: .
+      - text: Miss the overlap and it's
+      - strong [ref=e10]: game over
+      - text: "!"
+      - text: How high can you build?
+    - button "START GAME" [ref=e11] [cursor=pointer]
+  - generic:
+    - heading "GAME OVER" [level=2]
+    - generic: "Score: 0"
+    - generic: "Best: 0"
+    - button "PLAY AGAIN" [ref=e12] [cursor=pointer]
