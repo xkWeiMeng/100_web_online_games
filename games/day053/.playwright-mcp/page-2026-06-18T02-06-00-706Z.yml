@@ -1,0 +1,68 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e15]:
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - generic [ref=e18]: Pairs
+        - generic [ref=e19]: 7 / 8
+      - generic [ref=e20]:
+        - generic [ref=e21]: Moves
+        - generic [ref=e22]: "7"
+      - generic [ref=e23]:
+        - generic [ref=e24]: Score
+        - generic [ref=e25]: "1375"
+      - generic [ref=e26]:
+        - generic [ref=e27]: Time
+        - generic [ref=e28]: 1:40
+    - generic [ref=e29]:
+      - generic:
+        - generic: "?"
+        - generic: 🍕
+      - generic:
+        - generic: "?"
+        - generic: 🥝
+      - generic:
+        - generic: "?"
+        - generic: 🛸
+      - generic:
+        - generic: "?"
+        - generic: 🍋
+      - generic:
+        - generic: "?"
+        - generic: 🍒
+      - generic:
+        - generic: "?"
+        - generic: 🍔
+      - generic:
+        - generic: "?"
+        - generic: 🚁
+      - generic [ref=e51] [cursor=pointer]:
+        - generic [ref=e52]: "?"
+        - generic [ref=e53]: 🦀
+      - generic:
+        - generic: "?"
+        - generic: 🍒
+      - generic:
+        - generic: "?"
+        - generic: 🍕
+      - generic:
+        - generic: "?"
+        - generic: 🥝
+      - generic:
+        - generic: "?"
+        - generic: 🍋
+      - generic:
+        - generic: "?"
+        - generic: 🍔
+      - generic [ref=e69] [cursor=pointer]:
+        - generic [ref=e70]: "?"
+        - generic [ref=e71]: 🦀
+      - generic:
+        - generic: "?"
+        - generic: 🚁
+      - generic:
+        - generic: "?"
+        - generic: 🛸
+    - generic [ref=e78]:
+      - button "Restart" [ref=e79] [cursor=pointer]
+      - button "Menu" [ref=e80] [cursor=pointer]
+  - generic: 7x Combo!
