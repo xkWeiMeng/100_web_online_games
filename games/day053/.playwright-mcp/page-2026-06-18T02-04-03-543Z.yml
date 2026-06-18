@@ -1,0 +1,17 @@
+- generic [ref=e2]:
+  - generic [ref=e3]: 🧠 🃏 ✨
+  - heading "Emoji Memory Match" [level=1] [ref=e4]
+  - generic [ref=e5]:
+    - heading "How to Play" [level=3] [ref=e6]
+    - text: Flip two cards at a time to find matching emoji pairs. Remember where each emoji is hidden! Match all pairs to win. Fewer moves = higher score. Consecutive matches earn combo bonuses!
+  - generic [ref=e7]:
+    - button "Easy 4 × 4" [ref=e8] [cursor=pointer]:
+      - text: Easy
+      - generic [ref=e9]: 4 × 4
+    - button "Medium 4 × 5" [ref=e10] [cursor=pointer]:
+      - text: Medium
+      - generic [ref=e11]: 4 × 5
+    - button "Hard 6 × 6" [ref=e12] [cursor=pointer]:
+      - text: Hard
+      - generic [ref=e13]: 6 × 6
+  - button "Start Game" [ref=e14] [cursor=pointer]
