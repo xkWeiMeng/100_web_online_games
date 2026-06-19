@@ -1,0 +1,16 @@
+- generic [ref=e13]:
+  - generic [ref=e14]:
+    - heading "Snakes & Ladders" [level=2] [ref=e15]
+    - button "New Game" [ref=e16] [cursor=pointer]
+  - generic [ref=e19]:
+    - generic [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e23]: Red
+        - generic [ref=e24]: Start
+      - generic [ref=e25]:
+        - generic [ref=e27]: Blue
+        - generic [ref=e28]: Start
+    - generic [ref=e29]:
+      - generic [ref=e30]: ⚃
+      - button "Roll Dice" [disabled] [ref=e31]
+    - generic [ref=e32]: Red rolled 4 — moves to 4
