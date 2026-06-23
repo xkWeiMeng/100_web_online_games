@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dots and Boxes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        /* Title Screen */
+        #title-screen {
+            text-align: center;
+            animation: fadeIn 0.8s ease;
+        }
+
+        #title-screen h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #e94560, #f5a623);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            text-shadow: none;
+        }
+
+        #title-screen .subtitle {
+            font-size: 1.1rem;
+            color: #8892b0;
+            margin-bottom: 2rem;
+        }
+
+        .instructions {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1.5rem auto;
+            max-width: 450px;
+            text-align: left;
+            font-size: 0.9rem;
+            line-height: 1.7;
+            color: #a0aec0;
+        }
+
+        .instructions h3 {
+            color: #e94560;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .instructions ul {
+            padding-left: 1.2rem;
+        }
+
+        .instructions li {
+            margin-bottom: 0.3rem;
+        }
+
+        .settings {
+            margin: 1.5rem 0;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .setting-row label {
+            font-size: 0.95rem;
+            color: #a0aec0;
+        }
+
+        .setting-row select {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #e0e0e0;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .setting-row select:focus {
+            outline: none;
+            border-color: #e94560;
+        }
+
+        .btn {
+            padding: 0.9rem 2.5rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #e94560, #f06292);
+            color: white;
+            box-shadow: 0 4px 20px rgba(233, 69, 96, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(233, 69, 96, 0.6);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e0e0e0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 0.7rem 1.5rem;
+            font-size: 0.9rem;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Game Screen */
+        #game-screen {
+            display: none;
+            text-align: center;
+            width: 100%;
+            max-width: 600px;
+            padding: 1rem;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding: 0 0.5rem;
+        }
+
+        .player-score {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0.8rem 1.5rem;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            min-width: 100px;
+        }
+
+        .player-score.active {
+            transform: scale(1.05);
+        }
+
+        .player-score .name {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.3rem;
+        }
+
+        .player-score .score {
+            font-size: 2rem;
+            font-weight: 800;
+        }
+
+        .player1-score {
+            background: rgba(233, 69, 96, 0.15);
+            border: 2px solid rgba(233, 69, 96, 0.3);
+        }
+
+        .player1-score.active {
+            border-color: #e94560;
+            box-shadow: 0 0 20px rgba(233, 69, 96, 0.3);
+        }
+
+        .player1-score .name { color: #e94560; }
+        .player1-score .score { color: #e94560; }
+
+        .player2-score {
+            background: rgba(79, 172, 254, 0.15);
+            border: 2px solid rgba(79, 172, 254, 0.3);
+        }
+
+        .player2-score.active {
+            border-color: #4facfe;
+            box-shadow: 0 0 20px rgba(79, 172, 254, 0.3);
+        }
+
+        .player2-score .name { color: #4facfe; }
+        .player2-score .score { color: #4facfe; }
+
+        .turn-indicator {
+            font-size: 0.85rem;
+            color: #8892b0;
+            padding: 0.4rem 1rem;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        #game-canvas {
+            display: block;
+            margin: 0 auto;
+            cursor: pointer;
+            touch-action: none;
+        }
+
+        .game-footer {
+            margin-top: 1rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        /* Game Over Modal */
+        #game-over {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease;
+        }
+
+        #game-over.show {
+            display: flex;
+        }
+
+        .modal {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 2.5rem;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            animation: slideUp 0.4s ease;
+        }
+
+        .modal h2 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .modal .winner-text {
+            font-size: 1.2rem;
+            color: #a0aec0;
+            margin-bottom: 1rem;
+        }
+
+        .modal .final-score {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal .buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        @keyframes boxFill {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            #title-screen h1 {
+                font-size: 2.5rem;
+            }
+
+            .game-header {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+                justify-content: center;
+            }
+
+            .player-score {
+                min-width: 80px;
+                padding: 0.6rem 1rem;
+            }
+
+            .player-score .score {
+                font-size: 1.5rem;
+            }
+
+            .instructions {
+                margin: 1rem;
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Title Screen -->
+    <div id="title-screen">
+        <h1>Dots & Boxes</h1>
+        <p class="subtitle">The classic pen-and-paper strategy game</p>
+
+        <div class="instructions">
+            <h3>How to Play</h3>
+            <ul>
+                <li>Click between two dots to draw a line</li>
+                <li>Complete the 4th side of a box to claim it</li>
+                <li>Claiming a box earns you an extra turn</li>
+                <li>The player with the most boxes wins!</li>
+            </ul>
+        </div>
+
+        <div class="settings">
+            <div class="setting-row">
+                <label>Grid Size:</label>
+                <select id="grid-size">
+                    <option value="3">3 × 3 (Quick)</option>
+                    <option value="4" selected>4 × 4 (Classic)</option>
+                    <option value="5">5 × 5 (Challenge)</option>
+                    <option value="6">6 × 6 (Expert)</option>
+                </select>
+            </div>
+            <div class="setting-row">
+                <label>Opponent:</label>
+                <select id="opponent-type">
+                    <option value="human">2 Players</option>
+                    <option value="easy">vs AI (Easy)</option>
+                    <option value="hard" selected>vs AI (Hard)</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="startGame()">Play Game</button>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen">
+        <div class="game-header">
+            <div class="player-score player1-score active" id="p1-display">
+                <span class="name">Player 1</span>
+                <span class="score" id="p1-score">0</span>
+            </div>
+            <div class="turn-indicator" id="turn-indicator">Player 1's Turn</div>
+            <div class="player-score player2-score" id="p2-display">
+                <span class="name" id="p2-name">Player 2</span>
+                <span class="score" id="p2-score">0</span>
+            </div>
+        </div>
+
+        <canvas id="game-canvas"></canvas>
+
+        <div class="game-footer">
+            <button class="btn btn-secondary" onclick="resetGame()">New Game</button>
+            <button class="btn btn-secondary" onclick="backToMenu()">Menu</button>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="game-over">
+        <div class="modal">
+            <h2 id="winner-title">Game Over!</h2>
+            <p class="winner-text" id="winner-text"></p>
+            <p class="final-score" id="final-score"></p>
+            <div class="buttons">
+                <button class="btn btn-primary" onclick="resetGame()">Play Again</button>
+                <button class="btn btn-secondary" onclick="backToMenu()">Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game state
+        let gridSize = 4;
+        let opponent = 'hard';
+        let currentPlayer = 1;
+        let scores = [0, 0];
+        let horizontalLines = [];
+        let verticalLines = [];
+        let boxes = [];
+        let totalBoxes = 0;
+        let gameOver = false;
+        let aiThinking = false;
+
+        // Canvas
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Layout constants
+        let dotSpacing = 80;
+        let dotRadius = 7;
+        let lineWidth = 5;
+        let padding = 40;
+        let canvasSize = 0;
+
+        // Colors
+        const COLORS = {
+            dot: '#cbd5e0',
+            dotHover: '#ffffff',
+            lineEmpty: 'rgba(255, 255, 255, 0.08)',
+            lineHover: 'rgba(255, 255, 255, 0.3)',
+            player1Line: '#e94560',
+            player2Line: '#4facfe',
+            player1Box: 'rgba(233, 69, 96, 0.2)',
+            player2Box: 'rgba(79, 172, 254, 0.2)',
+            player1BoxBorder: 'rgba(233, 69, 96, 0.5)',
+            player2BoxBorder: 'rgba(79, 172, 254, 0.5)',
+        };
+
+        // Hover state
+        let hoverLine = null;
+
+        // Animation state
+        let animations = [];
+
+        function startGame() {
+            gridSize = parseInt(document.getElementById('grid-size').value);
+            opponent = document.getElementById('opponent-type').value;
+
+            document.getElementById('title-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'block';
+
+            const p2Name = document.getElementById('p2-name');
+            if (opponent === 'human') {
+                p2Name.textContent = 'Player 2';
+            } else if (opponent === 'easy') {
+                p2Name.textContent = 'AI (Easy)';
+            } else {
+                p2Name.textContent = 'AI (Hard)';
+            }
+
+            initGame();
+        }
+
+        function initGame() {
+            currentPlayer = 1;
+            scores = [0, 0];
+            gameOver = false;
+            aiThinking = false;
+            animations = [];
+
+            // Initialize line arrays
+            horizontalLines = [];
+            verticalLines = [];
+            boxes = [];
+
+            for (let r = 0; r <= gridSize; r++) {
+                horizontalLines[r] = [];
+                for (let c = 0; c < gridSize; c++) {
+                    horizontalLines[r][c] = 0;
+                }
+            }
+
+            for (let r = 0; r < gridSize; r++) {
+                verticalLines[r] = [];
+                for (let c = 0; c <= gridSize; c++) {
+                    verticalLines[r][c] = 0;
+                }
+            }
+
+            for (let r = 0; r < gridSize; r++) {
+                boxes[r] = [];
+                for (let c = 0; c < gridSize; c++) {
+                    boxes[r][c] = 0;
+                }
+            }
+
+            totalBoxes = gridSize * gridSize;
+
+            // Calculate canvas size
+            const maxWidth = Math.min(window.innerWidth - 40, 560);
+            dotSpacing = Math.floor((maxWidth - padding * 2) / gridSize);
+            dotSpacing = Math.min(dotSpacing, 80);
+            dotRadius = Math.max(5, Math.floor(dotSpacing / 12));
+            lineWidth = Math.max(3, Math.floor(dotSpacing / 16));
+            canvasSize = dotSpacing * gridSize + padding * 2;
+
+            canvas.width = canvasSize;
+            canvas.height = canvasSize;
+            canvas.style.width = canvasSize + 'px';
+            canvas.style.height = canvasSize + 'px';
+
+            updateUI();
+            render();
+        }
+
+        function resetGame() {
+            document.getElementById('game-over').classList.remove('show');
+            initGame();
+        }
+
+        function backToMenu() {
+            document.getElementById('game-over').classList.remove('show');
+            document.getElementById('game-screen').style.display = 'none';
+            document.getElementById('title-screen').style.display = 'block';
+        }
+
+        function updateUI() {
+            document.getElementById('p1-score').textContent = scores[0];
+            document.getElementById('p2-score').textContent = scores[1];
+
+            const p1 = document.getElementById('p1-display');
+            const p2 = document.getElementById('p2-display');
+            const turnIndicator = document.getElementById('turn-indicator');
+
+            if (currentPlayer === 1) {
+                p1.classList.add('active');
+                p2.classList.remove('active');
+                turnIndicator.textContent = "Player 1's Turn";
+                turnIndicator.style.color = COLORS.player1Line;
+            } else {
+                p1.classList.remove('active');
+                p2.classList.add('active');
+                const name = opponent === 'human' ? 'Player 2' : 'AI';
+                turnIndicator.textContent = name + "'s Turn";
+                turnIndicator.style.color = COLORS.player2Line;
+            }
+        }
+
+        function getDotPosition(row, col) {
+            return {
+                x: padding + col * dotSpacing,
+                y: padding + row * dotSpacing
+            };
+        }
+
+        function getLineFromPoint(x, y) {
+            // Check horizontal lines
+            for (let r = 0; r <= gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    const start = getDotPosition(r, c);
+                    const end = getDotPosition(r, c + 1);
+                    const midX = (start.x + end.x) / 2;
+                    const midY = (start.y + end.y) / 2;
+                    const dist = Math.sqrt((x - midX) ** 2 + (y - midY) ** 2);
+                    if (dist < dotSpacing * 0.35 && horizontalLines[r][c] === 0) {
+                        return { type: 'h', row: r, col: c };
+                    }
+                }
+            }
+
+            // Check vertical lines
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c <= gridSize; c++) {
+                    const start = getDotPosition(r, c);
+                    const end = getDotPosition(r + 1, c);
+                    const midX = (start.x + end.x) / 2;
+                    const midY = (start.y + end.y) / 2;
+                    const dist = Math.sqrt((x - midX) ** 2 + (y - midY) ** 2);
+                    if (dist < dotSpacing * 0.35 && verticalLines[r][c] === 0) {
+                        return { type: 'v', row: r, col: c };
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        function placeLine(line) {
+            if (!line) return false;
+
+            if (line.type === 'h') {
+                if (horizontalLines[line.row][line.col] !== 0) return false;
+                horizontalLines[line.row][line.col] = currentPlayer;
+            } else {
+                if (verticalLines[line.row][line.col] !== 0) return false;
+                verticalLines[line.row][line.col] = currentPlayer;
+            }
+
+            // Check for completed boxes
+            let boxCompleted = false;
+
+            if (line.type === 'h') {
+                // Check box above
+                if (line.row > 0) {
+                    if (checkBox(line.row - 1, line.col)) {
+                        boxes[line.row - 1][line.col] = currentPlayer;
+                        scores[currentPlayer - 1]++;
+                        boxCompleted = true;
+                        addBoxAnimation(line.row - 1, line.col);
+                    }
+                }
+                // Check box below
+                if (line.row < gridSize) {
+                    if (checkBox(line.row, line.col)) {
+                        boxes[line.row][line.col] = currentPlayer;
+                        scores[currentPlayer - 1]++;
+                        boxCompleted = true;
+                        addBoxAnimation(line.row, line.col);
+                    }
+                }
+            } else {
+                // Check box to the left
+                if (line.col > 0) {
+                    if (checkBox(line.row, line.col - 1)) {
+                        boxes[line.row][line.col - 1] = currentPlayer;
+                        scores[currentPlayer - 1]++;
+                        boxCompleted = true;
+                        addBoxAnimation(line.row, line.col - 1);
+                    }
+                }
+                // Check box to the right
+                if (line.col < gridSize) {
+                    if (checkBox(line.row, line.col)) {
+                        boxes[line.row][line.col] = currentPlayer;
+                        scores[currentPlayer - 1]++;
+                        boxCompleted = true;
+                        addBoxAnimation(line.row, line.col);
+                    }
+                }
+            }
+
+            if (!boxCompleted) {
+                currentPlayer = currentPlayer === 1 ? 2 : 1;
+            }
+
+            // Check game over
+            if (scores[0] + scores[1] === totalBoxes) {
+                gameOver = true;
+                setTimeout(showGameOver, 600);
+            }
+
+            updateUI();
+            render();
+            return true;
+        }
+
+        function checkBox(row, col) {
+            if (boxes[row][col] !== 0) return false;
+            return (
+                horizontalLines[row][col] !== 0 &&
+                horizontalLines[row + 1][col] !== 0 &&
+                verticalLines[row][col] !== 0 &&
+                verticalLines[row][col + 1] !== 0
+            );
+        }
+
+        function countBoxSides(row, col) {
+            let count = 0;
+            if (horizontalLines[row][col] !== 0) count++;
+            if (horizontalLines[row + 1][col] !== 0) count++;
+            if (verticalLines[row][col] !== 0) count++;
+            if (verticalLines[row][col + 1] !== 0) count++;
+            return count;
+        }
+
+        function addBoxAnimation(row, col) {
+            animations.push({
+                type: 'box',
+                row: row,
+                col: col,
+                startTime: Date.now(),
+                duration: 400
+            });
+        }
+
+        function showGameOver() {
+            const modal = document.getElementById('game-over');
+            const title = document.getElementById('winner-title');
+            const text = document.getElementById('winner-text');
+            const score = document.getElementById('final-score');
+
+            if (scores[0] > scores[1]) {
+                title.textContent = '🎉 Player 1 Wins!';
+                title.style.color = COLORS.player1Line;
+                text.textContent = 'Excellent strategy!';
+            } else if (scores[1] > scores[0]) {
+                const winner = opponent === 'human' ? 'Player 2' : 'AI';
+                title.textContent = opponent === 'human' ? '🎉 Player 2 Wins!' : '🤖 AI Wins!';
+                title.style.color = COLORS.player2Line;
+                text.textContent = opponent === 'human' ? 'Well played!' : 'Better luck next time!';
+            } else {
+                title.textContent = "🤝 It's a Tie!";
+                title.style.color = '#f5a623';
+                text.textContent = 'Evenly matched!';
+            }
+
+            score.textContent = scores[0] + ' - ' + scores[1];
+            modal.classList.add('show');
+        }
+
+        // AI Logic
+        function aiMove() {
+            if (gameOver || currentPlayer !== 2 || aiThinking) return;
+            aiThinking = true;
+
+            setTimeout(() => {
+                let move = null;
+
+                if (opponent === 'hard') {
+                    move = getHardAIMove();
+                } else {
+                    move = getEasyAIMove();
+                }
+
+                if (move) {
+                    placeLine(move);
+                }
+
+                aiThinking = false;
+
+                // If AI gets another turn
+                if (currentPlayer === 2 && !gameOver) {
+                    setTimeout(() => aiMove(), 400);
+                }
+            }, 300 + Math.random() * 300);
+        }
+
+        function getEasyAIMove() {
+            const available = getAllAvailableLines();
+            if (available.length === 0) return null;
+
+            // First check for completing boxes (even easy AI takes free boxes)
+            for (const line of available) {
+                if (wouldCompleteBox(line)) {
+                    return line;
+                }
+            }
+
+            // Random move
+            return available[Math.floor(Math.random() * available.length)];
+        }
+
+        function getHardAIMove() {
+            const available = getAllAvailableLines();
+            if (available.length === 0) return null;
+
+            // 1. Complete any available boxes
+            const completingMoves = available.filter(line => wouldCompleteBox(line));
+            if (completingMoves.length > 0) {
+                return completingMoves[0];
+            }
+
+            // 2. Avoid giving opponent a box (don't make 3rd side)
+            const safeMoves = available.filter(line => !wouldGiveOpponentBox(line));
+
+            if (safeMoves.length > 0) {
+                // Among safe moves, prefer moves that don't create chains
+                // Pick move that touches fewest 2-side boxes
+                let bestMove = safeMoves[0];
+                let bestScore = -Infinity;
+
+                for (const move of safeMoves) {
+                    let score = evaluateMove(move);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMove = move;
+                    }
+                }
+                return bestMove;
+            }
+
+            // 3. All moves give opponent a box - use chain strategy
+            // Give opponent the shortest chain
+            return getBestSacrificeMove(available);
+        }
+
+        function getAllAvailableLines() {
+            const lines = [];
+            for (let r = 0; r <= gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    if (horizontalLines[r][c] === 0) {
+                        lines.push({ type: 'h', row: r, col: c });
+                    }
+                }
+            }
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c <= gridSize; c++) {
+                    if (verticalLines[r][c] === 0) {
+                        lines.push({ type: 'v', row: r, col: c });
+                    }
+                }
+            }
+            return lines;
+        }
+
+        function wouldCompleteBox(line) {
+            if (line.type === 'h') {
+                if (line.row > 0 && boxes[line.row - 1][line.col] === 0) {
+                    if (countBoxSides(line.row - 1, line.col) === 3) return true;
+                }
+                if (line.row < gridSize && boxes[line.row][line.col] === 0) {
+                    if (countBoxSides(line.row, line.col) === 3) return true;
+                }
+            } else {
+                if (line.col > 0 && boxes[line.row][line.col - 1] === 0) {
+                    if (countBoxSides(line.row, line.col - 1) === 3) return true;
+                }
+                if (line.col < gridSize && boxes[line.row][line.col] === 0) {
+                    if (countBoxSides(line.row, line.col) === 3) return true;
+                }
+            }
+            return false;
+        }
+
+        function wouldGiveOpponentBox(line) {
+            // Check if placing this line creates a box with 3 sides for opponent
+            if (line.type === 'h') {
+                if (line.row > 0 && boxes[line.row - 1][line.col] === 0) {
+                    if (countBoxSides(line.row - 1, line.col) === 2) return true;
+                }
+                if (line.row < gridSize && boxes[line.row][line.col] === 0) {
+                    if (countBoxSides(line.row, line.col) === 2) return true;
+                }
+            } else {
+                if (line.col > 0 && boxes[line.row][line.col - 1] === 0) {
+                    if (countBoxSides(line.row, line.col - 1) === 2) return true;
+                }
+                if (line.col < gridSize && boxes[line.row][line.col] === 0) {
+                    if (countBoxSides(line.row, line.col) === 2) return true;
+                }
+            }
+            return false;
+        }
+
+        function evaluateMove(line) {
+            // Prefer moves that don't touch boxes with 1 side (avoid creating 2-side boxes near completion)
+            let score = 0;
+            const adjacentBoxes = getAdjacentBoxes(line);
+
+            for (const box of adjacentBoxes) {
+                const sides = countBoxSides(box.row, box.col);
+                if (sides === 0) score += 2;
+                else if (sides === 1) score += 0;
+                else if (sides === 2) score -= 5; // This would make 3 sides - bad!
+            }
+
+            return score;
+        }
+
+        function getAdjacentBoxes(line) {
+            const result = [];
+            if (line.type === 'h') {
+                if (line.row > 0 && boxes[line.row - 1][line.col] === 0) {
+                    result.push({ row: line.row - 1, col: line.col });
+                }
+                if (line.row < gridSize && boxes[line.row][line.col] === 0) {
+                    result.push({ row: line.row, col: line.col });
+                }
+            } else {
+                if (line.col > 0 && boxes[line.row][line.col - 1] === 0) {
+                    result.push({ row: line.row, col: line.col - 1 });
+                }
+                if (line.col < gridSize && boxes[line.row][line.col] === 0) {
+                    result.push({ row: line.row, col: line.col });
+                }
+            }
+            return result;
+        }
+
+        function getBestSacrificeMove(available) {
+            // When all moves give opponent a box, sacrifice the shortest chain
+            let bestMove = available[0];
+            let bestChainLength = Infinity;
+
+            for (const move of available) {
+                const chainLen = getChainLength(move);
+                if (chainLen < bestChainLength) {
+                    bestChainLength = chainLen;
+                    bestMove = move;
+                }
+            }
+
+            // If shortest chain is 2, consider double-cross (leave 2 boxes for opponent)
+            return bestMove;
+        }
+
+        function getChainLength(line) {
+            // Estimate chain length that would be given
+            const adjacentBoxes = getAdjacentBoxes(line);
+            let chainLen = 0;
+
+            for (const box of adjacentBoxes) {
+                const sides = countBoxSides(box.row, box.col);
+                if (sides >= 2) chainLen++;
+            }
+
+            return Math.max(chainLen, 1);
+        }
+
+        // Rendering
+        function render() {
+            ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+            // Draw boxes
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    if (boxes[r][c] !== 0) {
+                        drawBox(r, c, boxes[r][c]);
+                    }
+                }
+            }
+
+            // Draw empty line slots
+            for (let r = 0; r <= gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    if (horizontalLines[r][c] === 0) {
+                        drawLineSlot('h', r, c);
+                    }
+                }
+            }
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c <= gridSize; c++) {
+                    if (verticalLines[r][c] === 0) {
+                        drawLineSlot('v', r, c);
+                    }
+                }
+            }
+
+            // Draw placed lines
+            for (let r = 0; r <= gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    if (horizontalLines[r][c] !== 0) {
+                        drawLine('h', r, c, horizontalLines[r][c]);
+                    }
+                }
+            }
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c <= gridSize; c++) {
+                    if (verticalLines[r][c] !== 0) {
+                        drawLine('v', r, c, verticalLines[r][c]);
+                    }
+                }
+            }
+
+            // Draw hover
+            if (hoverLine && !gameOver && !aiThinking) {
+                drawHoverLine(hoverLine);
+            }
+
+            // Draw dots on top
+            for (let r = 0; r <= gridSize; r++) {
+                for (let c = 0; c <= gridSize; c++) {
+                    drawDot(r, c);
+                }
+            }
+
+            // Draw animations
+            const now = Date.now();
+            animations = animations.filter(anim => {
+                const elapsed = now - anim.startTime;
+                if (elapsed > anim.duration) return false;
+
+                const progress = elapsed / anim.duration;
+                if (anim.type === 'box') {
+                    drawBoxAnimation(anim.row, anim.col, progress);
+                }
+                return true;
+            });
+
+            if (animations.length > 0) {
+                requestAnimationFrame(render);
+            }
+        }
+
+        function drawDot(row, col) {
+            const pos = getDotPosition(row, col);
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, dotRadius, 0, Math.PI * 2);
+            ctx.fillStyle = COLORS.dot;
+            ctx.fill();
+
+            // Subtle glow
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, dotRadius + 2, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(203, 213, 224, 0.1)';
+            ctx.fill();
+        }
+
+        function drawLineSlot(type, row, col) {
+            const start = type === 'h' ? getDotPosition(row, col) : getDotPosition(row, col);
+            const end = type === 'h' ? getDotPosition(row, col + 1) : getDotPosition(row + 1, col);
+
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.strokeStyle = COLORS.lineEmpty;
+            ctx.lineWidth = lineWidth;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
+
+        function drawLine(type, row, col, player) {
+            const start = type === 'h' ? getDotPosition(row, col) : getDotPosition(row, col);
+            const end = type === 'h' ? getDotPosition(row, col + 1) : getDotPosition(row + 1, col);
+
+            const color = player === 1 ? COLORS.player1Line : COLORS.player2Line;
+
+            // Glow effect
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = lineWidth + 2;
+            ctx.lineCap = 'round';
+            ctx.globalAlpha = 0.3;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+
+            // Main line
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = lineWidth;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
+
+        function drawHoverLine(line) {
+            const start = line.type === 'h' ? getDotPosition(line.row, line.col) : getDotPosition(line.row, line.col);
+            const end = line.type === 'h' ? getDotPosition(line.row, line.col + 1) : getDotPosition(line.row + 1, line.col);
+
+            const color = currentPlayer === 1 ? COLORS.player1Line : COLORS.player2Line;
+
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = lineWidth + 1;
+            ctx.lineCap = 'round';
+            ctx.globalAlpha = 0.5;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+
+        function drawBox(row, col, player) {
+            const topLeft = getDotPosition(row, col);
+            const size = dotSpacing;
+            const inset = dotRadius + 3;
+
+            const fillColor = player === 1 ? COLORS.player1Box : COLORS.player2Box;
+            const borderColor = player === 1 ? COLORS.player1BoxBorder : COLORS.player2BoxBorder;
+
+            ctx.fillStyle = fillColor;
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = 1;
+
+            const x = topLeft.x + inset;
+            const y = topLeft.y + inset;
+            const w = size - inset * 2;
+            const h = size - inset * 2;
+            const radius = 4;
+
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, h, radius);
+            ctx.fill();
+            ctx.stroke();
+
+            // Player initial
+            ctx.fillStyle = player === 1 ? COLORS.player1Line : COLORS.player2Line;
+            ctx.font = `bold ${Math.floor(dotSpacing * 0.3)}px system-ui`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.globalAlpha = 0.7;
+            ctx.fillText(player === 1 ? '1' : '2', topLeft.x + size / 2, topLeft.y + size / 2);
+            ctx.globalAlpha = 1;
+        }
+
+        function drawBoxAnimation(row, col, progress) {
+            const topLeft = getDotPosition(row, col);
+            const size = dotSpacing;
+            const inset = dotRadius + 3;
+            const player = boxes[row][col];
+
+            const color = player === 1 ? 'rgba(233, 69, 96, ' : 'rgba(79, 172, 254, ';
+            const alpha = (1 - progress) * 0.5;
+
+            const scale = 1 + (1 - progress) * 0.1;
+            const cx = topLeft.x + size / 2;
+            const cy = topLeft.y + size / 2;
+            const w = (size - inset * 2) * scale;
+            const h = (size - inset * 2) * scale;
+
+            ctx.fillStyle = color + alpha + ')';
+            ctx.beginPath();
+            ctx.roundRect(cx - w / 2, cy - h / 2, w, h, 4);
+            ctx.fill();
+        }
+
+        // Input handling
+        function getCanvasCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            let clientX, clientY;
+            if (e.touches) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (gameOver || aiThinking) return;
+            if (opponent !== 'human' && currentPlayer === 2) return;
+
+            const coords = getCanvasCoords(e);
+            const newHover = getLineFromPoint(coords.x, coords.y);
+
+            if (JSON.stringify(newHover) !== JSON.stringify(hoverLine)) {
+                hoverLine = newHover;
+                render();
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            hoverLine = null;
+            render();
+        });
+
+        canvas.addEventListener('click', (e) => {
+            if (gameOver || aiThinking) return;
+            if (opponent !== 'human' && currentPlayer === 2) return;
+
+            const coords = getCanvasCoords(e);
+            const line = getLineFromPoint(coords.x, coords.y);
+
+            if (line) {
+                const success = placeLine(line);
+                hoverLine = null;
+
+                if (success && opponent !== 'human' && currentPlayer === 2 && !gameOver) {
+                    aiMove();
+                }
+            }
+        });
+
+        // Touch support
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameOver || aiThinking) return;
+            if (opponent !== 'human' && currentPlayer === 2) return;
+
+            const coords = getCanvasCoords(e);
+            const line = getLineFromPoint(coords.x, coords.y);
+
+            if (line) {
+                hoverLine = line;
+                render();
+            }
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (gameOver || aiThinking) return;
+            if (opponent !== 'human' && currentPlayer === 2) return;
+
+            if (hoverLine) {
+                const success = placeLine(hoverLine);
+                hoverLine = null;
+
+                if (success && opponent !== 'human' && currentPlayer === 2 && !gameOver) {
+                    aiMove();
+                }
+            }
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (gameOver || aiThinking) return;
+            if (opponent !== 'human' && currentPlayer === 2) return;
+
+            const coords = getCanvasCoords(e);
+            const newHover = getLineFromPoint(coords.x, coords.y);
+
+            if (JSON.stringify(newHover) !== JSON.stringify(hoverLine)) {
+                hoverLine = newHover;
+                render();
+            }
+        });
+
+        // Handle resize
+        window.addEventListener('resize', () => {
+            if (document.getElementById('game-screen').style.display !== 'none') {
+                const maxWidth = Math.min(window.innerWidth - 40, 560);
+                dotSpacing = Math.floor((maxWidth - padding * 2) / gridSize);
+                dotSpacing = Math.min(dotSpacing, 80);
+                dotRadius = Math.max(5, Math.floor(dotSpacing / 12));
+                lineWidth = Math.max(3, Math.floor(dotSpacing / 16));
+                canvasSize = dotSpacing * gridSize + padding * 2;
+
+                canvas.width = canvasSize;
+                canvas.height = canvasSize;
+                canvas.style.width = canvasSize + 'px';
+                canvas.style.height = canvasSize + 'px';
+
+                render();
+            }
+        });
+    </script>
+</body>
+</html>
