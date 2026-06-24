@@ -1,0 +1,15 @@
+- generic [ref=e2]:
+  - heading "HexSweeper" [level=1] [ref=e3]
+  - paragraph [ref=e4]: Minesweeper on a Hexagonal Grid
+  - generic [ref=e5]:
+    - heading "How to Play" [level=3] [ref=e6]
+    - list [ref=e7]:
+      - listitem [ref=e8]: ⬡ Click a hex to reveal it
+      - listitem [ref=e9]: ⬡ Numbers show adjacent mines (up to 6)
+      - listitem [ref=e10]: ⬡ Right-click or use flag mode to mark mines
+      - listitem [ref=e11]: ⬡ Reveal all safe hexes to win!
+      - listitem [ref=e12]: ⬡ Score bonus for speed — beat the clock
+  - generic [ref=e13]:
+    - button "Easy" [ref=e14] [cursor=pointer]
+    - button "Medium" [ref=e15] [cursor=pointer]
+    - button "Hard" [ref=e16] [cursor=pointer]

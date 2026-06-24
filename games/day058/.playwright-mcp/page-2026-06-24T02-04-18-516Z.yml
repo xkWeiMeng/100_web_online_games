@@ -1,0 +1,14 @@
+- generic [active] [ref=e1]:
+  - text: ⬡ ⬡ ⬡ ⬡ ⬡
+  - generic [ref=e18]:
+    - button "← Menu" [ref=e19] [cursor=pointer]
+    - generic [ref=e20]:
+      - generic [ref=e21]: 💣
+      - generic [ref=e22]: "8"
+    - generic [ref=e23]:
+      - generic [ref=e24]: ⏱
+      - generic [ref=e25]: 0:00
+    - generic [ref=e26]:
+      - generic [ref=e27]: ⭐
+      - generic [ref=e28]: "0"
+  - button "🚩" [ref=e31] [cursor=pointer]
