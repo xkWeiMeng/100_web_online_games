@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Nonogram - Picross Puzzle</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  --bg: #1a1b2e;
+  --surface: #252742;
+  --surface-light: #2f3255;
+  --primary: #6c63ff;
+  --primary-light: #8b85ff;
+  --accent: #ff6b9d;
+  --success: #4ecdc4;
+  --text: #e8e8f0;
+  --text-dim: #9998b3;
+  --cell-empty: #1e2035;
+  --cell-filled: #6c63ff;
+  --cell-marked: #3a3d5c;
+  --border: #3a3d5c;
+  --clue-bg: #2a2d4a;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
+}
+
+/* Title Screen */
+#title-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+  text-align: center;
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+#title-screen h1 {
+  font-size: 3rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--primary-light), var(--accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+}
+
+#title-screen .subtitle {
+  font-size: 1.1rem;
+  color: var(--text-dim);
+  margin-bottom: 40px;
+}
+
+.instructions {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 450px;
+  margin-bottom: 32px;
+  text-align: left;
+  border: 1px solid var(--border);
+}
+
+.instructions h3 {
+  color: var(--primary-light);
+  margin-bottom: 12px;
+  font-size: 1rem;
+}
+
+.instructions p {
+  color: var(--text-dim);
+  line-height: 1.7;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+
+.instructions .key {
+  display: inline-block;
+  background: var(--surface-light);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
+.difficulty-select {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.diff-btn {
+  padding: 12px 24px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.diff-btn:hover {
+  border-color: var(--primary);
+  background: var(--surface-light);
+}
+
+.diff-btn.selected {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: white;
+}
+
+.diff-btn .size {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+  font-weight: 400;
+}
+
+.diff-btn.selected .size {
+  color: rgba(255,255,255,0.8);
+}
+
+.start-btn {
+  padding: 16px 48px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  border: none;
+  border-radius: 12px;
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 20px rgba(108, 99, 255, 0.3);
+}
+
+.start-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(108, 99, 255, 0.4);
+}
+
+/* Game Screen */
+#game-screen {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+  width: 100%;
+  animation: fadeIn 0.4s ease;
+}
+
+.game-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 600px;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.game-header h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--primary-light);
+}
+
+.stats {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.stat-value {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.tool-btn {
+  padding: 8px 16px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tool-btn:hover {
+  border-color: var(--primary);
+}
+
+.tool-btn.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: white;
+}
+
+.tool-btn.mark-btn.active {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+/* Nonogram Grid */
+.grid-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: auto;
+  max-width: 100%;
+  padding: 8px;
+}
+
+.grid-wrapper {
+  display: inline-grid;
+  gap: 0;
+  background: var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 30px rgba(0,0,0,0.3);
+}
+
+/* Clues */
+.col-clues-row {
+  display: contents;
+}
+
+.corner {
+  background: var(--surface);
+}
+
+.col-clue {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 4px 2px;
+  background: var(--clue-bg);
+  font-size: 0.7rem;
+  font-weight: 600;
+  gap: 2px;
+  min-width: 28px;
+}
+
+.col-clue span {
+  color: var(--text-dim);
+}
+
+.row-clue {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 2px 6px;
+  background: var(--clue-bg);
+  font-size: 0.7rem;
+  font-weight: 600;
+  gap: 4px;
+  min-height: 28px;
+}
+
+.row-clue span {
+  color: var(--text-dim);
+}
+
+.row-clue.completed span,
+.col-clue.completed span {
+  color: var(--success);
+  opacity: 0.7;
+}
+
+.cell {
+  width: 28px;
+  height: 28px;
+  background: var(--cell-empty);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.cell:hover {
+  background: var(--surface-light);
+}
+
+.cell.filled {
+  background: var(--cell-filled);
+  border-color: rgba(108, 99, 255, 0.5);
+}
+
+.cell.marked {
+  background: var(--cell-marked);
+}
+
+.cell.marked::after {
+  content: '✕';
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.cell.error {
+  background: #ff4757;
+  animation: shake 0.3s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
+/* Grid section borders for 5x5 blocks */
+.cell.border-right {
+  border-right: 2px solid var(--text-dim);
+}
+.cell.border-bottom {
+  border-bottom: 2px solid var(--text-dim);
+}
+
+/* Win Screen */
+#win-screen {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+  text-align: center;
+  animation: fadeIn 0.5s ease;
+}
+
+#win-screen h2 {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--success);
+  margin-bottom: 8px;
+}
+
+#win-screen .win-subtitle {
+  color: var(--text-dim);
+  font-size: 1rem;
+  margin-bottom: 24px;
+}
+
+.win-stats {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 24px 40px;
+  margin-bottom: 32px;
+  border: 1px solid var(--border);
+}
+
+.win-stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.win-stat:last-child {
+  border-bottom: none;
+}
+
+.win-stat-label {
+  color: var(--text-dim);
+}
+
+.win-stat-value {
+  font-weight: 700;
+  color: var(--primary-light);
+}
+
+.win-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.win-btn {
+  padding: 12px 28px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.win-btn:hover {
+  border-color: var(--primary);
+  background: var(--surface-light);
+}
+
+.win-btn.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+/* Lives / Mistakes */
+.lives {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.life {
+  font-size: 1rem;
+}
+
+.life.lost {
+  opacity: 0.3;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  #title-screen h1 {
+    font-size: 2.2rem;
+  }
+  
+  .cell {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .col-clue {
+    min-width: 24px;
+    font-size: 0.6rem;
+  }
+  
+  .row-clue {
+    font-size: 0.6rem;
+    min-height: 24px;
+  }
+  
+  .instructions {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 400px) {
+  .cell {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .col-clue {
+    min-width: 20px;
+    font-size: 0.55rem;
+  }
+  
+  .row-clue {
+    font-size: 0.55rem;
+    min-height: 20px;
+  }
+}
+
+/* Progress bar */
+.progress-bar {
+  width: 100%;
+  max-width: 600px;
+  height: 6px;
+  background: var(--surface);
+  border-radius: 3px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--success));
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+/* Puzzle preview on win */
+.win-preview {
+  display: grid;
+  gap: 1px;
+  margin: 16px auto 24px;
+  background: var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  max-width: 200px;
+}
+
+.win-preview .mini-cell {
+  width: 10px;
+  height: 10px;
+  background: var(--cell-empty);
+}
+
+.win-preview .mini-cell.filled {
+  background: var(--primary);
+}
+</style>
+</head>
+<body>
+
+<!-- Title Screen -->
+<div id="title-screen">
+  <h1>Nonogram</h1>
+  <p class="subtitle">Picross Logic Puzzle</p>
+  
+  <div class="instructions">
+    <h3>How to Play</h3>
+    <p>Fill in cells to reveal a hidden picture! The numbers on each row and column tell you how many consecutive filled cells exist in that line.</p>
+    <p><span class="key">Left Click</span> &mdash; Fill a cell</p>
+    <p><span class="key">Right Click</span> / <span class="key">Toggle Mark</span> &mdash; Mark cell as empty (X)</p>
+    <p>Multiple numbers mean multiple groups separated by at least one empty cell.</p>
+    <p>You have <strong>3 lives</strong> &mdash; filling an incorrect cell costs a life!</p>
+  </div>
+  
+  <div class="difficulty-select">
+    <button class="diff-btn selected" data-size="5">
+      Easy
+      <span class="size">5 × 5</span>
+    </button>
+    <button class="diff-btn" data-size="10">
+      Medium
+      <span class="size">10 × 10</span>
+    </button>
+    <button class="diff-btn" data-size="15">
+      Hard
+      <span class="size">15 × 15</span>
+    </button>
+  </div>
+  
+  <button class="start-btn" onclick="startGame()">Start Puzzle</button>
+</div>
+
+<!-- Game Screen -->
+<div id="game-screen">
+  <div class="game-header">
+    <h2>Nonogram</h2>
+    <div class="stats">
+      <div class="stat">
+        <span>⏱</span>
+        <span class="stat-value" id="timer">0:00</span>
+      </div>
+      <div class="stat">
+        <span>⭐</span>
+        <span class="stat-value" id="score">0</span>
+      </div>
+      <div class="lives" id="lives"></div>
+    </div>
+  </div>
+  
+  <div class="progress-bar">
+    <div class="progress-fill" id="progress-fill"></div>
+  </div>
+  
+  <div class="toolbar">
+    <button class="tool-btn active" id="fill-btn" onclick="setTool('fill')">✏️ Fill</button>
+    <button class="tool-btn mark-btn" id="mark-btn" onclick="setTool('mark')">✕ Mark</button>
+    <button class="tool-btn" onclick="resetPuzzle()">↺ Reset</button>
+    <button class="tool-btn" onclick="showTitle()">✖ Quit</button>
+  </div>
+  
+  <div class="grid-container">
+    <div class="grid-wrapper" id="grid"></div>
+  </div>
+</div>
+
+<!-- Win Screen -->
+<div id="win-screen">
+  <h2>Puzzle Complete!</h2>
+  <p class="win-subtitle">You solved it!</p>
+  
+  <div class="win-preview" id="win-preview"></div>
+  
+  <div class="win-stats">
+    <div class="win-stat">
+      <span class="win-stat-label">Time</span>
+      <span class="win-stat-value" id="win-time">0:00</span>
+    </div>
+    <div class="win-stat">
+      <span class="win-stat-label">Score</span>
+      <span class="win-stat-value" id="win-score">0</span>
+    </div>
+    <div class="win-stat">
+      <span class="win-stat-label">Mistakes</span>
+      <span class="win-stat-value" id="win-mistakes">0</span>
+    </div>
+    <div class="win-stat">
+      <span class="win-stat-label">Difficulty</span>
+      <span class="win-stat-value" id="win-difficulty">Easy</span>
+    </div>
+  </div>
+  
+  <div class="win-buttons">
+    <button class="win-btn" onclick="showTitle()">Menu</button>
+    <button class="win-btn primary" onclick="playAgain()">Next Puzzle</button>
+  </div>
+</div>
+
+<script>
+// Game State
+let gridSize = 5;
+let solution = [];
+let playerGrid = [];
+let lives = 3;
+let maxLives = 3;
+let score = 0;
+let mistakes = 0;
+let timer = 0;
+let timerInterval = null;
+let currentTool = 'fill';
+let totalCells = 0;
+let filledCells = 0;
+let isMouseDown = false;
+let dragAction = null;
+
+// Predefined puzzle patterns for better pictures
+const patterns5x5 = [
+  // Heart
+  [
+    [0,1,0,1,0],
+    [1,1,1,1,1],
+    [1,1,1,1,1],
+    [0,1,1,1,0],
+    [0,0,1,0,0]
+  ],
+  // Cross
+  [
+    [0,0,1,0,0],
+    [0,0,1,0,0],
+    [1,1,1,1,1],
+    [0,0,1,0,0],
+    [0,0,1,0,0]
+  ],
+  // Arrow
+  [
+    [0,0,1,0,0],
+    [0,1,1,1,0],
+    [1,0,1,0,1],
+    [0,0,1,0,0],
+    [0,0,1,0,0]
+  ],
+  // Diamond
+  [
+    [0,0,1,0,0],
+    [0,1,0,1,0],
+    [1,0,0,0,1],
+    [0,1,0,1,0],
+    [0,0,1,0,0]
+  ],
+  // Smile
+  [
+    [0,1,0,1,0],
+    [0,1,0,1,0],
+    [0,0,0,0,0],
+    [1,0,0,0,1],
+    [0,1,1,1,0]
+  ],
+  // House
+  [
+    [0,0,1,0,0],
+    [0,1,1,1,0],
+    [1,1,1,1,1],
+    [1,1,0,1,1],
+    [1,1,0,1,1]
+  ],
+  // Star
+  [
+    [0,0,1,0,0],
+    [1,1,1,1,1],
+    [0,1,1,1,0],
+    [0,1,0,1,0],
+    [1,0,0,0,1]
+  ],
+  // Cat
+  [
+    [1,0,0,0,1],
+    [1,1,0,1,1],
+    [1,1,1,1,1],
+    [0,1,0,1,0],
+    [1,1,1,1,1]
+  ]
+];
+
+// Generate random puzzle for larger sizes
+function generateRandomPuzzle(size) {
+  // For 5x5, pick from predefined patterns
+  if (size === 5) {
+    return patterns5x5[Math.floor(Math.random() * patterns5x5.length)];
+  }
+  
+  // For larger sizes, generate with structure
+  const grid = Array(size).fill(null).map(() => Array(size).fill(0));
+  
+  // Generate with density around 50-60%
+  const density = 0.5 + Math.random() * 0.1;
+  
+  // Use a seed-based approach for more interesting patterns
+  // Start with random blobs
+  const numBlobs = Math.floor(size * size * 0.15);
+  for (let b = 0; b < numBlobs; b++) {
+    const cx = Math.floor(Math.random() * size);
+    const cy = Math.floor(Math.random() * size);
+    const radius = 1 + Math.floor(Math.random() * (size / 4));
+    
+    for (let y = Math.max(0, cy - radius); y <= Math.min(size - 1, cy + radius); y++) {
+      for (let x = Math.max(0, cx - radius); x <= Math.min(size - 1, cx + radius); x++) {
+        if (Math.random() < 0.7) {
+          grid[y][x] = 1;
+        }
+      }
+    }
+  }
+  
+  // Ensure the puzzle is solvable (has at least some filled cells in each row/col)
+  for (let i = 0; i < size; i++) {
+    if (grid[i].every(c => c === 0)) {
+      grid[i][Math.floor(Math.random() * size)] = 1;
+    }
+    if (grid.every(row => row[i] === 0)) {
+      grid[Math.floor(Math.random() * size)][i] = 1;
+    }
+  }
+  
+  // Adjust density
+  let filled = grid.flat().filter(c => c === 1).length;
+  const target = Math.floor(size * size * density);
+  
+  while (filled < target) {
+    const r = Math.floor(Math.random() * size);
+    const c = Math.floor(Math.random() * size);
+    if (grid[r][c] === 0) {
+      grid[r][c] = 1;
+      filled++;
+    }
+  }
+  
+  while (filled > target) {
+    const r = Math.floor(Math.random() * size);
+    const c = Math.floor(Math.random() * size);
+    if (grid[r][c] === 1) {
+      grid[r][c] = 0;
+      filled--;
+    }
+  }
+  
+  return grid;
+}
+
+// Calculate clues for a line
+function getClues(line) {
+  const clues = [];
+  let count = 0;
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === 1) {
+      count++;
+    } else if (count > 0) {
+      clues.push(count);
+      count = 0;
+    }
+  }
+  if (count > 0) clues.push(count);
+  return clues.length > 0 ? clues : [0];
+}
+
+// Get row clues
+function getRowClues(grid, row) {
+  return getClues(grid[row]);
+}
+
+// Get column clues
+function getColClues(grid, col) {
+  const column = grid.map(row => row[col]);
+  return getClues(column);
+}
+
+// Check if row/col is completed correctly
+function isLineComplete(playerLine, solutionLine) {
+  for (let i = 0; i < solutionLine.length; i++) {
+    if (solutionLine[i] === 1 && playerLine[i] !== 1) return false;
+    if (solutionLine[i] === 0 && playerLine[i] === 1) return false;
+  }
+  return true;
+}
+
+// Initialize game
+function startGame() {
+  solution = generateRandomPuzzle(gridSize);
+  playerGrid = Array(gridSize).fill(null).map(() => Array(gridSize).fill(0));
+  lives = maxLives;
+  score = 0;
+  mistakes = 0;
+  timer = 0;
+  filledCells = 0;
+  totalCells = solution.flat().filter(c => c === 1).length;
+  currentTool = 'fill';
+  
+  document.getElementById('title-screen').style.display = 'none';
+  document.getElementById('win-screen').style.display = 'none';
+  document.getElementById('game-screen').style.display = 'flex';
+  
+  updateToolButtons();
+  renderGrid();
+  updateStats();
+  startTimer();
+}
+
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  
+  // Calculate max clue lengths
+  const rowClues = [];
+  const colClues = [];
+  for (let i = 0; i < gridSize; i++) {
+    rowClues.push(getRowClues(solution, i));
+    colClues.push(getColClues(solution, i));
+  }
+  
+  const maxRowClueLen = Math.max(...rowClues.map(c => c.length));
+  const maxColClueLen = Math.max(...colClues.map(c => c.length));
+  
+  // Set grid template
+  const colTemplate = `repeat(${maxRowClueLen}, auto) repeat(${gridSize}, 1fr)`;
+  const rowTemplate = `repeat(${maxColClueLen}, auto) repeat(${gridSize}, 1fr)`;
+  grid.style.gridTemplateColumns = colTemplate;
+  grid.style.gridTemplateRows = rowTemplate;
+  
+  // Corner space
+  for (let r = 0; r < maxColClueLen; r++) {
+    for (let c = 0; c < maxRowClueLen; c++) {
+      const corner = document.createElement('div');
+      corner.className = 'corner';
+      grid.appendChild(corner);
+    }
+    // Column clues
+    for (let c = 0; c < gridSize; c++) {
+      const clueCell = document.createElement('div');
+      clueCell.className = 'col-clue';
+      clueCell.dataset.col = c;
+      const clue = colClues[c];
+      const offset = maxColClueLen - clue.length;
+      if (r >= offset) {
+        const span = document.createElement('span');
+        span.textContent = clue[r - offset];
+        clueCell.appendChild(span);
+      }
+      grid.appendChild(clueCell);
+    }
+  }
+  
+  // Rows
+  for (let r = 0; r < gridSize; r++) {
+    // Row clues
+    const clue = rowClues[r];
+    const offset = maxRowClueLen - clue.length;
+    for (let c = 0; c < maxRowClueLen; c++) {
+      const clueCell = document.createElement('div');
+      clueCell.className = 'row-clue';
+      clueCell.dataset.row = r;
+      if (c >= offset) {
+        const span = document.createElement('span');
+        span.textContent = clue[c - offset];
+        clueCell.appendChild(span);
+      }
+      grid.appendChild(clueCell);
+    }
+    
+    // Cells
+    for (let c = 0; c < gridSize; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.row = r;
+      cell.dataset.col = c;
+      
+      // Add section borders for 10x10 and 15x15
+      if (gridSize >= 10) {
+        if ((c + 1) % 5 === 0 && c < gridSize - 1) cell.classList.add('border-right');
+        if ((r + 1) % 5 === 0 && r < gridSize - 1) cell.classList.add('border-bottom');
+      }
+      
+      // Events
+      cell.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        isMouseDown = true;
+        if (e.button === 2) {
+          dragAction = 'mark';
+          handleCellAction(r, c, 'mark');
+        } else {
+          dragAction = currentTool;
+          handleCellAction(r, c, currentTool);
+        }
+      });
+      
+      cell.addEventListener('mouseenter', () => {
+        if (isMouseDown && dragAction) {
+          handleCellAction(r, c, dragAction);
+        }
+      });
+      
+      cell.addEventListener('contextmenu', (e) => e.preventDefault());
+      
+      // Touch events
+      cell.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        handleCellAction(r, c, currentTool);
+      });
+      
+      grid.appendChild(cell);
+    }
+  }
+  
+  // Global mouse up
+  document.addEventListener('mouseup', () => {
+    isMouseDown = false;
+    dragAction = null;
+  });
+}
+
+function handleCellAction(row, col, tool) {
+  if (playerGrid[row][col] === 1) return; // Already filled correctly
+  
+  if (tool === 'fill') {
+    if (playerGrid[row][col] === 2) {
+      // Remove mark first
+      playerGrid[row][col] = 0;
+      updateCell(row, col);
+      return;
+    }
+    
+    if (solution[row][col] === 1) {
+      // Correct
+      playerGrid[row][col] = 1;
+      filledCells++;
+      score += 10;
+      updateCell(row, col);
+      checkLineCompletion(row, col);
+      updateStats();
+      
+      if (filledCells === totalCells) {
+        winGame();
+      }
+    } else {
+      // Wrong
+      lives--;
+      mistakes++;
+      score = Math.max(0, score - 5);
+      
+      const cell = getCell(row, col);
+      cell.classList.add('error');
+      setTimeout(() => {
+        cell.classList.remove('error');
+        // Show it as marked
+        playerGrid[row][col] = 2;
+        updateCell(row, col);
+      }, 400);
+      
+      updateStats();
+      
+      if (lives <= 0) {
+        gameOver();
+      }
+    }
+  } else if (tool === 'mark') {
+    if (playerGrid[row][col] === 2) {
+      playerGrid[row][col] = 0;
+    } else if (playerGrid[row][col] === 0) {
+      playerGrid[row][col] = 2;
+    }
+    updateCell(row, col);
+  }
+}
+
+function getCell(row, col) {
+  return document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
+}
+
+function updateCell(row, col) {
+  const cell = getCell(row, col);
+  cell.classList.remove('filled', 'marked');
+  if (playerGrid[row][col] === 1) {
+    cell.classList.add('filled');
+  } else if (playerGrid[row][col] === 2) {
+    cell.classList.add('marked');
+  }
+}
+
+function checkLineCompletion(row, col) {
+  // Check row
+  const rowComplete = isLineComplete(playerGrid[row], solution[row]);
+  const rowClues = document.querySelectorAll(`.row-clue[data-row="${row}"]`);
+  rowClues.forEach(el => {
+    if (rowComplete) {
+      el.classList.add('completed');
+      // Auto-mark remaining cells in completed row
+      for (let c = 0; c < gridSize; c++) {
+        if (playerGrid[row][c] === 0 && solution[row][c] === 0) {
+          playerGrid[row][c] = 2;
+          updateCell(row, c);
+        }
+      }
+    }
+  });
+  
+  // Check column
+  const colData = playerGrid.map(r => r[col]);
+  const colSol = solution.map(r => r[col]);
+  const colComplete = isLineComplete(colData, colSol);
+  const colClues = document.querySelectorAll(`.col-clue[data-col="${col}"]`);
+  colClues.forEach(el => {
+    if (colComplete) {
+      el.classList.add('completed');
+      // Auto-mark remaining cells in completed column
+      for (let r = 0; r < gridSize; r++) {
+        if (playerGrid[r][col] === 0 && solution[r][col] === 0) {
+          playerGrid[r][col] = 2;
+          updateCell(r, col);
+        }
+      }
+    }
+  });
+}
+
+function updateStats() {
+  document.getElementById('score').textContent = score;
+  document.getElementById('progress-fill').style.width = `${(filledCells / totalCells) * 100}%`;
+  
+  // Update lives
+  const livesEl = document.getElementById('lives');
+  livesEl.innerHTML = '';
+  for (let i = 0; i < maxLives; i++) {
+    const life = document.createElement('span');
+    life.className = 'life' + (i >= lives ? ' lost' : '');
+    life.textContent = '❤️';
+    livesEl.appendChild(life);
+  }
+}
+
+function setTool(tool) {
+  currentTool = tool;
+  updateToolButtons();
+}
+
+function updateToolButtons() {
+  document.getElementById('fill-btn').classList.toggle('active', currentTool === 'fill');
+  document.getElementById('mark-btn').classList.toggle('active', currentTool === 'mark');
+}
+
+function startTimer() {
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    timer++;
+    const mins = Math.floor(timer / 60);
+    const secs = timer % 60;
+    document.getElementById('timer').textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+  }, 1000);
+}
+
+function stopTimer() {
+  clearInterval(timerInterval);
+}
+
+function winGame() {
+  stopTimer();
+  
+  // Bonus score for time and lives
+  const timeBonus = Math.max(0, 500 - timer * 2);
+  const lifeBonus = lives * 100;
+  score += timeBonus + lifeBonus;
+  
+  setTimeout(() => {
+    document.getElementById('game-screen').style.display = 'none';
+    document.getElementById('win-screen').style.display = 'flex';
+    
+    const mins = Math.floor(timer / 60);
+    const secs = timer % 60;
+    document.getElementById('win-time').textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+    document.getElementById('win-score').textContent = score;
+    document.getElementById('win-mistakes').textContent = mistakes;
+    
+    const diffNames = { 5: 'Easy (5×5)', 10: 'Medium (10×10)', 15: 'Hard (15×15)' };
+    document.getElementById('win-difficulty').textContent = diffNames[gridSize] || `${gridSize}×${gridSize}`;
+    
+    // Render mini preview
+    renderWinPreview();
+  }, 500);
+}
+
+function renderWinPreview() {
+  const preview = document.getElementById('win-preview');
+  preview.innerHTML = '';
+  preview.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+  
+  const cellSize = Math.min(10, Math.floor(180 / gridSize));
+  
+  for (let r = 0; r < gridSize; r++) {
+    for (let c = 0; c < gridSize; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'mini-cell' + (solution[r][c] === 1 ? ' filled' : '');
+      cell.style.width = cellSize + 'px';
+      cell.style.height = cellSize + 'px';
+      preview.appendChild(cell);
+    }
+  }
+}
+
+function gameOver() {
+  stopTimer();
+  
+  setTimeout(() => {
+    // Reveal solution
+    for (let r = 0; r < gridSize; r++) {
+      for (let c = 0; c < gridSize; c++) {
+        if (solution[r][c] === 1 && playerGrid[r][c] !== 1) {
+          playerGrid[r][c] = 1;
+          const cell = getCell(r, c);
+          cell.classList.add('filled');
+          cell.style.opacity = '0.5';
+        }
+      }
+    }
+    
+    setTimeout(() => {
+      document.getElementById('game-screen').style.display = 'none';
+      document.getElementById('win-screen').style.display = 'flex';
+      
+      document.querySelector('#win-screen h2').textContent = 'Game Over';
+      document.querySelector('#win-screen .win-subtitle').textContent = 'You ran out of lives!';
+      
+      const mins = Math.floor(timer / 60);
+      const secs = timer % 60;
+      document.getElementById('win-time').textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+      document.getElementById('win-score').textContent = score;
+      document.getElementById('win-mistakes').textContent = mistakes;
+      
+      const diffNames = { 5: 'Easy (5×5)', 10: 'Medium (10×10)', 15: 'Hard (15×15)' };
+      document.getElementById('win-difficulty').textContent = diffNames[gridSize] || `${gridSize}×${gridSize}`;
+      
+      renderWinPreview();
+    }, 1500);
+  }, 300);
+}
+
+function resetPuzzle() {
+  playerGrid = Array(gridSize).fill(null).map(() => Array(gridSize).fill(0));
+  filledCells = 0;
+  lives = maxLives;
+  mistakes = 0;
+  score = 0;
+  timer = 0;
+  
+  // Re-render
+  renderGrid();
+  updateStats();
+  stopTimer();
+  startTimer();
+}
+
+function showTitle() {
+  stopTimer();
+  document.getElementById('game-screen').style.display = 'none';
+  document.getElementById('win-screen').style.display = 'none';
+  document.getElementById('title-screen').style.display = 'flex';
+  
+  // Reset win screen text
+  document.querySelector('#win-screen h2').textContent = 'Puzzle Complete!';
+  document.querySelector('#win-screen .win-subtitle').textContent = 'You solved it!';
+}
+
+function playAgain() {
+  // Reset win screen text
+  document.querySelector('#win-screen h2').textContent = 'Puzzle Complete!';
+  document.querySelector('#win-screen .win-subtitle').textContent = 'You solved it!';
+  startGame();
+}
+
+// Difficulty selection
+document.querySelectorAll('.diff-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    gridSize = parseInt(btn.dataset.size);
+  });
+});
+
+// Keyboard shortcut
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'f' || e.key === 'F') setTool('fill');
+  if (e.key === 'x' || e.key === 'X') setTool('mark');
+});
+</script>
+</body>
+</html>
