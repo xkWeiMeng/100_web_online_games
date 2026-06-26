@@ -1,0 +1,31 @@
+- generic [ref=e2]:
+  - heading "Kakuro" [level=1] [ref=e3]
+  - paragraph [ref=e4]: Number Crossword Puzzle
+  - generic [ref=e5]:
+    - heading "How to Play" [level=3] [ref=e6]
+    - list [ref=e7]:
+      - listitem [ref=e8]:
+        - text: Fill blank cells with digits
+        - strong [ref=e9]: 1 through 9
+      - listitem [ref=e10]:
+        - text: Clue cells show the required
+        - strong [ref=e11]: sum
+        - text: for a run of cells
+      - listitem [ref=e12]:
+        - text: Top-right number =
+        - strong [ref=e13]: sum downward
+        - text: ; Bottom-left =
+        - strong [ref=e14]: sum across right
+      - listitem [ref=e15]:
+        - strong [ref=e16]: No digit may repeat
+        - text: within a single horizontal or vertical run
+      - listitem [ref=e17]:
+        - text: Use
+        - strong [ref=e18]: Notes
+        - text: to pencil in candidates (press N on keyboard)
+      - listitem [ref=e19]: "Keyboard: Arrow keys to navigate, 1-9 to enter, Delete to erase"
+  - generic [ref=e20]:
+    - button "Easy" [ref=e21] [cursor=pointer]
+    - button "Medium" [ref=e22] [cursor=pointer]
+    - button "Hard" [ref=e23] [cursor=pointer]
+  - button "Start Puzzle" [ref=e24] [cursor=pointer]

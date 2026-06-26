@@ -1,0 +1,48 @@
+- generic [ref=e25]:
+  - generic [ref=e26]:
+    - generic [ref=e27]:
+      - generic [ref=e28]: "Time: 0:01"
+      - generic [ref=e29]: "Score: 1000"
+      - generic [ref=e30]: "Hints: 0"
+    - button "☰" [ref=e31] [cursor=pointer]
+  - generic [ref=e32]: "Easy #2"
+  - generic [ref=e34]:
+    - generic [ref=e36]:
+      - img
+      - generic [ref=e37]: "9"
+    - generic [ref=e38]:
+      - img
+      - generic [ref=e39]: "10"
+    - generic [ref=e40]:
+      - img
+      - generic [ref=e41]: "13"
+    - generic [ref=e43]:
+      - img
+      - generic [ref=e44]: "7"
+    - generic [ref=e48]:
+      - img
+      - generic [ref=e49]: "13"
+    - generic [ref=e50]:
+      - img
+      - generic [ref=e51]: "27"
+    - generic [ref=e58]:
+      - img
+      - generic [ref=e59]: "11"
+  - generic [ref=e62]:
+    - generic [ref=e63]:
+      - button "1" [ref=e64] [cursor=pointer]
+      - button "2" [ref=e65] [cursor=pointer]
+      - button "3" [ref=e66] [cursor=pointer]
+      - button "4" [ref=e67] [cursor=pointer]
+      - button "5" [ref=e68] [cursor=pointer]
+      - button "6" [ref=e69] [cursor=pointer]
+      - button "7" [ref=e70] [cursor=pointer]
+      - button "8" [ref=e71] [cursor=pointer]
+      - button "9" [ref=e72] [cursor=pointer]
+      - button "✕" [ref=e73] [cursor=pointer]
+    - generic [ref=e74]:
+      - 'button "Notes: OFF" [ref=e75] [cursor=pointer]'
+      - button "Check" [ref=e76] [cursor=pointer]
+      - button "Hint" [ref=e77] [cursor=pointer]
+      - button "Undo" [ref=e78] [cursor=pointer]
+      - button "Reset" [ref=e79] [cursor=pointer]
