@@ -57,6 +57,7 @@
   .cell.same-cage-highlight{background:var(--same-cage)}
   .cell.error{background:var(--error)}
   .cell.correct-flash{background:var(--correct)}
+  .cell.row-col-highlight{background:#f0f0ff}
   .cell.given{color:var(--text)}
   .cell .cage-label{position:absolute;top:2px;left:4px;font-size:.65rem;font-weight:700;color:#555;line-height:1;pointer-events:none;z-index:3;white-space:nowrap}
   .cell .pencil-marks{display:grid;grid-template-columns:repeat(3,1fr);gap:0;width:100%;height:100%;padding:14px 3px 2px;position:absolute;inset:0;pointer-events:none}
@@ -97,6 +98,20 @@
   .win-card button{margin-top:10px;padding:14px 36px;border:none;border-radius:12px;background:var(--primary);color:#fff;font-size:1rem;font-weight:600;cursor:pointer;transition:all .15s}
   .win-card button:hover{background:var(--primary-dark);transform:translateY(-1px)}
 
+  /* Hint button */
+  .action-btn.hint{background:#f0fdf4;color:#16a34a;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .action-btn.hint:hover{background:#dcfce7}
+
+  /* Error flash animation */
+  @keyframes shakeCell{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+  .cell.error{background:#fecaca !important;animation:shakeCell .3s ease}
+  .cell.error .cell-value{color:#dc2626 !important}
+
+  /* Confetti */
+  .confetti-box{position:fixed;inset:0;pointer-events:none;z-index:3000;overflow:hidden}
+  .confetti-piece{position:absolute;width:10px;height:10px;border-radius:2px;animation:confettiFall linear forwards}
+  @keyframes confettiFall{0%{transform:translateY(-10px) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
+
   /* Responsive */
   @media(max-width:400px){
     .cell{font-size:1.3rem}
@@ -120,6 +135,7 @@
     <button class="start-btn primary" onclick="startGame(4)">Easy <span class="size-label">4 x 4</span></button>
     <button class="start-btn secondary" onclick="startGame(5)">Medium <span class="size-label">5 x 5</span></button>
     <button class="start-btn secondary" onclick="startGame(6)">Hard <span class="size-label">6 x 6</span></button>
+    <button class="start-btn secondary" onclick="startGame(7)">Expert <span class="size-label">7 x 7</span></button>
   </div>
   <div id="how-to-play">
     <h3>How to Play</h3>
@@ -169,6 +185,7 @@
     <div class="action-row">
       <button class="action-btn pencil" id="pencil-btn" onclick="togglePencil()">&#9998; Notes</button>
       <button class="action-btn undo" onclick="undo()">&#8630; Undo</button>
+      <button class="action-btn hint" onclick="giveHint()">&#9733; Hint</button>
       <button class="action-btn check" onclick="checkPuzzle()">&#10003; Check</button>
     </div>
     <div class="numpad" id="numpad"></div>
@@ -188,6 +205,8 @@
     <button onclick="showTitleScreen()">Play Again</button>
   </div>
 </div>
+
+<div class="confetti-box" id="confetti-box"></div>
 
 <script>
 // ── State ─────────────────────────────────────────────
@@ -465,7 +484,7 @@ function updateTimerDisplay() {
 }
 
 function calcScore() {
-  const baseScore = {4: 200, 5: 400, 6: 800}[N] || 200;
+  const baseScore = {4: 200, 5: 400, 6: 800, 7: 1200}[N] || 200;
   const timeBonus = Math.max(0, baseScore - Math.floor(elapsedSeconds / 3));
   const errorPenalty = errorCount * 25;
   return Math.max(0, baseScore + timeBonus - errorPenalty);
@@ -544,6 +563,34 @@ function undo() {
   renderGrid();
 }
 
+function giveHint() {
+  if (gameWon) return;
+  // Find a wrong or empty cell and reveal the solution
+  const candidates = [];
+  for (let r = 0; r < N; r++)
+    for (let c = 0; c < N; c++) {
+      const cage = cages.find(cg => cg.cells.some(([cr, cc]) => cr === r && cc === c));
+      if (cage && cage.cells.length === 1) continue; // skip givens
+      if (playerGrid[r][c] !== solution[r][c]) candidates.push([r, c]);
+    }
+  if (candidates.length === 0) return;
+
+  // Prefer selected cell if wrong/empty
+  let [r, c] = selectedCell && playerGrid[selectedCell[0]][selectedCell[1]] !== solution[selectedCell[0]][selectedCell[1]]
+    && !(cages.find(cg => cg.cells.some(([cr, cc]) => cr === selectedCell[0] && cc === selectedCell[1])).cells.length === 1)
+    ? selectedCell
+    : candidates[Math.floor(Math.random() * candidates.length)];
+
+  history.push({ type: 'value', r, c, before: playerGrid[r][c], after: solution[r][c] });
+  playerGrid[r][c] = solution[r][c];
+  pencilGrid[r][c] = new Set();
+  errorCount++;
+  document.getElementById('errors-display').textContent = errorCount;
+  selectedCell = [r, c];
+  renderGrid();
+  checkWinCondition();
+}
+
 // ── Check Puzzle ──────────────────────────────────────
 function checkPuzzle() {
   if (gameWon) return;
@@ -573,11 +620,19 @@ function checkPuzzle() {
     const r = parseInt(cell.dataset.row);
     const c = parseInt(cell.dataset.col);
     if (errorCells.has(`${r},${c}`)) {
+      cell.style.background = '#fecaca';
       cell.classList.add('error');
-      setTimeout(() => cell.classList.remove('error'), 1500);
+      const val = cell.querySelector('.cell-value');
+      if (val) val.style.color = '#dc2626';
+      setTimeout(() => {
+        cell.classList.remove('error');
+        cell.style.background = '';
+        if (val) val.style.color = '';
+        renderGrid();
+      }, 1800);
     } else if (playerGrid[r][c] !== 0) {
-      cell.classList.add('correct-flash');
-      setTimeout(() => cell.classList.remove('correct-flash'), 800);
+      cell.style.background = '#dcfce7';
+      setTimeout(() => { cell.style.background = ''; }, 800);
     }
   });
   
@@ -604,6 +659,7 @@ function checkWinCondition() {
   
   const score = calcScore();
   updateScoreDisplay();
+  spawnConfetti();
   
   setTimeout(() => {
     const stats = document.getElementById('win-stats');
@@ -679,8 +735,12 @@ function renderGrid() {
       if (selectedCell && selectedCell[0] === r && selectedCell[1] === c) {
         cell.classList.add('selected');
         cell.style.background = 'var(--selected)';
+      } else if (selectedCell && (selectedCell[0] === r || selectedCell[1] === c)) {
+        cell.classList.add('row-col-highlight');
+        cell.style.background = '#e8ecff';
       } else if (selectedCell && cageMap[selectedCell[0]][selectedCell[1]] === cId) {
         cell.classList.add('same-cage-highlight');
+        cell.style.background = '#f0f3ff';
       }
       
       // Cage borders (use half-width because adjacent cells both draw borders)
@@ -767,6 +827,26 @@ function selectCell(r, c) {
   renderGrid();
 }
 
+// ── Confetti ──────────────────────────────────────────
+function spawnConfetti() {
+  const box = document.getElementById('confetti-box');
+  box.innerHTML = '';
+  const colors = ['#5b6abf','#e85d75','#2ecc71','#f39c12','#3498db','#9b59b6','#1abc9c'];
+  for (let i = 0; i < 80; i++) {
+    const p = document.createElement('div');
+    p.className = 'confetti-piece';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.width = (6 + Math.random() * 8) + 'px';
+    p.style.height = (6 + Math.random() * 8) + 'px';
+    p.style.animationDuration = (1.5 + Math.random() * 2) + 's';
+    p.style.animationDelay = Math.random() * 0.8 + 's';
+    p.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+    box.appendChild(p);
+  }
+  setTimeout(() => box.innerHTML = '', 4000);
+}
+
 // ── Keyboard Support ──────────────────────────────────
 document.addEventListener('keydown', (e) => {
   if (gameWon || !selectedCell) return;
@@ -791,6 +871,8 @@ document.addEventListener('keydown', (e) => {
     renderGrid();
   } else if (key === 'p' || key === 'P') {
     togglePencil();
+  } else if (key === 'h' || key === 'H') {
+    giveHint();
   } else if (key === 'z' && (e.ctrlKey || e.metaKey)) {
     e.preventDefault();
     undo();

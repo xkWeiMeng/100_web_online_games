@@ -1,0 +1,56 @@
+- generic [active] [ref=e1]:
+  - text: ▸ ▸ ▸ ▸ ▸
+  - generic [ref=e25]:
+    - generic [ref=e26]:
+      - heading "KenKen" [level=1] [ref=e27]
+      - button "☰" [ref=e29] [cursor=pointer]
+    - generic [ref=e30]:
+      - generic [ref=e31]:
+        - generic [ref=e32]: Size
+        - generic [ref=e33]: 5×5
+      - generic [ref=e34]:
+        - generic [ref=e35]: Time
+        - generic [ref=e36]: 0:11
+      - generic [ref=e37]:
+        - generic [ref=e38]: Score
+        - generic [ref=e39]: "797"
+      - generic [ref=e40]:
+        - generic [ref=e41]: Errors
+        - generic [ref=e42]: "0"
+    - generic [ref=e44]:
+      - generic [ref=e93] [cursor=pointer]:
+        - generic: 3-
+      - generic [ref=e95] [cursor=pointer]: "5"
+      - generic [ref=e97] [cursor=pointer]: "3"
+      - generic [ref=e98] [cursor=pointer]:
+        - generic: 2÷
+      - generic [ref=e101] [cursor=pointer]:
+        - generic: 2-
+      - generic [ref=e104] [cursor=pointer]: "1"
+      - generic [ref=e106] [cursor=pointer]: "2"
+      - generic [ref=e108] [cursor=pointer]: "5"
+      - generic [ref=e110] [cursor=pointer]: "2"
+      - generic [ref=e112] [cursor=pointer]: "1"
+      - generic [ref=e113] [cursor=pointer]:
+        - generic: 10+
+      - generic [ref=e115] [cursor=pointer]:
+        - generic: 10+
+      - generic [ref=e117] [cursor=pointer]:
+        - generic: 6+
+      - generic [ref=e120] [cursor=pointer]: "5"
+      - generic [ref=e124] [cursor=pointer]:
+        - generic: 5×
+    - generic [ref=e78]:
+      - generic [ref=e79]:
+        - button "✎ Notes" [ref=e80] [cursor=pointer]
+        - button "↶ Undo" [ref=e81] [cursor=pointer]
+        - button "★ Hint" [ref=e82] [cursor=pointer]
+        - button "✓ Check" [ref=e83] [cursor=pointer]
+      - generic [ref=e84]:
+        - button "1" [ref=e85] [cursor=pointer]
+        - button "2" [ref=e86] [cursor=pointer]
+        - button "3" [ref=e87] [cursor=pointer]
+        - button "4" [ref=e88] [cursor=pointer]
+        - button "5" [ref=e89] [cursor=pointer]
+        - button "✕" [ref=e90] [cursor=pointer]
+      - button "New Puzzle" [ref=e92] [cursor=pointer]

@@ -1,0 +1,32 @@
+- generic [ref=e2]:
+  - heading "KenKen" [level=1] [ref=e3]
+  - generic [ref=e4]: The Arithmetic Logic Puzzle
+  - generic [ref=e5]:
+    - button "Easy 4 x 4" [ref=e6] [cursor=pointer]:
+      - text: Easy
+      - generic [ref=e7]: 4 x 4
+    - button "Medium 5 x 5" [ref=e8] [cursor=pointer]:
+      - text: Medium
+      - generic [ref=e9]: 5 x 5
+    - button "Hard 6 x 6" [ref=e10] [cursor=pointer]:
+      - text: Hard
+      - generic [ref=e11]: 6 x 6
+    - button "Expert 7 x 7" [ref=e12] [cursor=pointer]:
+      - text: Expert
+      - generic [ref=e13]: 7 x 7
+  - generic [ref=e14]:
+    - heading "How to Play" [level=3] [ref=e15]
+    - list [ref=e16]:
+      - listitem [ref=e17]: ▸ Fill the grid so each row and column contains 1 to N exactly once
+      - listitem [ref=e18]:
+        - text: ▸ Bold-outlined groups are
+        - strong [ref=e19]: cages
+        - text: with a target & operation
+      - listitem [ref=e20]: ▸ Numbers in a cage must produce the target using the operation
+      - listitem [ref=e21]:
+        - text: ▸ For
+        - strong [ref=e22]: "-"
+        - text: and
+        - strong [ref=e23]: ÷
+        - text: ", order doesn't matter—just get the result"
+      - listitem [ref=e24]: ▸ Single-number cages tell you exactly what goes there

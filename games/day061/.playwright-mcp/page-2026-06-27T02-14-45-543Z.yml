@@ -1,0 +1,46 @@
+- generic [active] [ref=e1]:
+  - text: ▸ ▸ ▸ ▸ ▸
+  - generic [ref=e23]:
+    - generic [ref=e24]:
+      - heading "KenKen" [level=1] [ref=e25]
+      - button "☰" [ref=e27] [cursor=pointer]
+    - generic [ref=e28]:
+      - generic [ref=e29]:
+        - generic [ref=e30]: Size
+        - generic [ref=e31]: 4×4
+      - generic [ref=e32]:
+        - generic [ref=e33]: Time
+        - generic [ref=e34]: 0:01
+      - generic [ref=e35]:
+        - generic [ref=e36]: Score
+        - generic [ref=e37]: "400"
+      - generic [ref=e38]:
+        - generic [ref=e39]: Errors
+        - generic [ref=e40]: "0"
+    - generic [ref=e42]:
+      - generic [ref=e43] [cursor=pointer]:
+        - generic: 4×
+      - generic [ref=e45] [cursor=pointer]:
+        - generic: 7+
+      - generic [ref=e48] [cursor=pointer]: "3"
+      - generic [ref=e50] [cursor=pointer]: "4"
+      - generic [ref=e51] [cursor=pointer]:
+        - generic: 2-
+      - generic [ref=e53] [cursor=pointer]:
+        - generic: 2×
+      - generic [ref=e56] [cursor=pointer]:
+        - generic: 9+
+      - generic [ref=e57] [cursor=pointer]:
+        - generic: 5+
+    - generic [ref=e61]:
+      - generic [ref=e62]:
+        - button "✎ Notes" [ref=e63] [cursor=pointer]
+        - button "↶ Undo" [ref=e64] [cursor=pointer]
+        - button "✓ Check" [ref=e65] [cursor=pointer]
+      - generic [ref=e66]:
+        - button "1" [ref=e67] [cursor=pointer]
+        - button "2" [ref=e68] [cursor=pointer]
+        - button "3" [ref=e69] [cursor=pointer]
+        - button "4" [ref=e70] [cursor=pointer]
+        - button "✕" [ref=e71] [cursor=pointer]
+      - button "New Puzzle" [ref=e73] [cursor=pointer]
