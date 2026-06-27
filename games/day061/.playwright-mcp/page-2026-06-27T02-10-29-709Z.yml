@@ -1,0 +1,26 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - text: KenKen
+    - generic [ref=e4]: Math Puzzle
+  - paragraph [ref=e5]: Fill each row and column with unique numbers. Numbers in each outlined cage must produce the target using the given operation.
+  - generic [ref=e6]:
+    - button "Easy 4 × 4" [ref=e7] [cursor=pointer]:
+      - text: Easy
+      - generic [ref=e8]: 4 × 4
+    - button "Medium 5 × 5" [ref=e9] [cursor=pointer]:
+      - text: Medium
+      - generic [ref=e10]: 5 × 5
+    - button "Hard 6 × 6" [ref=e11] [cursor=pointer]:
+      - text: Hard
+      - generic [ref=e12]: 6 × 6
+    - button "Expert 7 × 7" [ref=e13] [cursor=pointer]:
+      - text: Expert
+      - generic [ref=e14]: 7 × 7
+  - generic [ref=e15]:
+    - heading "How to Play" [level=3] [ref=e16]
+    - list [ref=e17]:
+      - listitem [ref=e18]: → Fill rows & columns with 1–N (no repeats)
+      - listitem [ref=e19]: → Each cage shows a target & operation (+, −, ×, ÷)
+      - listitem [ref=e20]: → Cage numbers must produce the target with that operation
+      - listitem [ref=e21]: → Single-cell cages show the answer directly
+      - listitem [ref=e22]: → Use pencil mode to note possible numbers
