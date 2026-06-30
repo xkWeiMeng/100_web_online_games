@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spelling Bee Word Builder</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* Title Screen */
+        #title-screen {
+            animation: fadeIn 0.5s ease;
+        }
+
+        #title-screen h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #f6d365, #fda085);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        #title-screen .bee-icon {
+            font-size: 4rem;
+            margin: 20px 0;
+            animation: bounce 2s infinite;
+        }
+
+        #title-screen .instructions {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 24px;
+            margin: 20px 0;
+            text-align: left;
+            line-height: 1.7;
+        }
+
+        #title-screen .instructions h3 {
+            text-align: center;
+            margin-bottom: 12px;
+            color: #fda085;
+        }
+
+        #title-screen .instructions li {
+            margin: 8px 0;
+            padding-left: 8px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #f6d365, #fda085);
+            color: #1a1a2e;
+            border: none;
+            padding: 16px 48px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(253, 160, 133, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(253, 160, 133, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        /* Game Screen */
+        #game-screen {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .score-display {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .score-display span {
+            color: #f6d365;
+        }
+
+        .rank-display {
+            font-size: 0.9rem;
+            color: #fda085;
+            font-weight: 600;
+        }
+
+        /* Progress bar */
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #f6d365, #fda085);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+            width: 0%;
+        }
+
+        .rank-markers {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-size: 0.65rem;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .rank-markers span.active {
+            color: #fda085;
+            font-weight: 700;
+        }
+
+        /* Input display */
+        .input-area {
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .current-word {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            min-height: 40px;
+        }
+
+        .current-word .center-letter {
+            color: #f6d365;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 2px;
+            height: 2rem;
+            background: #f6d365;
+            animation: blink 1s infinite;
+            vertical-align: middle;
+            margin-left: 2px;
+        }
+
+        /* Message display */
+        .message {
+            min-height: 30px;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .message.error {
+            color: #ff6b6b;
+        }
+
+        .message.success {
+            color: #51cf66;
+        }
+
+        .message.great {
+            color: #f6d365;
+            font-size: 1.1rem;
+        }
+
+        /* Honeycomb */
+        .honeycomb {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px 0;
+            gap: 6px;
+        }
+
+        .hex-row {
+            display: flex;
+            gap: 6px;
+        }
+
+        .hex-btn {
+            width: 70px;
+            height: 70px;
+            border: none;
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.12);
+            color: #e0e0e0;
+        }
+
+        .hex-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .hex-btn:active {
+            transform: scale(0.95);
+        }
+
+        .hex-btn.center {
+            background: linear-gradient(135deg, #f6d365, #fda085);
+            color: #1a1a2e;
+        }
+
+        .hex-btn.pressed {
+            transform: scale(0.9);
+            opacity: 0.7;
+        }
+
+        /* Action buttons */
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .action-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            color: #e0e0e0;
+            padding: 12px 24px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .action-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .action-btn.submit {
+            background: linear-gradient(135deg, #f6d365, #fda085);
+            border-color: transparent;
+            color: #1a1a2e;
+        }
+
+        .action-btn.submit:hover {
+            box-shadow: 0 4px 15px rgba(253, 160, 133, 0.3);
+        }
+
+        /* Found words */
+        .found-words-section {
+            margin-top: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 16px;
+        }
+
+        .found-words-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .found-words-header h4 {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.6);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .found-words-toggle {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .found-words-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .found-word {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            animation: popIn 0.3s ease;
+        }
+
+        .found-word.pangram {
+            background: linear-gradient(135deg, rgba(246, 211, 101, 0.3), rgba(253, 160, 133, 0.3));
+            border: 1px solid rgba(246, 211, 101, 0.5);
+        }
+
+        /* New puzzle button */
+        .new-puzzle-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #e0e0e0;
+            padding: 8px 16px;
+            font-size: 0.8rem;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .new-puzzle-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .shake {
+            animation: shake 0.3s ease;
+        }
+
+        /* Responsive */
+        @media (max-width: 400px) {
+            .hex-btn {
+                width: 58px;
+                height: 58px;
+                font-size: 1.3rem;
+            }
+
+            .current-word {
+                font-size: 1.6rem;
+            }
+
+            #title-screen h1 {
+                font-size: 2rem;
+            }
+        }
+
+        /* Win screen */
+        #win-screen {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        #win-screen h2 {
+            font-size: 2.2rem;
+            background: linear-gradient(135deg, #f6d365, #fda085);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        #win-screen .trophy {
+            font-size: 5rem;
+            margin: 20px 0;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin: 24px 0;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .stat-box .value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #f6d365;
+        }
+
+        .stat-box .label {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 4px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Title Screen -->
+        <div id="title-screen">
+            <div class="bee-icon">&#x1F41D;</div>
+            <h1>Spelling Bee</h1>
+            <p style="color: rgba(255,255,255,0.6); margin-bottom: 10px;">Word Builder</p>
+            <div class="instructions">
+                <h3>How to Play</h3>
+                <ul>
+                    <li>Create words using the 7 given letters</li>
+                    <li>Every word <strong>must</strong> include the <span style="color:#f6d365;">center letter</span></li>
+                    <li>Words must be at least <strong>4 letters</strong> long</li>
+                    <li>Letters can be reused in a word</li>
+                    <li>Score: 1pt for 4-letter words, 1pt per letter for longer words</li>
+                    <li><strong>Pangrams</strong> (using all 7 letters) earn +7 bonus!</li>
+                    <li>Reach <strong>Genius</strong> rank to win!</li>
+                </ul>
+            </div>
+            <button class="btn" onclick="startGame()">Start Game</button>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="game-screen">
+            <button class="new-puzzle-btn" onclick="newPuzzle()">New Puzzle</button>
+            <div class="game-header">
+                <div class="score-display">Score: <span id="score">0</span></div>
+                <div class="rank-display" id="rank-display">Beginner</div>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div class="rank-markers">
+                <span class="active">Beginner</span>
+                <span>Good</span>
+                <span>Nice</span>
+                <span>Great</span>
+                <span>Amazing</span>
+                <span>Genius</span>
+            </div>
+
+            <div class="input-area">
+                <div class="current-word" id="current-word"><span class="cursor"></span></div>
+            </div>
+
+            <div class="message" id="message"></div>
+
+            <div class="honeycomb" id="honeycomb"></div>
+
+            <div class="action-buttons">
+                <button class="action-btn" onclick="deleteLetter()">Delete</button>
+                <button class="action-btn" onclick="shuffleLetters()">Shuffle</button>
+                <button class="action-btn submit" onclick="submitWord()">Enter</button>
+            </div>
+
+            <div class="found-words-section">
+                <div class="found-words-header" onclick="toggleWords()">
+                    <h4>Found Words: <span id="word-count">0</span></h4>
+                    <span class="found-words-toggle" id="toggle-icon">&#x25BC;</span>
+                </div>
+                <div class="found-words-list" id="found-words-list"></div>
+            </div>
+        </div>
+
+        <!-- Win Screen -->
+        <div id="win-screen">
+            <div class="trophy">&#x1F3C6;</div>
+            <h2>Genius!</h2>
+            <p style="color: rgba(255,255,255,0.7);">You've reached the highest rank!</p>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="value" id="final-score">0</div>
+                    <div class="label">Total Score</div>
+                </div>
+                <div class="stat-box">
+                    <div class="value" id="final-words">0</div>
+                    <div class="label">Words Found</div>
+                </div>
+                <div class="stat-box">
+                    <div class="value" id="final-pangrams">0</div>
+                    <div class="label">Pangrams</div>
+                </div>
+                <div class="stat-box">
+                    <div class="value" id="final-longest">-</div>
+                    <div class="label">Longest Word</div>
+                </div>
+            </div>
+            <button class="btn" onclick="newPuzzle()" style="margin-top: 10px;">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        // Word list - curated common English words (4+ letters)
+        const WORD_LIST = [
+            "able","about","above","accept","account","achieve","across","action","active","actual",
+            "added","address","admit","adult","advance","advice","affect","afford","afraid","after",
+            "again","against","agent","agree","ahead","allow","almost","alone","along","already",
+            "also","always","among","amount","ancient","angel","anger","angle","angry","animal",
+            "announce","annual","another","answer","apart","appeal","appear","apple","apply","approach",
+            "area","argue","arise","army","around","arrange","arrive","article","aside","aspect",
+            "assign","assist","assume","attach","attack","attempt","attend","audience","author","avoid",
+            "award","aware","awful","baby","back","background","balance","ball","band","bank",
+            "bare","barn","base","basic","basis","batch","bath","battle","bear","beat",
+            "beautiful","became","because","become","been","before","began","begin","beginning","behind",
+            "being","believe","belong","below","bench","beneath","benefit","best","better","between",
+            "beyond","bind","bird","birth","bite","black","blade","blame","blank","blast",
+            "blaze","bleed","blend","bless","blind","block","blood","blow","blue","board",
+            "boat","body","bolt","bomb","bond","bone","book","border","born","both",
+            "bottom","bound","bowl","brain","branch","brave","bread","break","breath","breed",
+            "brick","bridge","brief","bright","bring","broad","broke","broken","brother","brown",
+            "brush","build","built","bulk","burn","burst","busy","buyer","cabin","cable",
+            "cake","call","calm","came","camp","capable","capital","captain","capture","card",
+            "care","careful","carry","case","cash","cast","catch","cause","cell","center",
+            "central","certain","chain","chair","chairman","challenge","chamber","champion","chance","change",
+            "channel","chapter","charge","chart","chase","cheap","check","cheek","chest","chief",
+            "child","chin","chip","choice","choose","church","circle","citizen","civil","claim",
+            "class","clean","clear","climb","clinical","clock","clone","close","closely","cloth",
+            "cloud","club","clue","coach","coast","code","cold","collapse","collect","college",
+            "colony","color","column","combination","combine","come","comfort","command","comment","commercial",
+            "commission","commit","common","communicate","community","company","compare","compete","complain","complete",
+            "complex","component","computer","concentrate","concern","condition","conduct","conference","confidence","confirm",
+            "conflict","congress","connect","connection","conscious","consider","consist","constant","construct","consultant",
+            "consumer","contact","contain","content","context","continue","contract","contrast","contribute","control",
+            "convention","conversation","convince","cool","cope","copy","core","corner","correct","cost",
+            "could","council","count","counter","country","county","couple","courage","course","court",
+            "cover","crack","craft","crash","crazy","cream","create","credit","crew","crime",
+            "crisis","critic","critical","crop","cross","crowd","crucial","crush","cultural","culture",
+            "cure","current","curve","custom","cycle","daily","damage","dance","danger","dare",
+            "dark","data","database","date","daughter","dawn","deal","dear","death","debate",
+            "debt","decade","decent","decide","decision","declare","decline","deep","deeply","defeat",
+            "defend","define","degree","delay","deliver","demand","democracy","demonstrate","deny","department",
+            "depend","deposit","depth","derive","describe","desert","design","desire","desk","despite",
+            "destroy","detail","detect","determine","develop","device","devote","dialogue","diamond","diet",
+            "differ","difference","difficult","digital","dimension","direct","direction","director","dirt","disappear",
+            "discipline","discover","discuss","discussion","disease","dish","dismiss","display","distance","distinct",
+            "distribute","district","diverse","divide","division","doctor","document","domain","domestic","dominant",
+            "door","double","doubt","down","draft","drag","drain","drama","dramatic","draw",
+            "drawing","dream","dress","drift","drink","drive","drop","drug","drunk","dual",
+            "duration","during","dust","duty","each","eager","earn","earth","ease","easily",
+            "east","eastern","easy","edge","edition","editor","educate","education","effect","effective",
+            "efficiency","effort","eight","either","elderly","elect","election","element","eliminate","elite",
+            "else","elsewhere","embrace","emerge","emergency","emission","emotion","emphasis","empire","employ",
+            "employee","employer","employment","empty","enable","encounter","encourage","endless","enemy","energy",
+            "enforce","engage","engine","engineer","enjoy","enormous","enough","ensure","enter","entire",
+            "entrance","entry","environment","episode","equal","equipment","error","escape","especially","essay",
+            "essential","establish","estate","estimate","evaluate","even","evening","event","eventually","ever",
+            "every","everybody","everyday","everyone","everything","evidence","evil","evolution","evolve","exact",
+            "exactly","examine","example","excellent","except","exchange","exciting","exercise","exhibit","exist",
+            "expand","expansion","expect","expense","experience","experiment","expert","explain","explanation","explore",
+            "explosion","export","expose","exposure","extend","extension","extensive","extent","external","extra",
+            "extreme","face","facility","fact","factor","factory","fail","failure","fair","fairly",
+            "faith","fall","false","familiar","family","famous","fantasy","farm","farmer","fashion",
+            "fast","fate","father","fault","favor","fear","feature","federal","feed","feel",
+            "female","fence","fiction","field","fifth","fight","fighter","figure","file","fill",
+            "film","final","finally","finance","financial","find","finding","fine","finger","finish",
+            "fire","firm","first","fish","flag","flame","flash","flat","flavor","flee",
+            "flesh","flight","float","flood","floor","flow","flower","fluid","flush","focus",
+            "folk","follow","food","foot","football","force","foreign","forest","forever","forget",
+            "form","formal","formation","former","formula","forth","fortune","forward","found","foundation",
+            "founder","four","fourth","frame","framework","free","freedom","freeze","french","frequent",
+            "fresh","friend","front","fruit","fuel","fulfill","full","fully","function","fund",
+            "fundamental","funding","furthermore","future","gain","galaxy","game","gang","garage","garden",
+            "garlic","gate","gather","gave","gender","gene","general","generate","generation","genetic",
+            "genius","genre","gentle","genuine","ghost","giant","gift","girl","give","given",
+            "glad","glance","glass","global","glory","goal","gold","golden","gone","good",
+            "govern","government","governor","grab","grace","grade","grain","grand","grant","grass",
+            "grave","gray","great","green","grew","ground","group","grow","growing","growth",
+            "guarantee","guard","guess","guest","guide","guilty","guitar","gulf","habit","hair",
+            "half","hall","hand","handle","hang","happen","happy","hard","hardly","harm",
+            "hate","have","head","headline","health","healthy","hear","hearing","heart","heat",
+            "heavy","height","held","hello","help","helpful","here","heritage","hero","hide",
+            "high","highlight","highly","hill","hint","hire","history","hold","hole","holy",
+            "home","honest","honor","hope","horror","horse","host","hostile","hotel","hour",
+            "house","household","housing","huge","human","humor","hundred","hungry","hunt","hurt",
+            "husband","idea","ideal","identify","identity","ignore","illegal","illustrate","image","imagine",
+            "immediate","immigrant","impact","implement","implication","imply","import","important","impose","impossible",
+            "impress","impression","impressive","improve","incident","include","income","increase","increasingly","incredible",
+            "indeed","independent","index","indicate","individual","industrial","industry","infant","infection","inflation",
+            "influence","inform","information","initial","initiative","injury","inner","innocent","innovation","input",
+            "inquiry","inside","insight","insist","install","instance","instead","institution","insurance","intend",
+            "intention","interest","interesting","internal","international","internet","interpret","intervention","interview","introduce",
+            "introduction","invade","invasion","invest","investigate","investigation","investigator","investment","investor","invisible",
+            "invitation","invite","involve","iron","island","isolate","isolation","issue","item","itself",
+            "jacket","jail","jazz","jewish","join","joint","joke","journal","journalist","journey",
+            "judge","judgment","juice","jump","junior","jury","justice","justify","keen","keep",
+            "kept","kick","kill","kind","king","kiss","kitchen","knee","knew","knife",
+            "knock","know","knowledge","label","labor","lack","lake","land","landscape","language",
+            "large","largely","last","late","later","latest","latter","laugh","launch","lawn",
+            "lawyer","layer","lead","leader","leadership","leading","leaf","league","lean","learn",
+            "learning","least","leather","leave","left","legacy","legal","legend","legislation","legitimate",
+            "lend","length","less","lesson","letter","level","liberal","liberty","library","license",
+            "life","lifestyle","lifetime","lift","light","like","likely","limit","limitation","limited",
+            "line","link","lion","list","listen","literally","literary","literature","little","live",
+            "living","load","loan","local","locate","location","lock","long","look","loose",
+            "lord","lose","loss","lost","lots","loud","love","lovely","lover","luck",
+            "lunch","lung","machine","magazine","magic","mail","main","mainly","maintain","major",
+            "majority","make","male","mall","manage","management","manager","manner","manufacturer","many",
+            "mark","market","marketing","marriage","married","marry","mask","mass","massive","master",
+            "match","material","math","matter","mayor","meal","mean","meaning","measure","mechanism",
+            "media","medical","medicine","medium","meet","meeting","member","membership","memory","mental",
+            "mention","mentor","menu","mere","merely","merge","message","metal","method","middle",
+            "might","military","milk","million","mind","mine","minister","minor","minority","minute",
+            "miracle","mirror","miss","mission","mistake","mixed","mixture","model","moderate","modern",
+            "modify","moment","money","monitor","month","mood","moon","moral","more","moreover",
+            "morning","mortgage","most","mostly","mother","motion","motivation","mount","mountain","mouse",
+            "mouth","move","movement","movie","much","multiple","murder","muscle","museum","music",
+            "musical","muslim","must","mutual","myself","mystery","myth","nail","name","narrow",
+            "nation","national","natural","naturally","nature","near","nearby","nearly","necessarily","necessary",
+            "neck","need","negative","negotiate","negotiation","neighbor","neighborhood","neither","nerve","network",
+            "never","nevertheless","newly","news","newspaper","next","nice","night","nine","nobody",
+            "nod","noise","nomination","none","nonetheless","normal","normally","north","northern","nose",
+            "note","nothing","notice","notion","novel","nuclear","number","numerous","nurse","nutrition",
+            "object","objective","obligation","observation","observe","observer","obstacle","obtain","obvious","obviously",
+            "occasion","occasionally","occupation","occupy","occur","ocean","odds","offense","offensive","offer",
+            "office","officer","official","often","okay","once","ongoing","online","only","open",
+            "opening","operate","operation","operator","opinion","opponent","opportunity","oppose","opposite","opposition",
+            "option","orange","order","ordinary","organic","organization","organize","orientation","origin","original",
+            "other","otherwise","ought","ourselves","outcome","output","outside","overcome","overlook","owner",
+            "pace","pack","package","page","paid","pain","paint","painting","pair","pale",
+            "palm","panel","panic","paper","parent","park","parking","part","participate","participation",
+            "particular","particularly","partly","partner","partnership","party","pass","passage","passenger","passion",
+            "past","path","patient","pattern","pause","payment","peace","peak","peer","penalty",
+            "pension","people","percent","percentage","perception","perfect","perfectly","perform","performance","perhaps",
+            "period","permanent","permission","permit","person","personal","personally","perspective","phase","phenomenon",
+            "philosophy","phone","photo","photograph","phrase","physical","physician","piano","pick","picture",
+            "piece","pilot","pine","pink","pipe","pitch","place","plan","plane","planet",
+            "planning","plant","plastic","plate","platform","play","player","please","pleasure","plenty",
+            "plot","plus","pocket","poem","poet","poetry","point","pole","police","policy",
+            "political","politician","politics","poll","pollution","pool","poor","popular","population","porch",
+            "port","portion","portrait","pose","position","positive","possibility","possible","possibly","post",
+            "potential","potentially","pound","pour","poverty","power","powerful","practical","practice","pray",
+            "prayer","precisely","predict","prefer","preference","pregnancy","preparation","prepare","presence","present",
+            "presentation","preserve","presidency","president","presidential","press","pressure","pretend","pretty","prevent",
+            "previous","previously","price","pride","priest","primarily","primary","prime","prince","princess",
+            "principal","principle","print","prior","priority","prison","prisoner","privacy","private","privilege",
+            "probably","probe","problem","procedure","proceed","process","produce","producer","product","production",
+            "profession","professional","professor","profile","profit","program","progress","project","prominent","promise",
+            "promote","promotion","proof","proper","properly","property","proportion","proposal","propose","prospect",
+            "protect","protection","protein","protest","proud","prove","provide","provider","province","provision",
+            "psychological","public","publication","pull","punch","punishment","purchase","pure","purple","purpose",
+            "pursue","push","qualify","quality","quarter","queen","question","quick","quickly","quiet",
+            "quietly","quit","quite","quote","race","racial","radical","radio","rage","rail",
+            "rain","raise","range","rank","rapid","rapidly","rare","rarely","rate","rather",
+            "rating","reach","react","reaction","read","reader","reading","ready","real","realistic",
+            "reality","realize","really","reason","reasonable","recall","receive","recent","recently","recognize",
+            "recommend","recommendation","record","recover","recovery","recruit","reduce","reduction","refer","reference",
+            "reflect","reflection","reform","refrigerator","regard","regarding","regime","region","regional","register",
+            "regular","regularly","regulate","regulation","reinforce","reject","relate","relation","relationship","relative",
+            "relatively","relax","release","relevant","relief","religion","religious","reluctant","rely","remain",
+            "remaining","remark","remarkable","remember","remind","remote","remove","repeat","replace","report",
+            "reporter","represent","representation","representative","republic","republican","reputation","request","require","requirement",
+            "research","researcher","resident","resist","resistance","resolution","resolve","resort","resource","respond",
+            "response","responsibility","responsible","rest","restaurant","restore","restriction","result","retain","retire",
+            "retirement","return","reveal","revenue","review","revolution","rhythm","rice","rich","ride",
+            "rifle","right","ring","rise","risk","river","road","rock","role","roll",
+            "romantic","roof","room","root","rope","rose","rough","round","route","routine",
+            "royal","rule","running","rural","rush","sacred","safe","safety","sake","salad",
+            "salary","sale","salt","same","sample","sand","satellite","satisfy","save","scale",
+            "scandal","scene","schedule","scheme","scholar","scholarship","school","science","scientific","scientist",
+            "scope","score","screen","script","search","season","seat","second","secret","secretary",
+            "section","sector","secure","security","seed","seek","seem","segment","seize","select",
+            "selection","self","sell","senior","sense","sensitive","sentence","separate","sequence","series",
+            "serious","seriously","serve","service","session","settle","settlement","seven","several","severe",
+            "shade","shadow","shake","shall","shame","shape","share","sharp","shed","sheer",
+            "sheet","shelf","shell","shelter","shift","shine","ship","shirt","shock","shoot",
+            "shop","shopping","shore","short","shortly","shot","should","shoulder","shout","show",
+            "shower","shut","sick","side","sight","sign","signal","significance","significant","significantly",
+            "silence","silent","silver","similar","similarly","simple","simply","since","sing","singer",
+            "single","sister","site","situation","sixth","size","skill","skin","sleep","slice",
+            "slide","slight","slightly","slip","slow","slowly","small","smart","smell","smile",
+            "smoke","smooth","snap","snow","social","society","soft","software","soil","solar",
+            "soldier","solid","solution","solve","somebody","somehow","someone","something","sometimes","somewhat",
+            "somewhere","song","soon","sorry","sort","soul","sound","source","south","southern",
+            "space","speak","speaker","special","specialist","specific","specifically","speech","speed","spend",
+            "spin","spirit","split","spokesman","sport","spot","spread","spring","square","squeeze",
+            "stability","stable","staff","stage","stair","stake","stand","standard","standing","star",
+            "stare","start","state","statement","station","status","stay","steady","steal","steam",
+            "steel","steep","stem","step","stick","still","stock","stomach","stone","stop",
+            "store","storm","story","straight","strange","stranger","strategic","strategy","stream","street",
+            "strength","stress","stretch","strict","strike","string","strip","stroke","strong","strongly",
+            "structure","struggle","student","studio","study","stuff","style","subject","submit","subsequent",
+            "substance","substantial","succeed","success","successful","such","sudden","suddenly","suffer","sufficient",
+            "suggest","suggestion","suit","suitable","summer","summit","supply","support","supporter","suppose",
+            "sure","surely","surface","surprise","surround","survey","survival","survive","survivor","suspect",
+            "suspend","sustain","swear","sweet","swim","swing","switch","symbol","symptom","system",
+            "table","tactic","tail","take","tale","talent","talk","tall","tank","tape",
+            "target","task","taste","teach","teacher","teaching","team","tear","technical","technique",
+            "technology","television","tell","temperature","tend","tendency","term","terms","terrible","terror",
+            "test","testify","testing","text","thank","that","theater","their","them","theme",
+            "themselves","then","theory","therapy","there","therefore","thick","thin","thing","think",
+            "thinking","third","thirty","this","those","though","thought","thousand","threat","threaten",
+            "three","throat","through","throughout","throw","thus","ticket","tight","till","time",
+            "tiny","tire","title","today","together","tomorrow","tone","tonight","tool","tooth",
+            "topic","total","totally","touch","tough","tour","tourist","toward","towards","tower",
+            "town","track","trade","tradition","traditional","traffic","trail","train","training","transfer",
+            "transform","transformation","transition","translate","transmission","transport","travel","treat","treatment","treaty",
+            "tree","trend","trial","tribe","trick","trip","triumph","troop","trouble","truck",
+            "true","truly","trust","truth","turn","twelve","twice","twin","type","typical",
+            "typically","ugly","ultimate","ultimately","unable","uncle","under","undergo","understand","understanding",
+            "unemployment","unfair","unfortunate","unfortunately","uniform","union","unique","unit","unite","unity",
+            "universal","universe","university","unknown","unless","unlike","unlikely","until","unusual","upon",
+            "upper","urban","urge","used","useful","user","usual","usually","utility","vacation",
+            "valley","valuable","value","variable","variation","variety","various","vast","vehicle","venture",
+            "version","versus","very","vessel","veteran","victim","victory","video","view","viewer",
+            "village","violation","violence","violent","virtual","virtually","virtue","visible","vision","visit",
+            "visitor","visual","vital","voice","volume","voluntary","volunteer","vote","voter","vulnerable",
+            "wage","wait","wake","walk","wall","want","warm","warn","warning","wash",
+            "waste","watch","water","wave","weapon","wear","weather","week","weekend","weigh",
+            "weight","welcome","welfare","well","west","western","what","whatever","wheel","when",
+            "whenever","where","whereas","wherever","whether","which","while","whisper","white","whole",
+            "whom","whose","wide","widely","wife","wild","will","willing","wind","window",
+            "wine","wing","winner","winter","wire","wisdom","wise","wish","with","withdraw",
+            "within","without","witness","woman","wonder","wood","wooden","word","work","worker",
+            "working","works","workshop","world","worried","worry","worse","worst","worth","would",
+            "wound","wrap","write","writer","writing","wrong","yard","yeah","year","yellow",
+            "yesterday","yield","young","yours","yourself","youth","zone",
+            "abandon","absorb","abstract","abuse","academic","academy","accelerate","acceptable","accessible",
+            "accommodate","accompany","accomplish","accordance","accumulate","accurate","accuse","adapt","adequate",
+            "adjust","administration","administrator","admire","admission","adolescent","adoption","advocate","aesthetic",
+            "affordable","agenda","aggregate","aggressive","agriculture","aircraft","airline","airport","alcohol",
+            "alliance","allocate","alongside","alternative","altogether","aluminum","ambitious","amendment","amid",
+            "analyze","ancestor","animation","anniversary","anticipate","anxiety","anybody","anymore","anything",
+            "anywhere","apartment","apologize","apparatus","apparent","appetite","appliance","applicable","applicant",
+            "application","appointment","appreciation","apprentice","approximate","arbitrary","architect","architecture","arena",
+            "arithmetic","arrangement","array","articulate","artificial","assault","assemble","assembly","assertion",
+            "assessment","asset","assurance","astronaut","athlete","atmosphere","atomic","attribute","auction",
+            "authentic","authorize","autobiography","automobile","autonomous","availability","avenue","aviation","awkward",
+            "backbone","backdrop","bacteria","badge","balanced","ballet","balloon","bandwidth","bargain",
+            "barrel","basement","basket","basketball","battlefield","beam","beard","beast","behavioral",
+            "beloved","benchmark","beneficial","beside","betrayal","beverage","bias","biography","biology",
+            "bishop","bizarre","blade","blast","bleeding","blessing","bloom","blueprint","bonus",
+            "bookstore","boom","boost","booth","boundary","bounce","bracket","brake","brave",
+            "breakdown","breakthrough","breast","breed","breeze","brewery","bride","brilliant","broadcast",
+            "broker","bronze","browse","browser","brutal","bubble","bucket","buddy","buffalo",
+            "builder","bullet","bunch","burden","bureaucracy","burial","burning","burst","butterfly",
+            "cabin","calcium","calendar","calling","campaign","canal","cancel","candidate","canvas",
+            "capability","capitalism","carbon","cargo","carnival","carpet","carrier","carve","casual",
+            "catalog","category","cattle","caution","cease","celebrate","celebrity","cellular","cement",
+            "ceremony","certainty","certification","chaos","characteristic","charity","charm","charter","chemical",
+            "chemistry","childhood","chocolate","chronic","chunk","cinema","circuit","circular","circumstance",
+            "citation","civilian","civilization","clarity","clash","classic","classification","classroom","click",
+            "cliff","climate","clinic","clip","closure","cluster","coalition","coastal","cognitive",
+            "coincide","collaboration","collective","collector","colonial","combat","comeback","comedy","commander",
+            "commence","commentary","commerce","commissioner","commodity","commonly","commonwealth","communicate","companion",
+            "comparable","comparative","compelling","compensate","compensation","competence","competitive","competitor","complaint",
+            "complement","complexity","compliance","complicate","complication","composer","composition","comprehensive","comprise",
+            "compromise","computation","compute","conceive","conception","concrete","condemn","configuration","confine",
+            "confirmation","confront","confusion","congregation","conjunction","consciousness","consensus","consequence","conservation",
+            "conservative","consistently","conspiracy","constitute","constitution","constitutional","constraint","consultation","consumption",
+            "contemplate","contemporary","continent","contractor","contradiction","controversial","controversy","convenience","conventional",
+            "conversion","conviction","cookie","cooperation","cooperative","coordinate","coordination","copyright","cord",
+            "corporate","corporation","correction","correlation","correspond","correspondence","correspondent","corridor","corruption",
+            "cosmic","costume","cotton","counsel","counseling","countryside","courtesy","coverage","craft",
+            "creativity","creature","credibility","cricket","criminal","criterion","crop","crossing","crucial",
+            "crude","cruise","curiosity","curious","curriculum","curtain","custody","customize","cutting",
+            "dancer","darkness","deadline","dealer","debris","debut","declaration","decoration","deem",
+            "defender","defensive","deficit","definitely","deliberate","deliberately","delicate","demonstration","denial",
+            "dense","departure","deployment","depression","deputy","descriptor","designer","desktop","desperate",
+            "destruction","detector","developer","developmental","diabetes","diagnosis","dialogue","diary","dictate",
+            "dignity","dilemma","dimension","diminish","diplomat","disability","disagree","disappointment","disclose",
+            "discourse","discrimination","disorder","dispatch","displacement","disposal","dispute","disrupt","dissolve",
+            "distinctive","distinguish","distort","distress","disturb","documentation","dominance","donate","donation",
+            "donor","downtown","drainage","dramatically","drift","drought","dumb","dump","duration",
+            "dynamic","eager","earthquake","ecological","ecosystem","editorial","effectiveness","efficiency","elaborate",
+            "electoral","electrical","electricity","electronic","elementary","elevation","eligible","embassy","emission",
+            "emotional","emperor","empirical","empower","enable","enact","encompass","endless","endorse",
+            "endure","engagement","enhance","enjoyable","enterprise","enthusiasm","enthusiastic","entrepreneur","envelope",
+            "equality","equip","equivalent","erosion","essence","ethical","evaluate","evaluation","everyday",
+            "evident","exaggerate","excellence","exceptional","excessive","exclusively","execution","executive","exemption",
+            "exhaust","exile","exotic","expenditure","expertise","explicit","explicitly","exploit","exploitation",
+            "exploration","explosive","extensively","exterior","extract","extraordinary","fabric","facial","faction",
+            "faculty","fame","farewell","fascinating","feedback","fellow","feminist","festival","fiber",
+            "fierce","fighter","filter","finding","firearm","fiscal","fisherman","fixture","flame",
+            "flexibility","flexible","flock","flourish","fluid","forecast","foreigner","formation","formerly",
+            "formulate","foster","fraction","fragment","franchise","fraud","freely","frequency","freshman",
+            "friendship","frontier","frustrate","frustration","fulfill","functional","furniture","galaxy","gambling",
+            "garment","gasoline","gathering","gear","generous","genetic","gentleman","genuine","gesture",
+            "girlfriend","glimpse","goddess","governance","grace","gradual","gradually","graduate","grain",
+            "grammar","graphic","grasp","grateful","grave","gravity","greenhouse","greeting","grief",
+            "grocery","gross","guardian","guerrilla","guidance","guideline","guilt","guitar","habitat",
+            "halfway","hallway","handful","handler","handy","harbor","hardcore","harvest","hatred",
+            "hazard","heading","headline","headquarters","healing","healthcare","helpful","heritage","hierarchy",
+            "highway","historian","historic","holder","homeland","homework","horizon","horn","horrible",
+            "hostage","hostile","household","hurricane","hydrogen","hypothesis","identical","ideology","ignorance",
+            "illuminate","illusion","illustration","imagination","immigrant","immunity","implication","implicit","importantly",
+            "impressive","imprisonment","inadequate","inappropriate","incentive","inclusion","incorporate","independence","indication",
+            "indicator","indictment","indigenous","indirect","inevitable","inevitably","influential","infrastructure","inherent",
+            "inheritance","initially","initiate","injection","innovation","innovative","inspect","inspection","inspiration",
+            "inspire","installation","institutional","instruction","instructor","instrument","instrumental","insufficient","insurance",
+            "integration","intellectual","intelligence","intensive","interact","interaction","interface","interference","interior",
+            "intermediate","interpretation","intersection","intervention","intimate","invasion","inventory","investigation","invisible",
+            "involvement","isolation","journalism","judgment","judicial","jurisdiction","keeper","kidney","kingdom",
+            "knowledge","laboratory","landmark","landscape","laptop","lately","latitude","laughter","lawsuit",
+            "leadership","lean","legend","legendary","legislation","legislative","legislature","legitimate","leisure",
+            "lemon","lever","liable","liberal","liberation","lifetime","lightning","likelihood","limitation",
+            "linear","lineup","linguistic","literacy","livestock","logic","logical","longtime","loyalty",
+            "lumber","luxury","machinery","magical","magnificent","mainstream","makeup","mandate","manifest",
+            "manipulation","mansion","manufacture","manuscript","marathon","margin","marine","marker","marketplace",
+            "mask","massacre","massive","mate","mathematics","meaningful","measurement","mechanism","meditation",
+            "membership","memorial","merchant","mercy","merit","metabolism","metaphor","methodology","migration",
+            "milestone","militia","mineral","minimal","minimize","ministry","miracle","mislead","missionary",
+            "mobile","mobility","moderate","modification","molecular","momentum","monetary","monopoly","monument",
+            "moreover","mortality","mortgage","motivate","motivation","municipal","muscle","mutation","mystery",
+            "myth","narrative","nationwide","navigation","necessity","negotiate","negotiation","neighboring","neutral",
+            "newsletter","nightmare","noble","nominal","nonetheless","nonprofit","nonsense","norm","notable",
+            "notebook","notification","notorious","nowadays","nuclear","nursing","nutrition","objection","obligation",
+            "obsess","obstacle","occupation","odds","offering","offspring","ongoing","operator","operational",
+            "opponent","optical","optimism","optimistic","orbit","organic","organizational","orientation","outbreak",
+            "outdoor","outlet","outline","outlook","output","outreach","outstanding","overcome","overlook",
+            "oversee","overtime","overview","ownership","oxygen","pacific","packaging","palm","parade",
+            "parallel","parental","parish","parking","partial","partially","participant","participation","partnership",
+            "passionate","passive","patience","patrol","patron","payment","peacekeeping","peak","peasant",
+            "peculiar","pediatric","penalty","penetrate","pension","perceive","perception","permanent","persist",
+            "persistent","personnel","petition","phenomenon","philosophy","physician","pickup","pioneer","pipeline",
+            "plaintiff","plantation","platform","plea","plead","pledge","plot","plunge","poem",
+            "policeman","portfolio","portion","portrait","portray","poster","postpone","pot","pottery",
+            "poultry","practitioner","prayer","precious","prediction","predominantly","preference","pregnancy","prejudice",
+            "preliminary","premiere","premium","prescription","preservation","presidency","presumably","prevention","previously",
+            "primitive","princess","principal","privilege","probable","problematic","proceeds","productivity","profession",
+            "profitable","profound","programmer","prohibition","projection","prominence","promising","promotion","prompt",
+            "pronounce","propaganda","proportion","prosecution","prosecutor","prosperity","protective","protocol","province",
+            "provoke","proxy","psychiatric","publication","publicity","pursuit","puzzle","qualification",
+            "quarterly","questionnaire","quota","rack","radiation","radical","railroad","rally","random",
+            "ranking","rape","ratio","rational","reaction","readily","realistic","realm","rear",
+            "reasoning","rebellion","rebuild","recession","recipient","recognition","reconstruction","recording","recovery",
+            "recreation","recruit","recruitment","referendum","reflection","refugee","regardless","regime","registration",
+            "regulatory","rehabilitation","reinforce","rejection","relevance","reliability","reliance","religion","reluctance",
+            "remainder","remedy","renewal","rental","replacement","replica","representation","reproductive","reputation",
+            "resemblance","reservation","residence","residential","resignation","resistance","respective","restoration","restraint",
+            "restriction","retailer","retention","retreat","revelation","revenge","rhetoric","rhythm","rifle",
+            "rigid","riot","ritual","rival","robbery","robot","romance","rotation","roughly",
+            "router","royalty","rubber","ruling","rumor","runway","rural","sacred","sacrifice",
+            "saint","sake","salvation","sanction","satellite","satisfaction","sauce","scandal","scenario",
+            "scholarship","sculpture","seasonal","secondly","secular","segment","sensation","sensitivity","sentiment",
+            "separation","sergeant","setup","severely","sexuality","shallow","shareholder","shed","shipping",
+            "shortage","shortly","sibling","sidewalk","signature","significance","silicon","silver","simulate",
+            "simulation","simultaneously","situated","skeptic","sketch","skilled","slavery","slice","slight",
+            "slim","slot","smartphone","sodium","solar","solely","solidarity","solitary","solo",
+            "someday","sometime","sophisticated","sovereignty","spark","specification","specimen","spectacle","spectrum",
+            "sphere","spill","spine","spiritual","spokesman","sponsor","spotlight","spouse","squad",
+            "stability","stadium","stain","stake","standalone","standing","stark","startup","statistics",
+            "statue","steadily","steep","steering","stem","stereotype","steward","stimulus","stir",
+            "storage","straightforward","strain","strand","stranger","strategic","streak","strengthen","stride",
+            "strike","string","stripe","strive","structural","stumble","submit","subscriber","subscription",
+            "subsidiary","subsidy","substance","substantial","substitute","subtle","suburban","successor","suicide",
+            "suit","summit","sunlight","sunrise","superb","supervision","supplement","supporter","supposedly",
+            "supreme","surgeon","surplus","surrounding","surveillance","survival","survivor","suspect","suspension",
+            "suspicious","sustain","sustainable","swallow","sweep","swing","switch","symbolic","sympathetic",
+            "syndrome","synthesis","systematic","tackle","tactic","tale","talent","tangible","taxpayer",
+            "teamwork","telescope","temporarily","tenant","tender","tension","terminal","terribly","territorial",
+            "territory","testimony","texture","thankful","theatrical","theft","theme","therapist","thereby",
+            "thesis","threshold","thrive","tide","timber","timeline","tissue","tolerance","tomorrow",
+            "toolbar","tornado","torture","tourism","toxic","trademark","trail","trait","transaction",
+            "transcript","transformation","transgender","transition","translate","transmission","transparency","transplant","trauma",
+            "treasury","tremendous","tribal","tribute","trigger","tropical","truly","trustee","tuberculosis",
+            "tuition","tumor","tunnel","turbulence","twin","ugly","umbrella","uncertain","uncertainty",
+            "unconstitutional","undergraduate","underground","undermine","undertake","undoubtedly","unemployment","unexpected","unfold",
+            "unfortunate","uniform","unify","unintended","unique","unity","universal","unlock","unprecedented",
+            "unofficial","upcoming","update","upgrade","uphold","upon","usage","utility","utilize",
+            "vacation","vaccine","valid","validity","variable","variation","venture","verbal","verdict",
+            "veteran","viable","vibrant","violation","virtue","vocal","voluntary","vulnerability","vulnerable",
+            "wagon","wander","warfare","warrant","warrior","weakness","wealthy","weave","weird",
+            "welfare","whatsoever","wheelchair","wherever","whistle","wholesale","widen","widespread","wildlife",
+            "willing","wisdom","withdraw","withdrawal","workforce","workshop","worthwhile","worship","worthy",
+            "wrap","wrestle","yoga","youngster","youthful","zone"
+        ];
+
+        // Game state
+        let gameState = {
+            letters: [],
+            centerLetter: '',
+            currentWord: '',
+            foundWords: [],
+            score: 0,
+            maxScore: 0,
+            validWords: [],
+            wordsListOpen: true,
+            pangrams: 0
+        };
+
+        const RANKS = [
+            { name: 'Beginner', threshold: 0 },
+            { name: 'Good', threshold: 0.05 },
+            { name: 'Nice', threshold: 0.15 },
+            { name: 'Great', threshold: 0.30 },
+            { name: 'Amazing', threshold: 0.50 },
+            { name: 'Genius', threshold: 0.70 }
+        ];
+
+        function generatePuzzle() {
+            // Pick letters that produce enough valid words
+            const vowels = 'aeiou';
+            const consonants = 'bcdfghjklmnpqrstvwxyz';
+            let bestLetters = null;
+            let bestWords = [];
+            let attempts = 0;
+
+            while (attempts < 100) {
+                attempts++;
+                // Pick 2-3 vowels and 4-5 consonants
+                let letters = new Set();
+                const numVowels = 2 + Math.floor(Math.random() * 2);
+                while (letters.size < numVowels) {
+                    letters.add(vowels[Math.floor(Math.random() * vowels.length)]);
+                }
+                while (letters.size < 7) {
+                    letters.add(consonants[Math.floor(Math.random() * consonants.length)]);
+                }
+
+                const letterArr = Array.from(letters);
+                // Try each letter as center
+                for (let i = 0; i < letterArr.length; i++) {
+                    const center = letterArr[i];
+                    const validWords = findValidWords(letterArr, center);
+                    if (validWords.length >= 20 && validWords.length <= 80) {
+                        if (validWords.length > bestWords.length) {
+                            bestWords = validWords;
+                            bestLetters = { all: letterArr, center: center };
+                        }
+                    }
+                }
+
+                if (bestWords.length >= 20) break;
+            }
+
+            // Fallback puzzle if generation fails
+            if (!bestLetters) {
+                bestLetters = { all: ['a', 'c', 'e', 'l', 'n', 'r', 't'], center: 'a' };
+                bestWords = findValidWords(bestLetters.all, bestLetters.center);
+            }
+
+            return { letters: bestLetters.all, center: bestLetters.center, words: bestWords };
+        }
+
+        function findValidWords(letters, center) {
+            const letterSet = new Set(letters);
+            return WORD_LIST.filter(word => {
+                if (word.length < 4) return false;
+                if (!word.includes(center)) return false;
+                for (let ch of word) {
+                    if (!letterSet.has(ch)) return false;
+                }
+                return true;
+            });
+        }
+
+        function isPangram(word, letters) {
+            const letterSet = new Set(letters);
+            const wordLetters = new Set(word);
+            for (let l of letterSet) {
+                if (!wordLetters.has(l)) return false;
+            }
+            return true;
+        }
+
+        function calculateWordScore(word) {
+            if (word.length === 4) return 1;
+            let score = word.length;
+            if (isPangram(word, gameState.letters)) {
+                score += 7;
+            }
+            return score;
+        }
+
+        function calculateMaxScore() {
+            let total = 0;
+            for (let word of gameState.validWords) {
+                total += calculateWordScore(word);
+            }
+            return total;
+        }
+
+        function startGame() {
+            document.getElementById('title-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'block';
+            document.getElementById('win-screen').style.display = 'none';
+            initPuzzle();
+        }
+
+        function newPuzzle() {
+            document.getElementById('win-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'block';
+            initPuzzle();
+        }
+
+        function initPuzzle() {
+            const puzzle = generatePuzzle();
+            gameState = {
+                letters: puzzle.letters,
+                centerLetter: puzzle.center,
+                currentWord: '',
+                foundWords: [],
+                score: 0,
+                maxScore: 0,
+                validWords: puzzle.words,
+                wordsListOpen: true,
+                pangrams: 0
+            };
+            gameState.maxScore = calculateMaxScore();
+
+            renderHoneycomb();
+            updateDisplay();
+            updateScore();
+            updateFoundWords();
+            clearMessage();
+        }
+
+        function renderHoneycomb() {
+            const container = document.getElementById('honeycomb');
+            const outerLetters = gameState.letters.filter(l => l !== gameState.centerLetter);
+
+            // Shuffle outer letters
+            for (let i = outerLetters.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [outerLetters[i], outerLetters[j]] = [outerLetters[j], outerLetters[i]];
+            }
+
+            container.innerHTML = `
+                <div class="hex-row">
+                    <button class="hex-btn" onclick="addLetter('${outerLetters[0]}')">${outerLetters[0]}</button>
+                    <button class="hex-btn" onclick="addLetter('${outerLetters[1]}')">${outerLetters[1]}</button>
+                </div>
+                <div class="hex-row">
+                    <button class="hex-btn" onclick="addLetter('${outerLetters[2]}')">${outerLetters[2]}</button>
+                    <button class="hex-btn center" onclick="addLetter('${gameState.centerLetter}')">${gameState.centerLetter}</button>
+                    <button class="hex-btn" onclick="addLetter('${outerLetters[3]}')">${outerLetters[3]}</button>
+                </div>
+                <div class="hex-row">
+                    <button class="hex-btn" onclick="addLetter('${outerLetters[4]}')">${outerLetters[4]}</button>
+                    <button class="hex-btn" onclick="addLetter('${outerLetters[5]}')">${outerLetters[5]}</button>
+                </div>
+            `;
+        }
+
+        function addLetter(letter) {
+            gameState.currentWord += letter;
+            updateDisplay();
+
+            // Animate button press
+            const btns = document.querySelectorAll('.hex-btn');
+            btns.forEach(btn => {
+                if (btn.textContent === letter) {
+                    btn.classList.add('pressed');
+                    setTimeout(() => btn.classList.remove('pressed'), 150);
+                }
+            });
+        }
+
+        function deleteLetter() {
+            if (gameState.currentWord.length > 0) {
+                gameState.currentWord = gameState.currentWord.slice(0, -1);
+                updateDisplay();
+            }
+        }
+
+        function shuffleLetters() {
+            renderHoneycomb();
+        }
+
+        function submitWord() {
+            const word = gameState.currentWord.toLowerCase();
+
+            if (word.length < 4) {
+                showMessage('Too short! Need 4+ letters', 'error');
+                shakeInput();
+            } else if (!word.includes(gameState.centerLetter)) {
+                showMessage('Must include center letter', 'error');
+                shakeInput();
+            } else if (gameState.foundWords.includes(word)) {
+                showMessage('Already found!', 'error');
+                shakeInput();
+            } else if (!gameState.validWords.includes(word)) {
+                // Check if letters are valid
+                const letterSet = new Set(gameState.letters);
+                let invalidLetter = false;
+                for (let ch of word) {
+                    if (!letterSet.has(ch)) {
+                        invalidLetter = true;
+                        break;
+                    }
+                }
+                if (invalidLetter) {
+                    showMessage('Invalid letters used', 'error');
+                } else {
+                    showMessage('Not in word list', 'error');
+                }
+                shakeInput();
+            } else {
+                // Valid word!
+                const points = calculateWordScore(word);
+                gameState.score += points;
+                gameState.foundWords.push(word);
+
+                if (isPangram(word, gameState.letters)) {
+                    gameState.pangrams++;
+                    showMessage(`PANGRAM! +${points} points!`, 'great');
+                } else if (word.length >= 7) {
+                    showMessage(`Excellent! +${points} points!`, 'great');
+                } else if (word.length >= 5) {
+                    showMessage(`Nice! +${points} points`, 'success');
+                } else {
+                    showMessage(`+${points}`, 'success');
+                }
+
+                updateScore();
+                updateFoundWords();
+
+                // Check for genius rank
+                if (gameState.score >= gameState.maxScore * 0.7) {
+                    setTimeout(() => showWinScreen(), 1000);
+                }
+            }
+
+            gameState.currentWord = '';
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            const display = document.getElementById('current-word');
+            if (gameState.currentWord.length === 0) {
+                display.innerHTML = '<span class="cursor"></span>';
+            } else {
+                let html = '';
+                for (let ch of gameState.currentWord) {
+                    if (ch === gameState.centerLetter) {
+                        html += `<span class="center-letter">${ch}</span>`;
+                    } else {
+                        html += ch;
+                    }
+                }
+                html += '<span class="cursor"></span>';
+                display.innerHTML = html;
+            }
+        }
+
+        function updateScore() {
+            document.getElementById('score').textContent = gameState.score;
+
+            const progress = gameState.maxScore > 0 ? gameState.score / gameState.maxScore : 0;
+            document.getElementById('progress-fill').style.width = `${Math.min(progress / 0.7 * 100, 100)}%`;
+
+            // Update rank
+            let currentRank = RANKS[0];
+            const markers = document.querySelectorAll('.rank-markers span');
+            markers.forEach((m, i) => {
+                if (progress >= RANKS[i].threshold) {
+                    currentRank = RANKS[i];
+                    m.classList.add('active');
+                } else {
+                    m.classList.remove('active');
+                }
+            });
+            document.getElementById('rank-display').textContent = currentRank.name;
+        }
+
+        function updateFoundWords() {
+            document.getElementById('word-count').textContent = gameState.foundWords.length;
+            const list = document.getElementById('found-words-list');
+            list.innerHTML = gameState.foundWords
+                .sort()
+                .map(w => {
+                    const cls = isPangram(w, gameState.letters) ? 'found-word pangram' : 'found-word';
+                    return `<span class="${cls}">${w}</span>`;
+                })
+                .join('');
+        }
+
+        function toggleWords() {
+            gameState.wordsListOpen = !gameState.wordsListOpen;
+            const list = document.getElementById('found-words-list');
+            const icon = document.getElementById('toggle-icon');
+            if (gameState.wordsListOpen) {
+                list.style.display = 'flex';
+                icon.innerHTML = '&#x25BC;';
+            } else {
+                list.style.display = 'none';
+                icon.innerHTML = '&#x25B6;';
+            }
+        }
+
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.className = 'message ' + type;
+            clearTimeout(showMessage.timeout);
+            showMessage.timeout = setTimeout(() => {
+                msg.textContent = '';
+                msg.className = 'message';
+            }, 2500);
+        }
+
+        function clearMessage() {
+            const msg = document.getElementById('message');
+            msg.textContent = '';
+            msg.className = 'message';
+        }
+
+        function shakeInput() {
+            const input = document.getElementById('current-word');
+            input.classList.add('shake');
+            setTimeout(() => input.classList.remove('shake'), 300);
+        }
+
+        function showWinScreen() {
+            document.getElementById('game-screen').style.display = 'none';
+            document.getElementById('win-screen').style.display = 'block';
+            document.getElementById('final-score').textContent = gameState.score;
+            document.getElementById('final-words').textContent = gameState.foundWords.length;
+            document.getElementById('final-pangrams').textContent = gameState.pangrams;
+            const longest = gameState.foundWords.reduce((a, b) => a.length >= b.length ? a : b, '');
+            document.getElementById('final-longest').textContent = longest.toUpperCase();
+        }
+
+        // Keyboard support
+        document.addEventListener('keydown', (e) => {
+            if (document.getElementById('game-screen').style.display === 'none') {
+                if (e.key === 'Enter') startGame();
+                return;
+            }
+
+            if (e.key === 'Enter') {
+                submitWord();
+            } else if (e.key === 'Backspace') {
+                e.preventDefault();
+                deleteLetter();
+            } else if (e.key === ' ') {
+                e.preventDefault();
+                shuffleLetters();
+            } else if (/^[a-zA-Z]$/.test(e.key)) {
+                const letter = e.key.toLowerCase();
+                if (gameState.letters.includes(letter)) {
+                    addLetter(letter);
+                } else {
+                    showMessage(`Letter "${letter.toUpperCase()}" not in puzzle`, 'error');
+                    shakeInput();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
