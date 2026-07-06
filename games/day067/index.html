@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flag Quiz - Geography Game</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0f172a;--surface:#1e293b;--card:#334155;--accent:#3b82f6;
+    --accent2:#8b5cf6;--green:#22c55e;--red:#ef4444;--yellow:#eab308;
+    --text:#f1f5f9;--muted:#94a3b8;--glow:0 0 20px rgba(59,130,246,.3);
+  }
+  @font-face{font-family:sys;src:local('Segoe UI'),local('Helvetica Neue'),local('Arial')}
+  body{
+    font-family:'sys',system-ui,sans-serif;background:var(--bg);color:var(--text);
+    min-height:100vh;display:flex;align-items:center;justify-content:center;
+    overflow:hidden;
+  }
+  #app{width:100%;max-width:560px;padding:16px;position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center}
+
+  /* ---- Animated BG ---- */
+  .bg-orb{position:fixed;border-radius:50%;filter:blur(80px);opacity:.15;pointer-events:none;z-index:0}
+  .bg-orb.a{width:400px;height:400px;background:#3b82f6;top:-100px;left:-100px;animation:float 8s ease-in-out infinite}
+  .bg-orb.b{width:350px;height:350px;background:#8b5cf6;bottom:-80px;right:-80px;animation:float 10s ease-in-out infinite reverse}
+  @keyframes float{0%,100%{transform:translate(0,0)}50%{transform:translate(40px,30px)}}
+
+  .screen{display:none;flex-direction:column;align-items:center;width:100%;position:relative;z-index:1}
+  .screen.active{display:flex}
+
+  /* ---- Title Screen ---- */
+  .title-flag{font-size:80px;margin-bottom:8px;animation:bounce 2s ease-in-out infinite}
+  @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+  h1{font-size:2.2rem;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px;text-align:center}
+  .subtitle{color:var(--muted);font-size:.95rem;margin-bottom:28px;text-align:center}
+
+  .mode-selector{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;justify-content:center}
+  .mode-btn{
+    padding:10px 20px;border-radius:12px;border:2px solid var(--card);background:var(--surface);
+    color:var(--text);cursor:pointer;font-size:.9rem;font-weight:600;transition:.2s;
+  }
+  .mode-btn:hover,.mode-btn.selected{border-color:var(--accent);background:rgba(59,130,246,.15);color:var(--accent)}
+  .mode-btn .count{display:block;font-size:.75rem;color:var(--muted);font-weight:400;margin-top:2px}
+
+  .region-selector{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:24px}
+  .region-btn{
+    padding:6px 14px;border-radius:20px;border:1.5px solid var(--card);background:transparent;
+    color:var(--muted);cursor:pointer;font-size:.8rem;transition:.2s;
+  }
+  .region-btn:hover,.region-btn.selected{border-color:var(--accent2);color:var(--accent2);background:rgba(139,92,246,.1)}
+
+  .instructions{
+    background:var(--surface);border-radius:16px;padding:20px;margin-bottom:24px;
+    width:100%;border:1px solid rgba(255,255,255,.05);
+  }
+  .instructions h3{font-size:.95rem;margin-bottom:10px;color:var(--accent)}
+  .instructions ul{list-style:none;padding:0}
+  .instructions li{padding:4px 0;font-size:.85rem;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .instructions li::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0}
+
+  .start-btn,.replay-btn{
+    padding:14px 48px;border-radius:14px;border:none;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    color:#fff;font-size:1.1rem;font-weight:700;cursor:pointer;
+    transition:.2s;box-shadow:var(--glow);letter-spacing:.5px;
+  }
+  .start-btn:hover,.replay-btn:hover{transform:translateY(-2px);box-shadow:0 0 30px rgba(59,130,246,.5)}
+  .start-btn:active,.replay-btn:active{transform:translateY(0)}
+
+  .high-score-badge{margin-top:14px;font-size:.8rem;color:var(--yellow);display:flex;align-items:center;gap:6px}
+
+  /* ---- Game Screen ---- */
+  .game-header{display:flex;justify-content:space-between;align-items:center;width:100%;margin-bottom:14px}
+  .stat{display:flex;flex-direction:column;align-items:center}
+  .stat-label{font-size:.65rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+  .stat-value{font-size:1.3rem;font-weight:700}
+  .stat-value.score-val{color:var(--accent)}
+  .stat-value.streak-val{color:var(--yellow)}
+
+  .progress-track{width:100%;height:6px;background:var(--card);border-radius:3px;margin-bottom:20px;overflow:hidden}
+  .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;transition:width .4s ease}
+
+  .timer-bar{width:100%;height:4px;background:var(--card);border-radius:2px;margin-bottom:16px;overflow:hidden}
+  .timer-fill{height:100%;background:var(--green);border-radius:2px;transition:width .1s linear}
+  .timer-fill.warn{background:var(--yellow)}
+  .timer-fill.danger{background:var(--red)}
+
+  .flag-container{
+    background:var(--surface);border-radius:20px;padding:32px;margin-bottom:24px;
+    width:100%;display:flex;align-items:center;justify-content:center;
+    border:1px solid rgba(255,255,255,.05);min-height:160px;
+    position:relative;overflow:hidden;
+  }
+  .flag-container .flag-emoji{font-size:100px;transition:opacity .3s;user-select:none}
+  .flag-container .question-num{
+    position:absolute;top:10px;right:14px;font-size:.7rem;color:var(--muted);
+    background:var(--card);padding:3px 10px;border-radius:10px;
+  }
+  .hint-text{
+    position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
+    font-size:.75rem;color:var(--muted);background:var(--card);
+    padding:3px 12px;border-radius:10px;white-space:nowrap;opacity:0;transition:.3s;
+  }
+  .hint-text.show{opacity:1}
+
+  .options{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .option-btn{
+    padding:14px 12px;border-radius:14px;border:2px solid var(--card);
+    background:var(--surface);color:var(--text);cursor:pointer;
+    font-size:.9rem;font-weight:500;transition:.15s;text-align:center;
+    position:relative;overflow:hidden;
+  }
+  .option-btn:hover:not(.disabled){border-color:var(--accent);background:rgba(59,130,246,.08)}
+  .option-btn:active:not(.disabled){transform:scale(.97)}
+  .option-btn.correct{border-color:var(--green);background:rgba(34,197,94,.15);color:var(--green);animation:pop .3s ease}
+  .option-btn.wrong{border-color:var(--red);background:rgba(239,68,68,.15);color:var(--red);animation:shake .4s ease}
+  .option-btn.reveal{border-color:var(--green);background:rgba(34,197,94,.08);color:var(--green)}
+  .option-btn.disabled{pointer-events:none;opacity:.7}
+  @keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.04)}100%{transform:scale(1)}}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+
+  .feedback{
+    margin-top:16px;padding:10px 20px;border-radius:12px;font-size:.9rem;font-weight:600;
+    opacity:0;transition:.3s;text-align:center;min-height:44px;display:flex;align-items:center;justify-content:center;gap:8px;
+  }
+  .feedback.show{opacity:1}
+  .feedback.correct-fb{background:rgba(34,197,94,.12);color:var(--green)}
+  .feedback.wrong-fb{background:rgba(239,68,68,.12);color:var(--red)}
+  .feedback.timeout-fb{background:rgba(234,179,8,.12);color:var(--yellow)}
+
+  /* ---- Results Screen ---- */
+  .results-card{
+    background:var(--surface);border-radius:24px;padding:32px 24px;width:100%;
+    border:1px solid rgba(255,255,255,.05);text-align:center;
+  }
+  .results-emoji{font-size:64px;margin-bottom:8px}
+  .results-title{font-size:1.6rem;font-weight:800;margin-bottom:4px}
+  .results-subtitle{color:var(--muted);font-size:.9rem;margin-bottom:24px}
+
+  .score-ring{
+    width:140px;height:140px;margin:0 auto 24px;position:relative;
+  }
+  .score-ring svg{transform:rotate(-90deg)}
+  .score-ring circle{fill:none;stroke-width:8}
+  .score-ring .track{stroke:var(--card)}
+  .score-ring .fill{stroke:url(#scoreGrad);stroke-linecap:round;transition:stroke-dashoffset 1.5s ease}
+  .score-ring .center-text{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    font-size:2rem;font-weight:800;
+  }
+  .score-ring .center-label{
+    position:absolute;top:62%;left:50%;transform:translateX(-50%);
+    font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;
+  }
+
+  .stats-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:24px}
+  .stats-grid .sg-item{background:var(--card);border-radius:12px;padding:12px 8px}
+  .sg-item .sg-val{font-size:1.2rem;font-weight:700}
+  .sg-item .sg-lbl{font-size:.7rem;color:var(--muted);margin-top:2px}
+  .sg-item.green .sg-val{color:var(--green)}
+  .sg-item.red .sg-val{color:var(--red)}
+  .sg-item.yellow .sg-val{color:var(--yellow)}
+
+  .new-best{color:var(--yellow);font-size:.85rem;font-weight:600;margin-bottom:16px;animation:pulse 1.5s ease infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+  .btn-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .secondary-btn{
+    padding:12px 24px;border-radius:12px;border:2px solid var(--card);
+    background:transparent;color:var(--muted);cursor:pointer;font-size:.9rem;
+    font-weight:600;transition:.2s;
+  }
+  .secondary-btn:hover{border-color:var(--accent);color:var(--text)}
+
+  /* ---- Transitions ---- */
+  .fade-in{animation:fadeIn .4s ease}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+  /* ---- Confetti ---- */
+  .confetti-piece{position:fixed;width:10px;height:10px;z-index:999;pointer-events:none;animation:confettiFall linear forwards}
+  @keyframes confettiFall{
+    0%{transform:translateY(-10vh) rotate(0);opacity:1}
+    100%{transform:translateY(110vh) rotate(720deg);opacity:0}
+  }
+
+  /* ---- Responsive ---- */
+  @media(max-width:400px){
+    h1{font-size:1.6rem}
+    .flag-container .flag-emoji{font-size:72px}
+    .flag-container{padding:24px;min-height:130px}
+    .option-btn{padding:12px 8px;font-size:.82rem}
+    .options{gap:8px}
+    .score-ring{width:110px;height:110px}
+  }
+</style>
+</head>
+<body>
+<div class="bg-orb a"></div>
+<div class="bg-orb b"></div>
+<div id="app">
+
+  <!-- ====== TITLE SCREEN ====== -->
+  <div id="titleScreen" class="screen active">
+    <div class="title-flag">🌍</div>
+    <h1>Flag Quiz</h1>
+    <p class="subtitle">Test your world geography knowledge</p>
+
+    <div class="mode-selector">
+      <button class="mode-btn selected" data-mode="quick">Quick<span class="count">10 flags</span></button>
+      <button class="mode-btn" data-mode="classic">Classic<span class="count">20 flags</span></button>
+      <button class="mode-btn" data-mode="marathon">Marathon<span class="count">40 flags</span></button>
+    </div>
+
+    <div class="region-selector">
+      <button class="region-btn selected" data-region="all">All</button>
+      <button class="region-btn" data-region="europe">Europe</button>
+      <button class="region-btn" data-region="asia">Asia</button>
+      <button class="region-btn" data-region="americas">Americas</button>
+      <button class="region-btn" data-region="africa">Africa</button>
+      <button class="region-btn" data-region="oceania">Oceania</button>
+    </div>
+
+    <div class="instructions">
+      <h3>How to Play</h3>
+      <ul>
+        <li>A flag will appear on screen</li>
+        <li>Choose the correct country from 4 options</li>
+        <li>Answer quickly for bonus points</li>
+        <li>Build streaks for multiplied scores</li>
+        <li>A hint appears after 5 seconds</li>
+      </ul>
+    </div>
+
+    <button class="start-btn" onclick="startGame()">Start Quiz</button>
+    <div id="highScoreBadge" class="high-score-badge" style="display:none"></div>
+  </div>
+
+  <!-- ====== GAME SCREEN ====== -->
+  <div id="gameScreen" class="screen">
+    <div class="game-header">
+      <div class="stat"><span class="stat-label">Score</span><span class="stat-value score-val" id="scoreDisplay">0</span></div>
+      <div class="stat"><span class="stat-label">Streak</span><span class="stat-value streak-val" id="streakDisplay">0</span></div>
+      <div class="stat"><span class="stat-label">Best</span><span class="stat-value" id="bestDisplay">0</span></div>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div>
+    <div class="flag-container" id="flagContainer">
+      <span class="flag-emoji" id="flagEmoji"></span>
+      <span class="question-num" id="questionNum"></span>
+      <span class="hint-text" id="hintText"></span>
+    </div>
+    <div class="options" id="optionsGrid"></div>
+    <div class="feedback" id="feedback"></div>
+  </div>
+
+  <!-- ====== RESULTS SCREEN ====== -->
+  <div id="resultsScreen" class="screen">
+    <div class="results-card fade-in">
+      <div class="results-emoji" id="resultsEmoji"></div>
+      <div class="results-title" id="resultsTitle"></div>
+      <div class="results-subtitle" id="resultsSub"></div>
+
+      <div class="score-ring">
+        <svg viewBox="0 0 140 140" width="100%" height="100%">
+          <defs><linearGradient id="scoreGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="var(--accent)"/><stop offset="100%" stop-color="var(--accent2)"/></linearGradient></defs>
+          <circle class="track" cx="70" cy="70" r="58"/>
+          <circle class="fill" id="scoreRing" cx="70" cy="70" r="58"/>
+        </svg>
+        <span class="center-text" id="ringScore"></span>
+        <span class="center-label">score</span>
+      </div>
+
+      <div class="stats-grid">
+        <div class="sg-item green"><div class="sg-val" id="correctCount"></div><div class="sg-lbl">Correct</div></div>
+        <div class="sg-item red"><div class="sg-val" id="wrongCount"></div><div class="sg-lbl">Wrong</div></div>
+        <div class="sg-item yellow"><div class="sg-val" id="bestStreak"></div><div class="sg-lbl">Best Streak</div></div>
+      </div>
+
+      <div id="newBestMsg" class="new-best" style="display:none"></div>
+
+      <div class="btn-row">
+        <button class="secondary-btn" onclick="goHome()">Menu</button>
+        <button class="replay-btn" onclick="startGame()">Play Again</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ====== FLAG DATA ======
+const FLAGS=[
+  // Europe
+  {f:"\u{1F1EC}\u{1F1E7}",n:"United Kingdom",c:"Europe",h:"Island nation"},
+  {f:"\u{1F1EB}\u{1F1F7}",n:"France",c:"Europe",h:"Tricolor flag"},
+  {f:"\u{1F1E9}\u{1F1EA}",n:"Germany",c:"Europe",h:"Central Europe"},
+  {f:"\u{1F1EE}\u{1F1F9}",n:"Italy",c:"Europe",h:"Boot-shaped country"},
+  {f:"\u{1F1EA}\u{1F1F8}",n:"Spain",c:"Europe",h:"Iberian Peninsula"},
+  {f:"\u{1F1F5}\u{1F1F9}",n:"Portugal",c:"Europe",h:"Western Iberia"},
+  {f:"\u{1F1F3}\u{1F1F1}",n:"Netherlands",c:"Europe",h:"Land of tulips"},
+  {f:"\u{1F1E7}\u{1F1EA}",n:"Belgium",c:"Europe",h:"Home of chocolate"},
+  {f:"\u{1F1E8}\u{1F1ED}",n:"Switzerland",c:"Europe",h:"Alpine nation"},
+  {f:"\u{1F1E6}\u{1F1F9}",n:"Austria",c:"Europe",h:"Former empire"},
+  {f:"\u{1F1F5}\u{1F1F1}",n:"Poland",c:"Europe",h:"Central Europe"},
+  {f:"\u{1F1F8}\u{1F1EA}",n:"Sweden",c:"Europe",h:"Scandinavian"},
+  {f:"\u{1F1F3}\u{1F1F4}",n:"Norway",c:"Europe",h:"Fjords country"},
+  {f:"\u{1F1E9}\u{1F1F0}",n:"Denmark",c:"Europe",h:"Nordic cross"},
+  {f:"\u{1F1EB}\u{1F1EE}",n:"Finland",c:"Europe",h:"Land of lakes"},
+  {f:"\u{1F1EE}\u{1F1EA}",n:"Ireland",c:"Europe",h:"Emerald Isle"},
+  {f:"\u{1F1EC}\u{1F1F7}",n:"Greece",c:"Europe",h:"Ancient civilization"},
+  {f:"\u{1F1F9}\u{1F1F7}",n:"Turkey",c:"Europe",h:"Crescent and star"},
+  {f:"\u{1F1F7}\u{1F1FA}",n:"Russia",c:"Europe",h:"Largest country"},
+  {f:"\u{1F1FA}\u{1F1E6}",n:"Ukraine",c:"Europe",h:"Blue and yellow"},
+  {f:"\u{1F1E8}\u{1F1FF}",n:"Czech Republic",c:"Europe",h:"Heart of Europe"},
+  {f:"\u{1F1F7}\u{1F1F4}",n:"Romania",c:"Europe",h:"Eastern Europe"},
+  {f:"\u{1F1ED}\u{1F1FA}",n:"Hungary",c:"Europe",h:"Danube country"},
+  {f:"\u{1F1ED}\u{1F1F7}",n:"Croatia",c:"Europe",h:"Adriatic coast"},
+  {f:"\u{1F1EE}\u{1F1F8}",n:"Iceland",c:"Europe",h:"Land of fire & ice"},
+  // Asia
+  {f:"\u{1F1EF}\u{1F1F5}",n:"Japan",c:"Asia",h:"Rising sun"},
+  {f:"\u{1F1F0}\u{1F1F7}",n:"South Korea",c:"Asia",h:"Yin-yang flag"},
+  {f:"\u{1F1E8}\u{1F1F3}",n:"China",c:"Asia",h:"Most populous"},
+  {f:"\u{1F1EE}\u{1F1F3}",n:"India",c:"Asia",h:"Ashoka Chakra"},
+  {f:"\u{1F1F9}\u{1F1ED}",n:"Thailand",c:"Asia",h:"Land of smiles"},
+  {f:"\u{1F1FB}\u{1F1F3}",n:"Vietnam",c:"Asia",h:"Yellow star"},
+  {f:"\u{1F1F5}\u{1F1ED}",n:"Philippines",c:"Asia",h:"Archipelago nation"},
+  {f:"\u{1F1EE}\u{1F1E9}",n:"Indonesia",c:"Asia",h:"Red and white"},
+  {f:"\u{1F1F2}\u{1F1FE}",n:"Malaysia",c:"Asia",h:"Southeast Asia"},
+  {f:"\u{1F1F8}\u{1F1EC}",n:"Singapore",c:"Asia",h:"City-state"},
+  {f:"\u{1F1F5}\u{1F1F0}",n:"Pakistan",c:"Asia",h:"Crescent moon"},
+  {f:"\u{1F1E7}\u{1F1E9}",n:"Bangladesh",c:"Asia",h:"Green with red"},
+  {f:"\u{1F1F8}\u{1F1E6}",n:"Saudi Arabia",c:"Asia",h:"Arabic script"},
+  {f:"\u{1F1E6}\u{1F1EA}",n:"UAE",c:"Asia",h:"Oil-rich nation"},
+  {f:"\u{1F1EE}\u{1F1F1}",n:"Israel",c:"Asia",h:"Star of David"},
+  {f:"\u{1F1F0}\u{1F1FF}",n:"Kazakhstan",c:"Asia",h:"Central Asia"},
+  {f:"\u{1F1F2}\u{1F1F3}",n:"Mongolia",c:"Asia",h:"Steppes nation"},
+  {f:"\u{1F1F3}\u{1F1F5}",n:"Nepal",c:"Asia",h:"Non-rectangular flag"},
+  {f:"\u{1F1F1}\u{1F1F0}",n:"Sri Lanka",c:"Asia",h:"Island nation"},
+  // Americas
+  {f:"\u{1F1FA}\u{1F1F8}",n:"United States",c:"Americas",h:"Stars and stripes"},
+  {f:"\u{1F1E8}\u{1F1E6}",n:"Canada",c:"Americas",h:"Maple leaf"},
+  {f:"\u{1F1F2}\u{1F1FD}",n:"Mexico",c:"Americas",h:"Eagle on cactus"},
+  {f:"\u{1F1E7}\u{1F1F7}",n:"Brazil",c:"Americas",h:"Green and yellow"},
+  {f:"\u{1F1E6}\u{1F1F7}",n:"Argentina",c:"Americas",h:"Sun of May"},
+  {f:"\u{1F1E8}\u{1F1F4}",n:"Colombia",c:"Americas",h:"Yellow blue red"},
+  {f:"\u{1F1E8}\u{1F1F1}",n:"Chile",c:"Americas",h:"Lone star"},
+  {f:"\u{1F1F5}\u{1F1EA}",n:"Peru",c:"Americas",h:"Andean nation"},
+  {f:"\u{1F1E8}\u{1F1FA}",n:"Cuba",c:"Americas",h:"Caribbean island"},
+  {f:"\u{1F1EF}\u{1F1F2}",n:"Jamaica",c:"Americas",h:"Caribbean island"},
+  {f:"\u{1F1E8}\u{1F1F7}",n:"Costa Rica",c:"Americas",h:"Central America"},
+  {f:"\u{1F1FA}\u{1F1FE}",n:"Uruguay",c:"Americas",h:"Sun emblem"},
+  {f:"\u{1F1EA}\u{1F1E8}",n:"Ecuador",c:"Americas",h:"Equator country"},
+  {f:"\u{1F1F5}\u{1F1E6}",n:"Panama",c:"Americas",h:"Canal country"},
+  {f:"\u{1F1FB}\u{1F1EA}",n:"Venezuela",c:"Americas",h:"South America"},
+  // Africa
+  {f:"\u{1F1FF}\u{1F1E6}",n:"South Africa",c:"Africa",h:"Rainbow nation"},
+  {f:"\u{1F1EA}\u{1F1EC}",n:"Egypt",c:"Africa",h:"Pyramids country"},
+  {f:"\u{1F1F3}\u{1F1EC}",n:"Nigeria",c:"Africa",h:"Green white green"},
+  {f:"\u{1F1F0}\u{1F1EA}",n:"Kenya",c:"Africa",h:"Maasai shield"},
+  {f:"\u{1F1EC}\u{1F1ED}",n:"Ghana",c:"Africa",h:"Gold Coast"},
+  {f:"\u{1F1EA}\u{1F1F9}",n:"Ethiopia",c:"Africa",h:"Horn of Africa"},
+  {f:"\u{1F1F2}\u{1F1E6}",n:"Morocco",c:"Africa",h:"North Africa"},
+  {f:"\u{1F1F9}\u{1F1FF}",n:"Tanzania",c:"Africa",h:"East Africa"},
+  {f:"\u{1F1F9}\u{1F1F3}",n:"Tunisia",c:"Africa",h:"Red crescent"},
+  {f:"\u{1F1E8}\u{1F1F2}",n:"Cameroon",c:"Africa",h:"Central Africa"},
+  {f:"\u{1F1E8}\u{1F1EE}",n:"Ivory Coast",c:"Africa",h:"West Africa"},
+  {f:"\u{1F1F8}\u{1F1F3}",n:"Senegal",c:"Africa",h:"Westernmost Africa"},
+  {f:"\u{1F1FA}\u{1F1EC}",n:"Uganda",c:"Africa",h:"Pearl of Africa"},
+  {f:"\u{1F1F7}\u{1F1FC}",n:"Rwanda",c:"Africa",h:"Land of 1000 hills"},
+  // Oceania
+  {f:"\u{1F1E6}\u{1F1FA}",n:"Australia",c:"Oceania",h:"Down under"},
+  {f:"\u{1F1F3}\u{1F1FF}",n:"New Zealand",c:"Oceania",h:"Kiwi country"},
+  {f:"\u{1F1EB}\u{1F1EF}",n:"Fiji",c:"Oceania",h:"Pacific islands"},
+  {f:"\u{1F1F5}\u{1F1EC}",n:"Papua New Guinea",c:"Oceania",h:"Bird of paradise"},
+  {f:"\u{1F1FC}\u{1F1F8}",n:"Samoa",c:"Oceania",h:"Pacific island"},
+  {f:"\u{1F1F9}\u{1F1F4}",n:"Tonga",c:"Oceania",h:"Polynesian kingdom"},
+];
+
+// ====== STATE ======
+let mode='quick', region='all';
+let questions=[], qIdx=0, score=0, streak=0, maxStreak=0, correct=0, wrong=0;
+let timerInterval=null, timeLeft=0, hintTimeout=null, answered=false;
+const TIMER_MAX=10000;
+const MODES={quick:10,classic:20,marathon:40};
+const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+
+// ====== AUDIO ======
+function playTone(freq,dur,type='sine',vol=.12){
+  try{
+    const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+    o.type=type;o.frequency.value=freq;g.gain.value=vol;
+    g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+dur);
+    o.connect(g);g.connect(audioCtx.destination);
+    o.start();o.stop(audioCtx.currentTime+dur);
+  }catch(e){}
+}
+function sfxCorrect(){playTone(523,.08);setTimeout(()=>playTone(659,.08),80);setTimeout(()=>playTone(784,.15),160)}
+function sfxWrong(){playTone(200,.2,'sawtooth',.08);setTimeout(()=>playTone(160,.25,'sawtooth',.06),150)}
+function sfxTick(){playTone(880,.03,'square',.04)}
+function sfxStart(){playTone(440,.1);setTimeout(()=>playTone(554,.1),100);setTimeout(()=>playTone(659,.1),200);setTimeout(()=>playTone(880,.2),300)}
+function sfxEnd(){[523,659,784,1047].forEach((f,i)=>setTimeout(()=>playTone(f,.15,'triangle',.1),i*120))}
+
+// ====== SELECTORS ======
+document.querySelectorAll('.mode-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.mode-btn').forEach(x=>x.classList.remove('selected'));
+    b.classList.add('selected');mode=b.dataset.mode;
+  });
+});
+document.querySelectorAll('.region-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.region-btn').forEach(x=>x.classList.remove('selected'));
+    b.classList.add('selected');region=b.dataset.region;
+  });
+});
+
+// ====== SCREENS ======
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function goHome(){
+  clearInterval(timerInterval);clearTimeout(hintTimeout);
+  showScreen('titleScreen');updateHighScoreBadge();
+}
+
+// ====== HIGH SCORE ======
+function getKey(){return`flagquiz_${mode}_${region}`}
+function getBest(){return parseInt(localStorage.getItem(getKey())||'0')}
+function setBest(s){localStorage.setItem(getKey(),s)}
+function updateHighScoreBadge(){
+  const b=getBest(),el=document.getElementById('highScoreBadge');
+  if(b>0){el.style.display='flex';el.textContent=`\u2B50 Best: ${b} pts`}else{el.style.display='none'}
+}
+updateHighScoreBadge();
+
+// ====== GAME LOGIC ======
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+function buildQuestions(){
+  let pool=region==='all'?[...FLAGS]:FLAGS.filter(f=>f.c.toLowerCase()===region);
+  shuffle(pool);
+  const count=Math.min(MODES[mode],pool.length);
+  questions=pool.slice(0,count);
+}
+
+function getDistractors(correct,count=3){
+  const sameRegion=FLAGS.filter(f=>f.n!==correct.n&&f.c===correct.c);
+  const diff=FLAGS.filter(f=>f.n!==correct.n&&f.c!==correct.c);
+  shuffle(sameRegion);shuffle(diff);
+  const picks=[];
+  // Prefer ~1 from same region for difficulty
+  if(sameRegion.length>0)picks.push(sameRegion.pop());
+  while(picks.length<count){
+    const src=sameRegion.length>0&&Math.random()>.5?sameRegion:diff;
+    if(src.length===0)continue;
+    const item=src.pop();
+    if(!picks.find(p=>p.n===item.n))picks.push(item);
+    if(sameRegion.length===0&&diff.length===0)break;
+  }
+  return picks.slice(0,count);
+}
+
+function startGame(){
+  if(audioCtx.state==='suspended')audioCtx.resume();
+  buildQuestions();
+  if(questions.length===0){alert('Not enough flags for this region/mode combo.');return;}
+  qIdx=0;score=0;streak=0;maxStreak=0;correct=0;wrong=0;answered=false;
+  document.getElementById('scoreDisplay').textContent='0';
+  document.getElementById('streakDisplay').textContent='0';
+  document.getElementById('bestDisplay').textContent=getBest();
+  showScreen('gameScreen');sfxStart();
+  setTimeout(()=>showQuestion(),400);
+}
+
+function showQuestion(){
+  answered=false;
+  const q=questions[qIdx];
+  document.getElementById('flagEmoji').textContent=q.f;
+  document.getElementById('flagEmoji').style.opacity='1';
+  document.getElementById('questionNum').textContent=`${qIdx+1} / ${questions.length}`;
+  document.getElementById('progressFill').style.width=`${(qIdx/questions.length)*100}%`;
+
+  // Hint
+  const hintEl=document.getElementById('hintText');
+  hintEl.textContent=`Hint: ${q.h}`;hintEl.classList.remove('show');
+  clearTimeout(hintTimeout);
+  hintTimeout=setTimeout(()=>hintEl.classList.add('show'),5000);
+
+  // Options
+  const distractors=getDistractors(q);
+  const options=shuffle([q,...distractors]);
+  const grid=document.getElementById('optionsGrid');
+  grid.innerHTML='';
+  options.forEach(opt=>{
+    const btn=document.createElement('button');
+    btn.className='option-btn';btn.textContent=opt.n;
+    btn.addEventListener('click',()=>handleAnswer(btn,opt,q));
+    grid.appendChild(btn);
+  });
+
+  // Feedback
+  const fb=document.getElementById('feedback');
+  fb.className='feedback';fb.textContent='';
+
+  // Timer
+  timeLeft=TIMER_MAX;
+  const timerFill=document.getElementById('timerFill');
+  timerFill.style.width='100%';timerFill.className='timer-fill';
+  clearInterval(timerInterval);
+  const tick=50;
+  timerInterval=setInterval(()=>{
+    timeLeft-=tick;
+    const pct=Math.max(0,(timeLeft/TIMER_MAX)*100);
+    timerFill.style.width=pct+'%';
+    if(pct<30)timerFill.className='timer-fill danger';
+    else if(pct<60)timerFill.className='timer-fill warn';
+    if(timeLeft<=3000&&timeLeft>0&&timeLeft%1000<tick)sfxTick();
+    if(timeLeft<=0){clearInterval(timerInterval);handleTimeout();}
+  },tick);
+}
+
+function handleAnswer(btn,chosen,q){
+  if(answered)return;answered=true;
+  clearInterval(timerInterval);clearTimeout(hintTimeout);
+  const isCorrect=chosen.n===q.n;
+  const fb=document.getElementById('feedback');
+
+  document.querySelectorAll('.option-btn').forEach(b=>b.classList.add('disabled'));
+
+  if(isCorrect){
+    btn.classList.add('correct');
+    correct++;streak++;
+    if(streak>maxStreak)maxStreak=streak;
+    const timeBonus=Math.round((timeLeft/TIMER_MAX)*50);
+    const streakBonus=Math.min(streak-1,5)*10;
+    const pts=100+timeBonus+streakBonus;
+    score+=pts;
+    sfxCorrect();
+    fb.className='feedback correct-fb show';
+    fb.textContent=`+${pts} pts${streakBonus>0?' (streak x'+streak+')':''}`;
+  }else{
+    btn.classList.add('wrong');
+    wrong++;streak=0;
+    sfxWrong();
+    // Reveal correct
+    document.querySelectorAll('.option-btn').forEach(b=>{if(b.textContent===q.n)b.classList.add('reveal')});
+    fb.className='feedback wrong-fb show';
+    fb.textContent=`It was ${q.n}`;
+  }
+
+  document.getElementById('scoreDisplay').textContent=score;
+  document.getElementById('streakDisplay').textContent=streak;
+
+  setTimeout(()=>nextQuestion(),1600);
+}
+
+function handleTimeout(){
+  if(answered)return;answered=true;
+  clearTimeout(hintTimeout);
+  wrong++;streak=0;
+  const q=questions[qIdx];
+  document.querySelectorAll('.option-btn').forEach(b=>{b.classList.add('disabled');if(b.textContent===q.n)b.classList.add('reveal')});
+  const fb=document.getElementById('feedback');
+  fb.className='feedback timeout-fb show';
+  fb.textContent=`Time's up! It was ${q.n}`;
+  sfxWrong();
+  document.getElementById('streakDisplay').textContent='0';
+  setTimeout(()=>nextQuestion(),1800);
+}
+
+function nextQuestion(){
+  qIdx++;
+  if(qIdx>=questions.length){showResults();return}
+  // Quick fade
+  document.getElementById('flagEmoji').style.opacity='0';
+  setTimeout(()=>showQuestion(),250);
+}
+
+// ====== RESULTS ======
+function showResults(){
+  sfxEnd();
+  const pct=Math.round((correct/questions.length)*100);
+  const prev=getBest();const isNew=score>prev;
+  if(isNew&&score>0)setBest(score);
+
+  // Emoji & title
+  let emoji,title,sub;
+  if(pct===100){emoji='🏆';title='Perfect Score!';sub='You\'re a geography master!'}
+  else if(pct>=80){emoji='🌟';title='Excellent!';sub='Impressive world knowledge!'}
+  else if(pct>=60){emoji='👏';title='Great Job!';sub='You know your flags well!'}
+  else if(pct>=40){emoji='🌍';title='Not Bad!';sub='Keep exploring the world!'}
+  else{emoji='📚';title='Keep Learning!';sub='Practice makes perfect!'}
+
+  document.getElementById('resultsEmoji').textContent=emoji;
+  document.getElementById('resultsTitle').textContent=title;
+  document.getElementById('resultsSub').textContent=sub;
+  document.getElementById('correctCount').textContent=correct;
+  document.getElementById('wrongCount').textContent=wrong;
+  document.getElementById('bestStreak').textContent=maxStreak;
+  document.getElementById('ringScore').textContent=score;
+
+  // Score ring animation
+  const circ=2*Math.PI*58;
+  const ring=document.getElementById('scoreRing');
+  ring.style.strokeDasharray=circ;
+  ring.style.strokeDashoffset=circ;
+  setTimeout(()=>{ring.style.strokeDashoffset=circ-(circ*(pct/100))},100);
+
+  // New best
+  const nbEl=document.getElementById('newBestMsg');
+  if(isNew&&score>0){nbEl.style.display='block';nbEl.textContent=`\u2B50 New Best Score: ${score} pts!`}
+  else{nbEl.style.display='none'}
+
+  showScreen('resultsScreen');
+
+  if(pct>=80)spawnConfetti();
+}
+
+// ====== CONFETTI ======
+function spawnConfetti(){
+  const colors=['#3b82f6','#8b5cf6','#22c55e','#eab308','#ef4444','#ec4899'];
+  for(let i=0;i<60;i++){
+    const el=document.createElement('div');
+    el.className='confetti-piece';
+    el.style.left=Math.random()*100+'vw';
+    el.style.background=colors[Math.floor(Math.random()*colors.length)];
+    el.style.width=(6+Math.random()*8)+'px';
+    el.style.height=(6+Math.random()*8)+'px';
+    el.style.borderRadius=Math.random()>.5?'50%':'2px';
+    el.style.animationDuration=(2+Math.random()*2)+'s';
+    el.style.animationDelay=(Math.random()*1.5)+'s';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(),5000);
+  }
+}
+
+// ====== KEYBOARD ======
+document.addEventListener('keydown',e=>{
+  if(document.getElementById('gameScreen').classList.contains('active')&&!answered){
+    const idx={'1':0,'2':1,'3':2,'4':3}[e.key];
+    if(idx!==undefined){
+      const btns=document.querySelectorAll('.option-btn');
+      if(btns[idx])btns[idx].click();
+    }
+  }
+  if(e.key==='Enter'){
+    if(document.getElementById('titleScreen').classList.contains('active'))startGame();
+  }
+});
+</script>
+</body>
+</html>
