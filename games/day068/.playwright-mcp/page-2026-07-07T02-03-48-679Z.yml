@@ -1,0 +1,20 @@
+- generic [ref=e19]:
+  - generic [ref=e20]:
+    - generic [ref=e21]:
+      - generic [ref=e22]: "110"
+      - generic [ref=e23]: Score
+    - generic [ref=e24]:
+      - img [ref=e25]
+      - generic [ref=e28]: "2"
+    - generic [ref=e30]: 1/20
+  - generic [ref=e32]:
+    - text: 🇱🇧
+    - paragraph [ref=e33]: What is the capital of
+    - heading "Lebanon" [level=2] [ref=e34]
+    - paragraph [ref=e35]: Asia
+  - generic [ref=e36]:
+    - button "Baku" [ref=e37]
+    - button "Beirut" [active] [ref=e38]
+    - button "Tunis" [ref=e39]
+    - button "Kampala" [ref=e40]
+  - generic [ref=e41]: ✓ Correct! +110 pts

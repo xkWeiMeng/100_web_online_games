@@ -1,0 +1,19 @@
+- generic [ref=e2]:
+  - generic [ref=e3]: 🌍
+  - heading "Capital Cities Quiz" [level=1] [ref=e4]:
+    - text: Capital Cities
+    - text: Quiz
+  - paragraph [ref=e5]: Test your world geography knowledge
+  - generic [ref=e6]:
+    - heading "How to Play" [level=3] [ref=e7]
+    - list [ref=e8]:
+      - listitem [ref=e9]: Identify the capital of each country shown
+      - listitem [ref=e10]: Pick the correct answer from four choices
+      - listitem [ref=e11]: Answer quickly for bonus points
+      - listitem [ref=e12]: Build streaks for score multipliers
+  - paragraph [ref=e13]: Select Difficulty
+  - generic [ref=e14]:
+    - button "Easy (10)" [ref=e15] [cursor=pointer]
+    - button "Medium (20)" [ref=e16] [cursor=pointer]
+    - button "Hard (30)" [ref=e17] [cursor=pointer]
+  - button "Start Quiz" [ref=e18] [cursor=pointer]
