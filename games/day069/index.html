@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Piano Tiles - Rhythm Tapper</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #0a0a0f;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  #game-container {
+    width: 100%; height: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    position: relative;
+    overflow: hidden;
+    background: #111118;
+    box-shadow: 0 0 60px rgba(88, 100, 255, 0.15);
+  }
+
+  /* ── Title Screen ── */
+  #title-screen {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: linear-gradient(170deg, #0d0d1a 0%, #12121f 40%, #1a1028 100%);
+    z-index: 100;
+    transition: opacity 0.5s;
+  }
+  #title-screen.hidden { opacity: 0; pointer-events: none; }
+
+  .title-icon {
+    font-size: 72px;
+    margin-bottom: 8px;
+    animation: float 3s ease-in-out infinite;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+  }
+
+  .title-name {
+    font-size: 36px; font-weight: 800;
+    background: linear-gradient(135deg, #7c83ff, #c084fc, #f472b6);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -1px;
+    margin-bottom: 4px;
+  }
+  .title-sub {
+    font-size: 15px; color: #8888aa;
+    letter-spacing: 4px; text-transform: uppercase;
+    margin-bottom: 40px;
+  }
+
+  .instructions {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 20px 28px;
+    margin-bottom: 36px;
+    max-width: 320px;
+    text-align: left;
+  }
+  .instructions h3 {
+    color: #c084fc; font-size: 14px;
+    text-transform: uppercase; letter-spacing: 2px;
+    margin-bottom: 12px;
+  }
+  .instructions p {
+    color: #aaa; font-size: 14px; line-height: 1.7;
+  }
+  .instructions .key-hint {
+    display: inline-block;
+    background: rgba(124,131,255,0.15);
+    color: #a5a8ff;
+    padding: 2px 8px; border-radius: 4px;
+    font-size: 12px; font-weight: 600;
+    margin: 0 2px;
+  }
+
+  .mode-select {
+    display: flex; gap: 10px;
+    margin-bottom: 28px;
+  }
+  .mode-btn {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #999; border-radius: 12px;
+    padding: 10px 20px; font-size: 14px;
+    cursor: pointer; transition: all 0.2s;
+    font-family: inherit;
+  }
+  .mode-btn:hover { background: rgba(255,255,255,0.08); color: #ccc; }
+  .mode-btn.active {
+    background: linear-gradient(135deg, rgba(124,131,255,0.2), rgba(192,132,252,0.2));
+    border-color: rgba(124,131,255,0.4);
+    color: #c4c6ff;
+  }
+
+  #start-btn {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white; border: none; border-radius: 50px;
+    padding: 16px 56px; font-size: 18px;
+    font-weight: 700; cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    box-shadow: 0 4px 24px rgba(99,102,241,0.35);
+    font-family: inherit;
+  }
+  #start-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 32px rgba(99,102,241,0.5);
+  }
+  #start-btn:active { transform: translateY(0); }
+
+  .high-score-display {
+    margin-top: 20px; color: #666;
+    font-size: 13px;
+  }
+  .high-score-display span { color: #c084fc; font-weight: 700; }
+
+  /* ── Game Area ── */
+  #game-area {
+    position: absolute; inset: 0;
+    display: none;
+  }
+  #game-area.active { display: block; }
+
+  /* HUD */
+  #hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 64px;
+    background: linear-gradient(180deg, rgba(10,10,15,0.95), rgba(10,10,15,0));
+    display: flex; align-items: center;
+    justify-content: space-between;
+    padding: 0 20px; z-index: 20;
+  }
+  .hud-score {
+    font-size: 28px; font-weight: 800; color: white;
+  }
+  .hud-combo {
+    font-size: 14px; color: #c084fc;
+    font-weight: 600;
+    transition: transform 0.1s;
+  }
+  .hud-combo.pop { transform: scale(1.3); }
+  .hud-speed {
+    font-size: 12px; color: #666;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+
+  /* Canvas */
+  #game-canvas {
+    width: 100%; height: 100%;
+    display: block;
+  }
+
+  /* Column dividers */
+  .col-dividers {
+    position: absolute; inset: 0;
+    pointer-events: none; z-index: 5;
+  }
+  .col-divider {
+    position: absolute; top: 0; bottom: 0;
+    width: 1px;
+    background: rgba(255,255,255,0.04);
+  }
+
+  /* Tap zone indicator */
+  .tap-zone {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg,
+      transparent 5%, rgba(124,131,255,0.3) 15%,
+      rgba(124,131,255,0.3) 85%, transparent 95%);
+    z-index: 5;
+  }
+
+  /* Hit effects overlay */
+  #effects-layer {
+    position: absolute; inset: 0;
+    pointer-events: none; z-index: 15;
+  }
+
+  /* ── Game Over Screen ── */
+  #game-over {
+    position: absolute; inset: 0;
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: rgba(6,6,12,0.92);
+    backdrop-filter: blur(12px);
+    z-index: 50;
+    animation: fadeIn 0.4s;
+  }
+  #game-over.active { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .go-label {
+    font-size: 14px; color: #f87171;
+    text-transform: uppercase; letter-spacing: 4px;
+    margin-bottom: 8px; font-weight: 600;
+  }
+  .go-score {
+    font-size: 64px; font-weight: 800;
+    background: linear-gradient(135deg, #fff, #c084fc);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 4px;
+  }
+  .go-subtitle { color: #666; font-size: 14px; margin-bottom: 6px; }
+  .go-best { color: #c084fc; font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+  .go-new-best {
+    color: #fbbf24; font-size: 13px;
+    text-transform: uppercase; letter-spacing: 2px;
+    animation: pulse 1s infinite;
+    margin-bottom: 4px;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; } 50% { opacity: 0.5; }
+  }
+
+  .go-stats {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px; margin: 24px 0 32px;
+    text-align: center;
+  }
+  .go-stat-val {
+    font-size: 22px; font-weight: 700; color: white;
+  }
+  .go-stat-label {
+    font-size: 11px; color: #666;
+    text-transform: uppercase; letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  #restart-btn {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white; border: none; border-radius: 50px;
+    padding: 14px 48px; font-size: 16px;
+    font-weight: 700; cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 24px rgba(99,102,241,0.35);
+    font-family: inherit;
+    margin-bottom: 12px;
+  }
+  #restart-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 32px rgba(99,102,241,0.5);
+  }
+  #menu-btn {
+    background: none; border: 1px solid rgba(255,255,255,0.1);
+    color: #888; border-radius: 50px;
+    padding: 10px 32px; font-size: 13px;
+    cursor: pointer; transition: all 0.2s;
+    font-family: inherit;
+  }
+  #menu-btn:hover { border-color: rgba(255,255,255,0.2); color: #bbb; }
+
+  /* ── Countdown overlay ── */
+  #countdown {
+    position: absolute; inset: 0;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(6,6,12,0.7);
+    z-index: 40;
+  }
+  #countdown.active { display: flex; }
+  #countdown .num {
+    font-size: 96px; font-weight: 800; color: white;
+    animation: countPop 0.6s ease-out;
+  }
+  @keyframes countPop {
+    0% { transform: scale(2); opacity: 0; }
+    50% { transform: scale(1); opacity: 1; }
+    100% { opacity: 0.8; }
+  }
+
+  /* Perfect/Great/Miss labels */
+  .hit-label {
+    position: absolute;
+    font-size: 18px; font-weight: 800;
+    pointer-events: none;
+    animation: hitLabelAnim 0.6s ease-out forwards;
+    z-index: 25;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+  @keyframes hitLabelAnim {
+    0% { transform: translateY(0) scale(1.2); opacity: 1; }
+    100% { transform: translateY(-40px) scale(0.8); opacity: 0; }
+  }
+
+  /* Ripple effect */
+  .tap-ripple {
+    position: absolute; border-radius: 50%;
+    pointer-events: none;
+    animation: ripple 0.5s ease-out forwards;
+    z-index: 14;
+  }
+  @keyframes ripple {
+    0% { transform: scale(0); opacity: 0.6; }
+    100% { transform: scale(3); opacity: 0; }
+  }
+
+  /* Pause overlay */
+  #pause-overlay {
+    position: absolute; inset: 0;
+    display: none; align-items: center; justify-content: center;
+    flex-direction: column;
+    background: rgba(6,6,12,0.85);
+    backdrop-filter: blur(8px);
+    z-index: 45;
+  }
+  #pause-overlay.active { display: flex; }
+  .pause-text {
+    font-size: 32px; font-weight: 800; color: white;
+    margin-bottom: 20px;
+  }
+  #resume-btn {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white; border: none; border-radius: 50px;
+    padding: 14px 48px; font-size: 16px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+    box-shadow: 0 4px 24px rgba(99,102,241,0.35);
+  }
+
+  /* Pause button in HUD */
+  #pause-btn {
+    background: none; border: none;
+    color: #666; font-size: 20px;
+    cursor: pointer; padding: 4px 8px;
+    transition: color 0.2s;
+  }
+  #pause-btn:hover { color: #aaa; }
+</style>
+</head>
+<body>
+
+<div id="game-container">
+  <!-- Title Screen -->
+  <div id="title-screen">
+    <div class="title-icon">🎹</div>
+    <div class="title-name">Piano Tiles</div>
+    <div class="title-sub">Rhythm Tapper</div>
+
+    <div class="instructions">
+      <h3>How to Play</h3>
+      <p>
+        Tap the <strong style="color:#e2e2ff">black tiles</strong> as they scroll down.
+        Don't miss any tiles and don't tap empty lanes!<br><br>
+        <span class="key-hint">D</span>
+        <span class="key-hint">F</span>
+        <span class="key-hint">J</span>
+        <span class="key-hint">K</span>
+        &nbsp;keys for desktop.<br>
+        Speed increases as you score higher.
+      </p>
+    </div>
+
+    <div class="mode-select">
+      <button class="mode-btn active" data-mode="classic">Classic</button>
+      <button class="mode-btn" data-mode="zen">Zen</button>
+      <button class="mode-btn" data-mode="rush">Rush</button>
+    </div>
+
+    <button id="start-btn">START</button>
+    <div class="high-score-display">Best: <span id="title-best">0</span></div>
+  </div>
+
+  <!-- Game Area -->
+  <div id="game-area">
+    <div id="hud">
+      <div>
+        <div class="hud-score" id="hud-score">0</div>
+        <div class="hud-speed" id="hud-speed">Speed 1x</div>
+      </div>
+      <div style="text-align:center">
+        <div class="hud-combo" id="hud-combo"></div>
+      </div>
+      <button id="pause-btn">⏸</button>
+    </div>
+
+    <div class="col-dividers">
+      <div class="col-divider" style="left:25%"></div>
+      <div class="col-divider" style="left:50%"></div>
+      <div class="col-divider" style="left:75%"></div>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+    <div class="tap-zone"></div>
+    <div id="effects-layer"></div>
+  </div>
+
+  <!-- Countdown -->
+  <div id="countdown"><div class="num" id="count-num">3</div></div>
+
+  <!-- Pause -->
+  <div id="pause-overlay">
+    <div class="pause-text">Paused</div>
+    <button id="resume-btn">Resume</button>
+  </div>
+
+  <!-- Game Over -->
+  <div id="game-over">
+    <div class="go-label">Game Over</div>
+    <div class="go-score" id="go-score">0</div>
+    <div class="go-subtitle" id="go-reason"></div>
+    <div class="go-best" id="go-best"></div>
+    <div class="go-new-best" id="go-new-best" style="display:none">New Best!</div>
+    <div class="go-stats">
+      <div><div class="go-stat-val" id="go-perfects">0</div><div class="go-stat-label">Perfect</div></div>
+      <div><div class="go-stat-val" id="go-greats">0</div><div class="go-stat-label">Great</div></div>
+      <div><div class="go-stat-val" id="go-max-combo">0</div><div class="go-stat-label">Max Combo</div></div>
+    </div>
+    <button id="restart-btn">Play Again</button>
+    <button id="menu-btn">Menu</button>
+  </div>
+</div>
+
+<script>
+// ── Audio Engine (Web Audio API) ──
+const AudioEngine = (() => {
+  let ctx = null;
+  const init = () => {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+  };
+
+  // Piano notes: C4, D4, E4, F4 (one per column)
+  const noteFreqs = [261.63, 293.66, 329.63, 349.23];
+  // Extended scale for variety
+  const scaleFreqs = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
+
+  const playNote = (col, quality) => {
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    osc.type = 'sine';
+    const baseFreq = noteFreqs[col] || 261.63;
+    osc.frequency.setValueAtTime(baseFreq, now);
+
+    // Add a harmonic for richness
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(baseFreq * 2, now);
+    const gain2 = ctx.createGain();
+    gain2.gain.setValueAtTime(0.08, now);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2000, now);
+
+    const vol = quality === 'perfect' ? 0.18 : quality === 'great' ? 0.14 : 0.1;
+    gain.gain.setValueAtTime(vol, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.4);
+    osc2.start(now);
+    osc2.stop(now + 0.3);
+  };
+
+  const playMiss = () => {
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, now);
+    osc.frequency.exponentialRampToValueAtTime(80, now + 0.3);
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.3);
+  };
+
+  const playClick = () => {
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(800, now);
+    gain.gain.setValueAtTime(0.05, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.05);
+  };
+
+  return { init, playNote, playMiss, playClick };
+})();
+
+// ── Game State ──
+const COLS = 4;
+let canvas, ctxC, W, H;
+let tiles = [];
+let score = 0;
+let combo = 0;
+let maxCombo = 0;
+let perfects = 0;
+let greats = 0;
+let gameMode = 'classic';
+let baseSpeed = 3;
+let speed = 3;
+let tileH = 0;
+let colW = 0;
+let running = false;
+let paused = false;
+let lastFrame = 0;
+let spawnTimer = 0;
+let spawnInterval = 0;
+let lastCol = -1;
+let tileIdCounter = 0;
+let zenTimer = 0;
+let rushTimer = 0;
+const RUSH_TIME = 30;
+
+// Elements
+const titleScreen = document.getElementById('title-screen');
+const gameArea = document.getElementById('game-area');
+const gameOverScreen = document.getElementById('game-over');
+const countdownEl = document.getElementById('countdown');
+const countNumEl = document.getElementById('count-num');
+const pauseOverlay = document.getElementById('pause-overlay');
+const effectsLayer = document.getElementById('effects-layer');
+
+const hudScore = document.getElementById('hud-score');
+const hudCombo = document.getElementById('hud-combo');
+const hudSpeed = document.getElementById('hud-speed');
+
+const goScore = document.getElementById('go-score');
+const goReason = document.getElementById('go-reason');
+const goBest = document.getElementById('go-best');
+const goNewBest = document.getElementById('go-new-best');
+const goPerfects = document.getElementById('go-perfects');
+const goGreats = document.getElementById('go-greats');
+const goMaxCombo = document.getElementById('go-max-combo');
+
+const titleBest = document.getElementById('title-best');
+
+// ── High scores ──
+function getHigh(mode) {
+  return parseInt(localStorage.getItem('piano_best_' + mode) || '0', 10);
+}
+function setHigh(mode, val) {
+  localStorage.setItem('piano_best_' + mode, val);
+}
+
+// ── Setup Canvas ──
+function setupCanvas() {
+  canvas = document.getElementById('game-canvas');
+  ctxC = canvas.getContext('2d');
+  const container = document.getElementById('game-container');
+  const rect = container.getBoundingClientRect();
+  W = rect.width;
+  H = rect.height;
+  canvas.width = W * devicePixelRatio;
+  canvas.height = H * devicePixelRatio;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctxC.scale(devicePixelRatio, devicePixelRatio);
+  colW = W / COLS;
+  tileH = Math.min(H / 4.5, 140);
+}
+
+// ── Tile factory ──
+function makeTile(col) {
+  return {
+    id: tileIdCounter++,
+    col,
+    y: -tileH,
+    h: tileH,
+    hit: false,
+    missed: false,
+    hitAnim: 0,
+    glowAlpha: 0,
+    hitQuality: null,
+  };
+}
+
+function spawnRow() {
+  // Pick column, avoid same column twice in a row
+  let col;
+  do { col = Math.floor(Math.random() * COLS); } while (col === lastCol);
+  lastCol = col;
+
+  // Occasionally spawn double tiles at higher speeds
+  if (speed > 6 && Math.random() < 0.2) {
+    let col2;
+    do { col2 = Math.floor(Math.random() * COLS); } while (col2 === col);
+    tiles.push(makeTile(col));
+    tiles.push(makeTile(col2));
+  } else {
+    tiles.push(makeTile(col));
+  }
+}
+
+// ── Gradient caching ──
+let tileGrad = null;
+let tileGradH = 0;
+function getTileGrad(h) {
+  if (tileGrad && tileGradH === h) return tileGrad;
+  tileGradH = h;
+  tileGrad = ctxC.createLinearGradient(0, 0, 0, h);
+  tileGrad.addColorStop(0, '#1e1e2e');
+  tileGrad.addColorStop(1, '#0f0f1a');
+  return tileGrad;
+}
+
+// ── Draw ──
+function draw() {
+  ctxC.clearRect(0, 0, W, H);
+
+  // Draw column backgrounds with subtle alternating shade
+  for (let c = 0; c < COLS; c++) {
+    ctxC.fillStyle = c % 2 === 0 ? 'rgba(255,255,255,0.008)' : 'rgba(0,0,0,0.05)';
+    ctxC.fillRect(c * colW, 0, colW, H);
+  }
+
+  // Draw tiles
+  for (const t of tiles) {
+    const x = t.col * colW;
+    const y = t.y;
+
+    if (t.hit) {
+      // Hit animation: shrink and fade
+      t.hitAnim += 0.08;
+      const alpha = Math.max(0, 1 - t.hitAnim);
+      const scale = 1 - t.hitAnim * 0.3;
+      if (alpha <= 0) continue;
+
+      ctxC.save();
+      ctxC.globalAlpha = alpha;
+      ctxC.translate(x + colW / 2, y + t.h / 2);
+      ctxC.scale(scale, scale);
+
+      const color = t.hitQuality === 'perfect' ? '#7c83ff' : '#a78bfa';
+      ctxC.fillStyle = color;
+      const r = 8;
+      const hw = colW / 2 - 2;
+      const hh = t.h / 2 - 1;
+      ctxC.beginPath();
+      ctxC.roundRect(-hw, -hh, hw * 2, hh * 2, r);
+      ctxC.fill();
+
+      // Glow
+      ctxC.shadowColor = color;
+      ctxC.shadowBlur = 20;
+      ctxC.fillStyle = 'rgba(124,131,255,0.1)';
+      ctxC.fill();
+      ctxC.shadowBlur = 0;
+
+      ctxC.restore();
+    } else if (t.missed) {
+      // Red flash for missed
+      ctxC.fillStyle = 'rgba(248,113,113,0.7)';
+      ctxC.beginPath();
+      ctxC.roundRect(x + 2, y + 1, colW - 4, t.h - 2, 8);
+      ctxC.fill();
+    } else {
+      // Normal tile
+      ctxC.save();
+
+      // Main tile body
+      const grad = ctxC.createLinearGradient(x, y, x, y + t.h);
+      grad.addColorStop(0, '#2a2a3d');
+      grad.addColorStop(0.5, '#1a1a2e');
+      grad.addColorStop(1, '#141422');
+      ctxC.fillStyle = grad;
+      ctxC.beginPath();
+      ctxC.roundRect(x + 2, y + 1, colW - 4, t.h - 2, 8);
+      ctxC.fill();
+
+      // Subtle shine on top
+      const shine = ctxC.createLinearGradient(x, y, x, y + t.h * 0.3);
+      shine.addColorStop(0, 'rgba(255,255,255,0.06)');
+      shine.addColorStop(1, 'rgba(255,255,255,0)');
+      ctxC.fillStyle = shine;
+      ctxC.beginPath();
+      ctxC.roundRect(x + 2, y + 1, colW - 4, t.h * 0.3, [8, 8, 0, 0]);
+      ctxC.fill();
+
+      // Border
+      ctxC.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctxC.lineWidth = 1;
+      ctxC.beginPath();
+      ctxC.roundRect(x + 2, y + 1, colW - 4, t.h - 2, 8);
+      ctxC.stroke();
+
+      ctxC.restore();
+    }
+  }
+
+  // Draw tap zone line
+  const tapY = H - tileH * 0.3;
+  ctxC.strokeStyle = 'rgba(124,131,255,0.12)';
+  ctxC.lineWidth = 1;
+  ctxC.setLineDash([8, 6]);
+  ctxC.beginPath();
+  ctxC.moveTo(0, tapY);
+  ctxC.lineTo(W, tapY);
+  ctxC.stroke();
+  ctxC.setLineDash([]);
+
+  // Rush mode timer bar
+  if (gameMode === 'rush' && running) {
+    const pct = Math.max(0, rushTimer / RUSH_TIME);
+    const barW = W * pct;
+    const barGrad = ctxC.createLinearGradient(0, H - 4, barW, H - 4);
+    barGrad.addColorStop(0, pct > 0.3 ? '#6366f1' : '#f87171');
+    barGrad.addColorStop(1, pct > 0.3 ? '#8b5cf6' : '#ef4444');
+    ctxC.fillStyle = barGrad;
+    ctxC.fillRect(0, H - 4, barW, 4);
+  }
+}
+
+// ── Update ──
+function update(dt) {
+  if (!running || paused) return;
+
+  // Speed ramp based on score
+  if (gameMode === 'classic' || gameMode === 'rush') {
+    speed = baseSpeed + Math.floor(score / 10) * 0.4;
+    speed = Math.min(speed, 18);
+  } else {
+    speed = baseSpeed; // zen mode stays constant
+  }
+
+  const speedLabel = (speed / baseSpeed).toFixed(1);
+  hudSpeed.textContent = gameMode === 'rush'
+    ? Math.ceil(rushTimer) + 's left'
+    : 'Speed ' + speedLabel + 'x';
+
+  // Spawn tiles
+  spawnInterval = tileH / speed;
+  spawnTimer += dt * 60;
+  if (spawnTimer >= spawnInterval) {
+    spawnTimer -= spawnInterval;
+    spawnRow();
+  }
+
+  // Move tiles
+  const moveAmt = speed * dt * 60 / 16.67;
+  for (const t of tiles) {
+    t.y += moveAmt;
+  }
+
+  // Check for missed tiles (passed bottom without being hit)
+  for (const t of tiles) {
+    if (!t.hit && !t.missed && t.y > H) {
+      if (gameMode === 'zen') {
+        // In zen mode, just remove, no penalty
+        t.missed = true;
+        combo = 0;
+        hudCombo.textContent = '';
+      } else {
+        t.missed = true;
+        AudioEngine.playMiss();
+        endGame('Tile missed!');
+        return;
+      }
+    }
+  }
+
+  // Cleanup offscreen tiles
+  tiles = tiles.filter(t => {
+    if (t.hit && t.hitAnim > 1) return false;
+    if (t.missed && t.y > H + 50) return false;
+    return true;
+  });
+
+  // Rush timer
+  if (gameMode === 'rush') {
+    rushTimer -= dt;
+    if (rushTimer <= 0) {
+      endGame('Time\'s up!');
+      return;
+    }
+  }
+}
+
+// ── Tap handling ──
+function handleTap(col) {
+  if (!running || paused) return;
+
+  AudioEngine.init();
+
+  // Find the lowest un-hit tile in this column that's in tap range
+  const tapZoneTop = H - tileH * 1.5;
+  const tapZoneBottom = H + tileH * 0.2;
+
+  let target = null;
+  for (const t of tiles) {
+    if (t.col !== col || t.hit || t.missed) continue;
+    const tileBottom = t.y + t.h;
+    // Tile must be at least partially in the visible area and near the tap zone
+    if (tileBottom > tapZoneTop && t.y < tapZoneBottom) {
+      if (!target || t.y > target.y) target = t;
+    }
+  }
+
+  if (!target) {
+    // Tapped empty lane
+    if (gameMode !== 'zen') {
+      AudioEngine.playMiss();
+      endGame('Wrong tap!');
+      showMissEffect(col);
+    }
+    return;
+  }
+
+  // Determine quality based on tile position
+  const tileCenter = target.y + target.h / 2;
+  const idealY = H - tileH * 0.5;
+  const dist = Math.abs(tileCenter - idealY);
+  let quality;
+  if (dist < tileH * 0.35) {
+    quality = 'perfect';
+    perfects++;
+    score += 2;
+  } else {
+    quality = 'great';
+    greats++;
+    score += 1;
+  }
+
+  target.hit = true;
+  target.hitQuality = quality;
+  combo++;
+  if (combo > maxCombo) maxCombo = combo;
+
+  // Combo bonus
+  if (combo > 0 && combo % 25 === 0) score += 10;
+
+  // Update HUD
+  hudScore.textContent = score;
+  if (combo >= 5) {
+    hudCombo.textContent = combo + 'x Combo';
+    hudCombo.classList.remove('pop');
+    void hudCombo.offsetWidth;
+    hudCombo.classList.add('pop');
+  } else {
+    hudCombo.textContent = '';
+  }
+
+  AudioEngine.playNote(col, quality);
+  showHitEffect(col, target.y + target.h / 2, quality);
+}
+
+// ── Visual Effects ──
+function showHitEffect(col, y, quality) {
+  const x = col * colW + colW / 2;
+
+  // Label
+  const label = document.createElement('div');
+  label.className = 'hit-label';
+  label.textContent = quality === 'perfect' ? 'Perfect' : 'Great';
+  label.style.color = quality === 'perfect' ? '#7c83ff' : '#a78bfa';
+  label.style.left = (x - 30) + 'px';
+  label.style.top = (y - 20) + 'px';
+  effectsLayer.appendChild(label);
+  setTimeout(() => label.remove(), 600);
+
+  // Ripple
+  const ripple = document.createElement('div');
+  ripple.className = 'tap-ripple';
+  const size = 40;
+  ripple.style.width = ripple.style.height = size + 'px';
+  ripple.style.left = (x - size / 2) + 'px';
+  ripple.style.top = (y - size / 2) + 'px';
+  ripple.style.background = quality === 'perfect'
+    ? 'radial-gradient(circle, rgba(124,131,255,0.4), transparent)'
+    : 'radial-gradient(circle, rgba(167,139,250,0.3), transparent)';
+  effectsLayer.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 500);
+}
+
+function showMissEffect(col) {
+  const x = col * colW + colW / 2;
+  const ripple = document.createElement('div');
+  ripple.className = 'tap-ripple';
+  const size = 50;
+  ripple.style.width = ripple.style.height = size + 'px';
+  ripple.style.left = (x - size / 2) + 'px';
+  ripple.style.top = (H - 100) + 'px';
+  ripple.style.background = 'radial-gradient(circle, rgba(248,113,113,0.5), transparent)';
+  effectsLayer.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 500);
+}
+
+// ── Game lifecycle ──
+function startGame() {
+  AudioEngine.init();
+  setupCanvas();
+
+  tiles = [];
+  score = 0;
+  combo = 0;
+  maxCombo = 0;
+  perfects = 0;
+  greats = 0;
+  speed = baseSpeed;
+  spawnTimer = 0;
+  lastCol = -1;
+  tileIdCounter = 0;
+  rushTimer = RUSH_TIME;
+
+  hudScore.textContent = '0';
+  hudCombo.textContent = '';
+  hudSpeed.textContent = '';
+  effectsLayer.innerHTML = '';
+
+  switch (gameMode) {
+    case 'classic': baseSpeed = 3; break;
+    case 'zen': baseSpeed = 2.5; break;
+    case 'rush': baseSpeed = 4; break;
+  }
+  speed = baseSpeed;
+
+  titleScreen.classList.add('hidden');
+  gameOverScreen.classList.remove('active');
+  gameArea.classList.add('active');
+
+  // Countdown
+  countdown(() => {
+    running = true;
+    paused = false;
+    lastFrame = performance.now();
+    requestAnimationFrame(gameLoop);
+  });
+}
+
+function countdown(cb) {
+  countdownEl.classList.add('active');
+  let n = 3;
+  countNumEl.textContent = n;
+
+  const tick = () => {
+    AudioEngine.playClick();
+    countNumEl.textContent = n;
+    countNumEl.style.animation = 'none';
+    void countNumEl.offsetWidth;
+    countNumEl.style.animation = '';
+
+    if (n <= 0) {
+      countdownEl.classList.remove('active');
+      cb();
+      return;
+    }
+    n--;
+    setTimeout(tick, 700);
+  };
+  tick();
+}
+
+function endGame(reason) {
+  running = false;
+
+  const best = getHigh(gameMode);
+  const isNew = score > best;
+  if (isNew) setHigh(gameMode, score);
+
+  goScore.textContent = score;
+  goReason.textContent = reason;
+  goBest.textContent = 'Best: ' + (isNew ? score : best);
+  goNewBest.style.display = isNew ? 'block' : 'none';
+  goPerfects.textContent = perfects;
+  goGreats.textContent = greats;
+  goMaxCombo.textContent = maxCombo;
+
+  setTimeout(() => {
+    gameOverScreen.classList.add('active');
+  }, 400);
+}
+
+function togglePause() {
+  if (!running) return;
+  paused = !paused;
+  pauseOverlay.classList.toggle('active', paused);
+  if (!paused) {
+    lastFrame = performance.now();
+    requestAnimationFrame(gameLoop);
+  }
+}
+
+// ── Game Loop ──
+function gameLoop(now) {
+  if (!running || paused) return;
+  const dt = Math.min((now - lastFrame) / 1000, 0.05);
+  lastFrame = now;
+
+  update(dt);
+  draw();
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ── Input ──
+// Touch / Click
+const gameContainer = document.getElementById('game-container');
+gameContainer.addEventListener('pointerdown', (e) => {
+  if (!running || paused) return;
+  const rect = gameContainer.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const col = Math.floor(x / colW);
+  if (col >= 0 && col < COLS) {
+    handleTap(col);
+  }
+}, { passive: true });
+
+// Keyboard
+const keyMap = { 'd': 0, 'f': 1, 'j': 2, 'k': 3 };
+const keyDown = {};
+document.addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if (k in keyMap && !keyDown[k]) {
+    keyDown[k] = true;
+    handleTap(keyMap[k]);
+  }
+  if (k === 'escape' || k === 'p') {
+    togglePause();
+  }
+  if (k === ' ' && !running) {
+    e.preventDefault();
+  }
+});
+document.addEventListener('keyup', (e) => {
+  const k = e.key.toLowerCase();
+  if (k in keyMap) keyDown[k] = false;
+});
+
+// ── UI Buttons ──
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('restart-btn').addEventListener('click', startGame);
+document.getElementById('menu-btn').addEventListener('click', () => {
+  running = false;
+  gameOverScreen.classList.remove('active');
+  gameArea.classList.remove('active');
+  titleScreen.classList.remove('hidden');
+  updateTitleBest();
+});
+document.getElementById('pause-btn').addEventListener('click', togglePause);
+document.getElementById('resume-btn').addEventListener('click', togglePause);
+
+// Mode buttons
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    gameMode = btn.dataset.mode;
+    updateTitleBest();
+  });
+});
+
+function updateTitleBest() {
+  titleBest.textContent = getHigh(gameMode);
+}
+
+// ── Resize ──
+window.addEventListener('resize', () => {
+  if (running) setupCanvas();
+});
+
+// ── Init ──
+updateTitleBest();
+setupCanvas();
+
+// Draw initial background
+draw();
+</script>
+</body>
+</html>
