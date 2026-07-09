@@ -1,0 +1,33 @@
+- generic [ref=e3]:
+  - heading "NEON FRETS" [level=1] [ref=e4]
+  - generic [ref=e5]: Guitar Hero Style Note Catcher
+  - generic [ref=e6]:
+    - heading "How to Play" [level=3] [ref=e7]
+    - text: Notes fall from the top — hit the matching key when they reach the glow zone at the bottom.
+    - strong [ref=e8]: "Keys:"
+    - generic [ref=e9]: D
+    - generic [ref=e10]: F
+    - generic [ref=e11]: J
+    - generic [ref=e12]: K
+    - text: or
+    - generic [ref=e13]: "1"
+    - generic [ref=e14]: "2"
+    - generic [ref=e15]: "3"
+    - generic [ref=e16]: "4"
+    - strong [ref=e17]: Perfect
+    - text: timing = big points. Build
+    - strong [ref=e18]: combos
+    - text: for score multipliers!
+    - text: On mobile, tap the lane columns directly.
+  - generic [ref=e19]: "Choose a song:"
+  - generic [ref=e20]:
+    - generic [ref=e21] [cursor=pointer]:
+      - generic [ref=e22]: Neon Pulse
+      - generic [ref=e23]: Easy | 120 BPM
+    - generic [ref=e24] [cursor=pointer]:
+      - generic [ref=e25]: Cyber Rush
+      - generic [ref=e26]: Medium | 140 BPM
+    - generic [ref=e27] [cursor=pointer]:
+      - generic [ref=e28]: Hyper Drive
+      - generic [ref=e29]: Hard | 160 BPM
+  - button "PLAY" [ref=e30] [cursor=pointer]

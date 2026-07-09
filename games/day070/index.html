@@ -396,7 +396,7 @@ const SONGS = [
         [2],[3],[1],[0],[2],[0],[3],[1],[0,1,2,3],[]
       ];
       for (let i = 0; i < patterns.length; i++) {
-        const time = 3000 + i * stepMs;
+        const time = 4500 + i * stepMs;
         for (const lane of patterns[i]) {
           notes.push({ time, lane });
         }
@@ -433,7 +433,7 @@ const SONGS = [
       ];
       for (const s of sequences) {
         for (const lane of s.lanes) {
-          notes.push({ time: 3000 + s.t, lane });
+          notes.push({ time: 4500 + s.t, lane });
         }
       }
       return notes;
@@ -449,7 +449,7 @@ const SONGS = [
       const step = 60000 / bpm;
       const half = step / 2;
       const quarter = step / 4;
-      let t = 3000;
+      let t = 4500;
       // Warm up
       for (let i = 0; i < 16; i++) {
         notes.push({ time: t, lane: i % 4 });
@@ -500,9 +500,9 @@ const gc = canvas.getContext('2d');
 
 const LANE_COLORS = ['#ff3e8a', '#a855f7', '#3b82f6', '#22d3ee'];
 const LANE_KEYS_MAP = { 'd': 0, 'f': 1, 'j': 2, 'k': 3, '1': 0, '2': 1, '3': 2, '4': 3 };
-const JUDGE_PERFECT = 50;
-const JUDGE_GOOD = 100;
-const JUDGE_WINDOW = 150;
+const JUDGE_PERFECT = 60;
+const JUDGE_GOOD = 120;
+const JUDGE_WINDOW = 180;
 const NUM_LANES = 4;
 
 let W, H, laneW, hitY, noteR;
@@ -598,15 +598,20 @@ function startGame() {
   particles = [];
   laneFlash = [0, 0, 0, 0];
 
+  // Set songStart immediately — notes already have a 3s offset built in
+  songStart = performance.now();
+  gameState = 'countdown';
+
   updateHUD();
   document.getElementById('hud').classList.add('active');
   document.getElementById('title-screen').classList.remove('active');
   document.getElementById('gameover-screen').classList.remove('active');
   if (isMobile) document.getElementById('touch-controls').classList.add('active');
 
-  gameState = 'playing';
+  // Start game loop if not already running
+  if (!animFrame) gameLoop();
 
-  // Countdown
+  // Countdown visual (notes start at t=3000ms so countdown fits naturally)
   let count = 3;
   const countInterval = setInterval(() => {
     if (count > 0) {
@@ -627,9 +632,8 @@ function startGame() {
       AudioEngine.playTick();
       setTimeout(() => el.remove(), 800);
 
-      songStart = performance.now();
+      gameState = 'playing';
       AudioEngine.startBgMusic(song.bpm, song.bgPattern);
-      if (!animFrame) gameLoop();
     }
   }, 800);
 }
@@ -694,7 +698,7 @@ function missNote() {
   combo = 0;
   multiplier = 1;
   misses++;
-  health = Math.max(0, health - 8);
+  health = Math.max(0, health - 5);
   showJudgment('MISS', '#ef4444');
   AudioEngine.playMiss();
   updateHUD();
@@ -928,7 +932,7 @@ function gameLoop(time = 0) {
     gc.beginPath(); gc.moveTo(0, y); gc.lineTo(W, y); gc.stroke();
   }
 
-  if (gameState === 'playing') {
+  if (gameState === 'playing' || gameState === 'countdown') {
     const songNow = performance.now() - songStart;
 
     drawLanes();
@@ -937,10 +941,11 @@ function gameLoop(time = 0) {
     for (const n of notes) {
       if (n.hit) continue;
 
-      // Check for missed notes
-      if (!n.missed && songNow > n.time + JUDGE_WINDOW) {
+      // Check for missed notes (only during active play, not countdown)
+      if (gameState === 'playing' && !n.missed && songNow > n.time + JUDGE_WINDOW) {
         n.missed = true;
         missNote();
+        if (gameState === 'gameover') break; // health hit 0, stop processing
       }
 
       drawNote(n, songNow);
@@ -953,10 +958,12 @@ function gameLoop(time = 0) {
       if (laneFlash[i] > 0) laneFlash[i] = Math.max(0, laneFlash[i] - dt * 5);
     }
 
-    // Check song end
-    const allProcessed = notes.every(n => n.hit || n.missed);
-    if (allProcessed && songNow > songDuration) {
-      endGame(true);
+    // Check song end (only if still playing — guard against same-frame override)
+    if (gameState === 'playing') {
+      const allProcessed = notes.every(n => n.hit || n.missed);
+      if (allProcessed && songNow > songDuration) {
+        endGame(true);
+      }
     }
 
     updateHUD();
