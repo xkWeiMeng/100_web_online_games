@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aim Trainer</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', sans-serif; background: #0f0f1a; color: #fff; overflow: hidden; height: 100vh; user-select: none; }
+#menu { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 20px; background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 100%); }
+#menu h1 { font-size: 3rem; background: linear-gradient(135deg, #ff6b6b, #feca57); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+#menu p { color: #aaa; max-width: 400px; text-align: center; line-height: 1.6; }
+#menu button { padding: 14px 40px; font-size: 1.2rem; border: none; border-radius: 8px; background: linear-gradient(135deg, #ff6b6b, #ee5a24); color: #fff; cursor: pointer; transition: transform .1s; }
+#menu button:hover { transform: scale(1.05); }
+#game { display: none; position: relative; width: 100vw; height: 100vh; background: #12121f; cursor: crosshair; }
+#hud { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; padding: 12px 20px; background: rgba(0,0,0,0.5); font-size: 1.1rem; z-index: 10; }
+#hud span { min-width: 100px; }
+.target { position: absolute; border-radius: 50%; pointer-events: auto; transition: transform 0.05s; }
+.target::after { content: ''; position: absolute; top: 25%; left: 25%; width: 50%; height: 50%; border-radius: 50%; background: rgba(255,255,255,0.3); }
+#results { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 16px; background: rgba(15,15,26,0.95); position: absolute; inset: 0; z-index: 20; }
+#results h2 { font-size: 2.2rem; color: #feca57; }
+#results p { font-size: 1.1rem; color: #ccc; }
+#results button { padding: 12px 36px; font-size: 1rem; border: none; border-radius: 8px; background: #ff6b6b; color: #fff; cursor: pointer; }
+.hit-effect { position: absolute; border-radius: 50%; background: rgba(255,255,255,0.6); pointer-events: none; animation: pop .3s forwards; }
+@keyframes pop { to { transform: scale(3); opacity: 0; } }
+</style>
+</head>
+<body>
+<div id="menu">
+  <h1>Aim Trainer</h1>
+  <p>Click or tap the moving targets as fast as you can! You have 30 seconds. Hits score points, misses lose points. Smaller and faster targets are worth more.</p>
+  <button onclick="startGame()">Start</button>
+</div>
+<div id="game">
+  <div id="hud">
+    <span id="scoreEl">Score: 0</span>
+    <span id="timerEl">Time: 30s</span>
+    <span id="accEl">Acc: 100%</span>
+  </div>
+  <div id="results">
+    <h2>Time's Up!</h2>
+    <p id="finalScore"></p>
+    <p id="finalAcc"></p>
+    <p id="finalHits"></p>
+    <button onclick="startGame()">Play Again</button>
+  </div>
+</div>
+<script>
+const game = document.getElementById('game');
+const menu = document.getElementById('menu');
+const results = document.getElementById('results');
+const scoreEl = document.getElementById('scoreEl');
+const timerEl = document.getElementById('timerEl');
+const accEl = document.getElementById('accEl');
+
+let score, hits, misses, timeLeft, timer, targets, animFrame;
+
+function startGame() {
+  menu.style.display = 'none';
+  game.style.display = 'block';
+  results.style.display = 'none';
+  score = 0; hits = 0; misses = 0; timeLeft = 30;
+  targets = [];
+  updateHUD();
+  spawnTargets(5);
+  timer = setInterval(() => {
+    timeLeft--;
+    timerEl.textContent = `Time: ${timeLeft}s`;
+    if (timeLeft <= 0) endGame();
+  }, 1000);
+  animFrame = requestAnimationFrame(moveTargets);
+}
+
+function spawnTargets(n) {
+  for (let i = 0; i < n; i++) spawnTarget();
+}
+
+function spawnTarget() {
+  const size = 30 + Math.random() * 40;
+  const el = document.createElement('div');
+  el.className = 'target';
+  el.style.width = el.style.height = size + 'px';
+  const hue = Math.random() * 360;
+  el.style.background = `radial-gradient(circle, hsl(${hue},80%,60%), hsl(${hue},70%,40%))`;
+  el.style.boxShadow = `0 0 12px hsl(${hue},80%,50%)`;
+  const maxX = window.innerWidth - size;
+  const maxY = window.innerHeight - size - 50;
+  const t = { el, x: Math.random() * maxX, y: 50 + Math.random() * maxY, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4, size };
+  el.style.left = t.x + 'px';
+  el.style.top = t.y + 'px';
+  el.addEventListener('pointerdown', e => { e.stopPropagation(); hitTarget(t); });
+  game.appendChild(el);
+  targets.push(t);
+}
+
+function moveTargets() {
+  for (const t of targets) {
+    t.x += t.vx; t.y += t.vy;
+    if (t.x < 0 || t.x > window.innerWidth - t.size) t.vx *= -1;
+    if (t.y < 50 || t.y > window.innerHeight - t.size) t.vy *= -1;
+    t.el.style.left = t.x + 'px';
+    t.el.style.top = t.y + 'px';
+  }
+  animFrame = requestAnimationFrame(moveTargets);
+}
+
+function hitTarget(t) {
+  const points = Math.round(80 / t.size * 10);
+  score += points; hits++;
+  showHitEffect(t.x + t.size/2, t.y + t.size/2);
+  t.el.remove();
+  targets = targets.filter(x => x !== t);
+  spawnTarget();
+  updateHUD();
+}
+
+function showHitEffect(x, y) {
+  const e = document.createElement('div');
+  e.className = 'hit-effect';
+  e.style.left = (x - 10) + 'px';
+  e.style.top = (y - 10) + 'px';
+  e.style.width = e.style.height = '20px';
+  game.appendChild(e);
+  setTimeout(() => e.remove(), 300);
+}
+
+game.addEventListener('pointerdown', () => { misses++; score = Math.max(0, score - 5); updateHUD(); });
+
+function updateHUD() {
+  scoreEl.textContent = `Score: ${score}`;
+  const total = hits + misses;
+  accEl.textContent = `Acc: ${total ? Math.round(hits/total*100) : 100}%`;
+}
+
+function endGame() {
+  clearInterval(timer);
+  cancelAnimationFrame(animFrame);
+  targets.forEach(t => t.el.remove());
+  targets = [];
+  const total = hits + misses;
+  document.getElementById('finalScore').textContent = `Score: ${score}`;
+  document.getElementById('finalAcc').textContent = `Accuracy: ${total ? Math.round(hits/total*100) : 0}%`;
+  document.getElementById('finalHits').textContent = `Hits: ${hits} | Misses: ${misses}`;
+  results.style.display = 'flex';
+}
+</script>
+</body>
+</html>
