@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dodge the Falling Blocks</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0f0f23; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; display: flex; align-items: center; justify-content: center; }
+canvas { display: block; background: #1a1a2e; border-radius: 8px; box-shadow: 0 0 40px rgba(99, 102, 241, 0.3); }
+#ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+#overlay { background: rgba(15, 15, 35, 0.92); border-radius: 16px; padding: 40px; text-align: center; color: #e2e8f0; pointer-events: auto; max-width: 360px; }
+#overlay h1 { font-size: 28px; margin-bottom: 12px; background: linear-gradient(135deg, #6366f1, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+#overlay p { font-size: 14px; color: #94a3b8; margin-bottom: 20px; line-height: 1.6; }
+#overlay .score { font-size: 22px; color: #f59e0b; margin-bottom: 16px; }
+#startBtn { background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; color: white; padding: 14px 36px; font-size: 16px; border-radius: 8px; cursor: pointer; transition: transform 0.1s; }
+#startBtn:hover { transform: scale(1.05); }
+#hud { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); color: #e2e8f0; font-size: 18px; font-weight: 600; pointer-events: none; }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud" class="hidden"><span id="scoreDisplay">0</span></div>
+<div id="ui">
+  <div id="overlay">
+    <h1>Dodge the Blocks</h1>
+    <p>Move left and right to avoid falling blocks.<br>Use arrow keys, A/D, or touch to move.<br>Survive as long as you can!</p>
+    <div class="score hidden" id="finalScore"></div>
+    <button id="startBtn">Play</button>
+  </div>
+</div>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const hud = document.getElementById('hud');
+const scoreDisplay = document.getElementById('scoreDisplay');
+const finalScore = document.getElementById('finalScore');
+const startBtn = document.getElementById('startBtn');
+
+let W, H, player, blocks, score, speed, spawnRate, frame, running, animId, touchX;
+
+function resize() {
+  const s = Math.min(window.innerWidth * 0.95, 480);
+  W = canvas.width = s;
+  H = canvas.height = s * 1.4;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const keys = {};
+window.addEventListener('keydown', e => keys[e.key] = true);
+window.addEventListener('keyup', e => keys[e.key] = false);
+
+canvas.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; e.preventDefault(); }, { passive: false });
+canvas.addEventListener('touchmove', e => { touchX = e.touches[0].clientX; e.preventDefault(); }, { passive: false });
+canvas.addEventListener('touchend', () => { touchX = null; });
+
+function init() {
+  player = { x: W / 2, y: H - 60, w: 36, h: 36, speed: 5 };
+  blocks = [];
+  score = 0;
+  speed = 3;
+  spawnRate = 40;
+  frame = 0;
+  running = true;
+  overlay.classList.add('hidden');
+  hud.classList.remove('hidden');
+  finalScore.classList.add('hidden');
+  touchX = null;
+  loop();
+}
+
+function spawnBlock() {
+  const w = 30 + Math.random() * 40;
+  blocks.push({ x: Math.random() * (W - w), y: -40, w, h: 24 + Math.random() * 16, color: `hsl(${Math.random()*360}, 70%, 55%)` });
+}
+
+function update() {
+  frame++;
+  if (keys['ArrowLeft'] || keys['a'] || keys['A']) player.x -= player.speed;
+  if (keys['ArrowRight'] || keys['d'] || keys['D']) player.x += player.speed;
+
+  if (touchX !== null) {
+    const rect = canvas.getBoundingClientRect();
+    const target = ((touchX - rect.left) / rect.width) * W - player.w / 2;
+    player.x += (target - player.x) * 0.15;
+  }
+
+  player.x = Math.max(0, Math.min(W - player.w, player.x));
+
+  if (frame % Math.max(10, Math.floor(spawnRate)) === 0) spawnBlock();
+
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    blocks[i].y += speed;
+    if (blocks[i].y > H) { blocks.splice(i, 1); score++; continue; }
+    if (player.x < blocks[i].x + blocks[i].w && player.x + player.w > blocks[i].x &&
+        player.y < blocks[i].y + blocks[i].h && player.y + player.h > blocks[i].y) {
+      gameOver(); return;
+    }
+  }
+
+  speed = 3 + score * 0.05;
+  spawnRate = 40 - score * 0.3;
+  scoreDisplay.textContent = score;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  // player
+  ctx.fillStyle = '#6366f1';
+  ctx.shadowColor = '#6366f1';
+  ctx.shadowBlur = 12;
+  ctx.fillRect(player.x, player.y, player.w, player.h);
+  ctx.shadowBlur = 0;
+  // blocks
+  for (const b of blocks) {
+    ctx.fillStyle = b.color;
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+  }
+}
+
+function loop() {
+  if (!running) return;
+  update();
+  draw();
+  animId = requestAnimationFrame(loop);
+}
+
+function gameOver() {
+  running = false;
+  cancelAnimationFrame(animId);
+  hud.classList.add('hidden');
+  finalScore.textContent = `Score: ${score}`;
+  finalScore.classList.remove('hidden');
+  overlay.querySelector('h1').textContent = 'Game Over';
+  overlay.querySelector('p').textContent = 'You were hit by a block!';
+  startBtn.textContent = 'Play Again';
+  overlay.classList.remove('hidden');
+}
+
+startBtn.addEventListener('click', init);
+</script>
+</body>
+</html>
