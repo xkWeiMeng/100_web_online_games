@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Helicopter Cave Navigator</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a1a; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; touch-action: none; user-select: none; }
+canvas { display: block; }
+#ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+#title-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, #0a0a2e 0%, #1a0a3e 50%, #0a1a2e 100%); pointer-events: all; z-index: 10; }
+#title-screen h1 { font-size: clamp(28px, 6vw, 56px); color: #00eaff; text-shadow: 0 0 30px #00eaff88, 0 0 60px #00eaff44; margin-bottom: 10px; text-align: center; }
+#title-screen .sub { color: #8899bb; font-size: clamp(12px, 2.5vw, 18px); margin-bottom: 30px; }
+#title-screen .instructions { color: #aabbcc; font-size: clamp(11px, 2vw, 15px); background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px 24px; max-width: 400px; line-height: 1.7; margin-bottom: 30px; text-align: center; }
+#start-btn { pointer-events: all; background: linear-gradient(135deg, #00eaff, #0080ff); color: #fff; border: none; padding: 14px 48px; font-size: 20px; border-radius: 30px; cursor: pointer; font-weight: 700; letter-spacing: 1px; box-shadow: 0 0 30px #00eaff44; transition: transform 0.15s; }
+#start-btn:hover { transform: scale(1.05); }
+#hud { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; color: #00eaff; font-size: 18px; font-weight: 700; text-shadow: 0 0 10px #00eaff88; }
+#game-over { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(5,5,20,0.85); pointer-events: all; z-index: 10; }
+#game-over h2 { font-size: 42px; color: #ff4466; text-shadow: 0 0 30px #ff446688; margin-bottom: 10px; }
+#game-over .score-display { color: #00eaff; font-size: 22px; margin-bottom: 8px; }
+#game-over .best { color: #ffaa00; font-size: 16px; margin-bottom: 24px; }
+#restart-btn { pointer-events: all; background: linear-gradient(135deg, #ff4466, #ff6644); color: #fff; border: none; padding: 12px 40px; font-size: 18px; border-radius: 30px; cursor: pointer; font-weight: 700; box-shadow: 0 0 20px #ff446644; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div id="title-screen">
+    <h1>Helicopter Cave Navigator</h1>
+    <div class="sub">Navigate the endless cave. Don't crash!</div>
+    <div class="instructions">
+      <strong>Controls:</strong><br>
+      Click / Tap / Hold &mdash; Fly UP<br>
+      Release &mdash; Fall DOWN<br><br>
+      Avoid the cave walls and obstacles.<br>
+      Collect gems for bonus points!
+    </div>
+    <button id="start-btn">START</button>
+  </div>
+  <div id="hud"><span id="score-hud">Score: 0</span><span id="best-hud"></span></div>
+  <div id="game-over">
+    <h2>CRASHED!</h2>
+    <div class="score-display" id="final-score"></div>
+    <div class="best" id="final-best"></div>
+    <button id="restart-btn">PLAY AGAIN</button>
+  </div>
+</div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const titleScreen = document.getElementById('title-screen');
+const gameOverScreen = document.getElementById('game-over');
+const scoreHud = document.getElementById('score-hud');
+const bestHud = document.getElementById('best-hud');
+const finalScore = document.getElementById('final-score');
+const finalBest = document.getElementById('final-best');
+
+let W, H, playing = false, lifting = false, score = 0, best = +localStorage.getItem('heli-best') || 0;
+let heli, cave, obstacles, gems, particles, speed, frameCount, caveGap, shakeDur = 0;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+bestHud.textContent = best ? `Best: ${best}` : '';
+
+function init() {
+  score = 0; frameCount = 0; speed = 2.5; caveGap = H * 0.45;
+  heli = { x: W * 0.2, y: H / 2, vy: 0, w: 36, h: 18, tilt: 0, trail: [] };
+  cave = []; obstacles = []; gems = []; particles = [];
+  const mid = H / 2;
+  for (let i = 0; i <= W + 60; i += 6) {
+    cave.push({ top: mid - caveGap / 2, bot: mid + caveGap / 2 });
+  }
+}
+
+function addParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    particles.push({ x, y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, life: 30 + Math.random() * 20, color, r: 2 + Math.random() * 3 });
+  }
+}
+
+function update() {
+  frameCount++;
+  speed = 2.5 + score * 0.003;
+  if (speed > 7) speed = 7;
+  caveGap = Math.max(H * 0.25, H * 0.45 - score * 0.15);
+
+  // Cave generation
+  const last = cave[cave.length - 1];
+  const drift = (Math.sin(frameCount * 0.015) * 1.2 + Math.cos(frameCount * 0.007) * 0.8);
+  let newTop = last.top + drift;
+  if (newTop < 20) newTop = 20;
+  if (newTop + caveGap > H - 20) newTop = H - 20 - caveGap;
+  cave.push({ top: newTop, bot: newTop + caveGap });
+  cave.shift();
+
+  // Helicopter physics
+  if (lifting) { heli.vy -= 0.55; } else { heli.vy += 0.35; }
+  heli.vy *= 0.96;
+  if (heli.vy < -6) heli.vy = -6;
+  if (heli.vy > 6) heli.vy = 6;
+  heli.y += heli.vy;
+  heli.tilt = heli.vy * 2;
+
+  // Trail
+  heli.trail.push({ x: heli.x - 14, y: heli.y });
+  if (heli.trail.length > 12) heli.trail.shift();
+
+  // Score
+  score += speed * 0.02;
+
+  // Obstacles
+  if (frameCount % Math.max(60, 120 - Math.floor(score)) === 0) {
+    const ci = Math.min(cave.length - 1, Math.floor((W + 40) / 6));
+    const c = cave[ci];
+    const oy = c.top + 20 + Math.random() * (c.bot - c.top - 40);
+    obstacles.push({ x: W + 40, y: oy, r: 8 + Math.random() * 10 });
+  }
+  obstacles.forEach(o => o.x -= speed);
+  obstacles = obstacles.filter(o => o.x > -30);
+
+  // Gems
+  if (frameCount % Math.max(80, 150 - Math.floor(score * 0.5)) === 0) {
+    const ci = Math.min(cave.length - 1, Math.floor((W + 40) / 6));
+    const c = cave[ci];
+    const gy = c.top + 30 + Math.random() * (c.bot - c.top - 60);
+    gems.push({ x: W + 40, y: gy, collected: false, t: 0 });
+  }
+  gems.forEach(g => { g.x -= speed; g.t++; });
+  gems = gems.filter(g => g.x > -20 && !g.collected);
+
+  // Gem collision
+  gems.forEach(g => {
+    const dx = heli.x - g.x, dy = heli.y - g.y;
+    if (Math.sqrt(dx * dx + dy * dy) < 22) {
+      g.collected = true; score += 10;
+      addParticles(g.x, g.y, '#ffee00', 12);
+    }
+  });
+
+  // Particles
+  particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.life--; });
+  particles = particles.filter(p => p.life > 0);
+
+  // Collision with cave
+  const ci = Math.max(0, Math.min(cave.length - 1, Math.round(heli.x / 6)));
+  const c = cave[ci];
+  if (heli.y - heli.h / 2 < c.top || heli.y + heli.h / 2 > c.bot) return die();
+
+  // Collision with obstacles
+  for (const o of obstacles) {
+    const dx = heli.x - o.x, dy = heli.y - o.y;
+    if (Math.sqrt(dx * dx + dy * dy) < o.r + 12) return die();
+  }
+}
+
+function die() {
+  playing = false; shakeDur = 15;
+  addParticles(heli.x, heli.y, '#ff4444', 30);
+  addParticles(heli.x, heli.y, '#ffaa00', 20);
+  const s = Math.floor(score);
+  if (s > best) { best = s; localStorage.setItem('heli-best', best); }
+  finalScore.textContent = `Score: ${s}`;
+  finalBest.textContent = `Best: ${best}`;
+  bestHud.textContent = `Best: ${best}`;
+  setTimeout(() => { gameOverScreen.style.display = 'flex'; }, 400);
+}
+
+function drawCave() {
+  // Cave fill
+  ctx.fillStyle = '#0d0d24';
+  ctx.fillRect(0, 0, W, H);
+
+  // Gradient background inside cave
+  const grd = ctx.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, '#1a0a3e'); grd.addColorStop(0.5, '#0a1a3e'); grd.addColorStop(1, '#0a0a2e');
+  ctx.fillStyle = grd;
+
+  // Draw top wall
+  ctx.beginPath(); ctx.moveTo(0, 0);
+  for (let i = 0; i < cave.length; i++) ctx.lineTo(i * 6, cave[i].top);
+  ctx.lineTo(W, 0); ctx.closePath();
+  ctx.fillStyle = '#141430'; ctx.fill();
+  ctx.strokeStyle = '#3344aa55'; ctx.lineWidth = 2; ctx.stroke();
+
+  // Draw bottom wall
+  ctx.beginPath(); ctx.moveTo(0, H);
+  for (let i = 0; i < cave.length; i++) ctx.lineTo(i * 6, cave[i].bot);
+  ctx.lineTo(W, H); ctx.closePath();
+  ctx.fillStyle = '#141430'; ctx.fill();
+  ctx.strokeStyle = '#3344aa55'; ctx.stroke();
+
+  // Edge glow top
+  ctx.beginPath();
+  for (let i = 0; i < cave.length; i++) { i === 0 ? ctx.moveTo(0, cave[0].top) : ctx.lineTo(i * 6, cave[i].top); }
+  ctx.strokeStyle = '#00eaff33'; ctx.lineWidth = 4; ctx.stroke();
+  // Edge glow bottom
+  ctx.beginPath();
+  for (let i = 0; i < cave.length; i++) { i === 0 ? ctx.moveTo(0, cave[0].bot) : ctx.lineTo(i * 6, cave[i].bot); }
+  ctx.stroke();
+}
+
+function drawHeli() {
+  const { x, y, tilt, trail } = heli;
+  // Trail
+  for (let i = 0; i < trail.length; i++) {
+    const a = i / trail.length * 0.4;
+    ctx.fillStyle = lifting ? `rgba(0,200,255,${a})` : `rgba(100,100,200,${a})`;
+    ctx.beginPath(); ctx.arc(trail[i].x, trail[i].y, 3, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.save(); ctx.translate(x, y); ctx.rotate(tilt * Math.PI / 180);
+  // Body
+  ctx.fillStyle = '#00ccff'; ctx.shadowColor = '#00ccff'; ctx.shadowBlur = 15;
+  ctx.beginPath(); ctx.ellipse(0, 0, 18, 8, 0, 0, Math.PI * 2); ctx.fill();
+  // Cockpit
+  ctx.fillStyle = '#66eeff'; ctx.beginPath(); ctx.ellipse(8, -2, 6, 5, 0, 0, Math.PI * 2); ctx.fill();
+  // Tail
+  ctx.fillStyle = '#0099cc'; ctx.fillRect(-20, -3, 10, 6);
+  ctx.fillRect(-22, -8, 4, 16);
+  // Rotor
+  const rPhase = frameCount * 0.6;
+  ctx.strokeStyle = '#aaeeff'; ctx.lineWidth = 2; ctx.shadowBlur = 5;
+  ctx.beginPath(); ctx.moveTo(-14 * Math.cos(rPhase), -10); ctx.lineTo(14 * Math.cos(rPhase), -10); ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  // Thrust particles
+  if (lifting && frameCount % 2 === 0) {
+    addParticles(x - 10, y + 6, '#00aaff', 1);
+  }
+}
+
+function drawObstacles() {
+  obstacles.forEach(o => {
+    ctx.fillStyle = '#ff3355'; ctx.shadowColor = '#ff3355'; ctx.shadowBlur = 12;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI * 2 / 6) * i - Math.PI / 2;
+      const r = o.r * (i % 2 === 0 ? 1 : 0.6);
+      i === 0 ? ctx.moveTo(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r) : ctx.lineTo(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+  });
+}
+
+function drawGems() {
+  gems.forEach(g => {
+    const bob = Math.sin(g.t * 0.1) * 3;
+    ctx.fillStyle = '#ffee00'; ctx.shadowColor = '#ffee00'; ctx.shadowBlur = 14;
+    ctx.save(); ctx.translate(g.x, g.y + bob); ctx.rotate(g.t * 0.05);
+    ctx.beginPath();
+    ctx.moveTo(0, -8); ctx.lineTo(6, 0); ctx.lineTo(0, 8); ctx.lineTo(-6, 0); ctx.closePath();
+    ctx.fill(); ctx.shadowBlur = 0; ctx.restore();
+  });
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    const a = p.life / 50;
+    ctx.globalAlpha = a; ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r * a, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+
+function draw() {
+  ctx.save();
+  if (shakeDur > 0) {
+    shakeDur--;
+    ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
+  }
+  drawCave();
+  drawGems();
+  drawObstacles();
+  if (playing) drawHeli();
+  drawParticles();
+  ctx.restore();
+  scoreHud.textContent = `Score: ${Math.floor(score)}`;
+}
+
+function loop() {
+  if (playing) update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// Controls
+function down() { lifting = true; }
+function up() { lifting = false; }
+window.addEventListener('mousedown', down); window.addEventListener('mouseup', up);
+window.addEventListener('touchstart', e => { e.preventDefault(); down(); }, { passive: false });
+window.addEventListener('touchend', up);
+window.addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); down(); } });
+window.addEventListener('keyup', e => { if (e.code === 'Space' || e.code === 'ArrowUp') up(); });
+
+function startGame() {
+  titleScreen.style.display = 'none';
+  gameOverScreen.style.display = 'none';
+  init(); playing = true;
+}
+
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('restart-btn').addEventListener('click', startGame);
+
+loop();
+</script>
+</body>
+</html>
