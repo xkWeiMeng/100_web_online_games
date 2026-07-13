@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tron Light Cycle</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0a; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Courier New', monospace; overflow: hidden; }
+canvas { display: block; border: 2px solid #0ff; box-shadow: 0 0 20px #0ff, inset 0 0 20px rgba(0,255,255,0.1); }
+#ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; pointer-events: none; }
+#overlay { pointer-events: all; text-align: center; color: #0ff; text-shadow: 0 0 10px #0ff; }
+#overlay h1 { font-size: 3rem; margin-bottom: 0.5rem; letter-spacing: 0.5rem; }
+#overlay p { font-size: 0.9rem; color: #aef; margin: 0.3rem 0; }
+#overlay button { margin-top: 1.5rem; padding: 12px 40px; font-size: 1.2rem; font-family: inherit; background: transparent; color: #0ff; border: 2px solid #0ff; cursor: pointer; text-transform: uppercase; letter-spacing: 3px; transition: all 0.2s; }
+#overlay button:hover { background: #0ff; color: #000; box-shadow: 0 0 20px #0ff; }
+#score { position: absolute; top: 10px; left: 0; width: 100%; text-align: center; color: #0ff; font-size: 1rem; text-shadow: 0 0 5px #0ff; pointer-events: none; }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="score" class="hidden"><span id="p1s">0</span> - <span id="p2s">0</span></div>
+<div id="ui">
+  <div id="overlay">
+    <h1>TRON</h1>
+    <p>Player 1 (Blue): WASD</p>
+    <p>Player 2 (Orange): Arrow Keys</p>
+    <p>Mobile: Tap left/right half to turn</p>
+    <p style="margin-top:0.8rem;color:#fff;">Don't hit walls or trails!</p>
+    <button id="startBtn">START</button>
+  </div>
+</div>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const scoreEl = document.getElementById('score');
+const p1sEl = document.getElementById('p1s');
+const p2sEl = document.getElementById('p2s');
+
+const CELL = 4;
+let W, H, cols, rows, grid, players, running, animId, scores = [0,0];
+
+function resize() {
+  const s = Math.min(window.innerWidth - 20, window.innerHeight - 20, 800);
+  W = H = Math.floor(s / CELL) * CELL;
+  canvas.width = W; canvas.height = H;
+  cols = W / CELL; rows = H / CELL;
+}
+resize();
+
+function init() {
+  grid = new Uint8Array(cols * rows);
+  players = [
+    { x: Math.floor(cols * 0.25), y: Math.floor(rows / 2), dx: 1, dy: 0, color: '#0ff', trail: '#066', alive: true },
+    { x: Math.floor(cols * 0.75), y: Math.floor(rows / 2), dx: -1, dy: 0, color: '#f80', trail: '#630', alive: true }
+  ];
+  players.forEach((p, i) => grid[p.y * cols + p.x] = i + 1);
+}
+
+function setDir(p, dx, dy) {
+  if (p.dx === -dx && p.dy === -dy) return;
+  p.dx = dx; p.dy = dy;
+}
+
+document.addEventListener('keydown', e => {
+  if (!running) return;
+  const p0 = players[0], p1 = players[1];
+  switch(e.key) {
+    case 'w': case 'W': setDir(p0,0,-1); break;
+    case 's': case 'S': setDir(p0,0,1); break;
+    case 'a': case 'A': setDir(p0,-1,0); break;
+    case 'd': case 'D': setDir(p0,1,0); break;
+    case 'ArrowUp': setDir(p1,0,-1); break;
+    case 'ArrowDown': setDir(p1,0,1); break;
+    case 'ArrowLeft': setDir(p1,-1,0); break;
+    case 'ArrowRight': setDir(p1,1,0); break;
+  }
+  e.preventDefault();
+});
+
+canvas.addEventListener('touchstart', e => {
+  if (!running) return;
+  const t = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const x = t.clientX - rect.left;
+  const p = players[0];
+  // tap left = turn left, tap right = turn right relative to direction
+  if (x < rect.width / 2) { // turn left
+    const nd = [-p.dy, p.dx]; setDir(p, nd[0], nd[1]);
+  } else { // turn right
+    const nd = [p.dy, -p.dx]; setDir(p, nd[0], nd[1]);
+  }
+  e.preventDefault();
+});
+
+function step() {
+  for (const p of players) {
+    if (!p.alive) continue;
+    p.x += p.dx; p.y += p.dy;
+    if (p.x < 0 || p.x >= cols || p.y < 0 || p.y >= rows || grid[p.y * cols + p.x]) {
+      p.alive = false;
+    } else {
+      grid[p.y * cols + p.x] = players.indexOf(p) + 1;
+    }
+  }
+}
+
+function draw() {
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < grid.length; i++) {
+    if (grid[i]) {
+      ctx.fillStyle = players[grid[i]-1].trail;
+      ctx.fillRect((i % cols) * CELL, Math.floor(i / cols) * CELL, CELL, CELL);
+    }
+  }
+  for (const p of players) {
+    if (!p.alive) continue;
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 8;
+    ctx.fillRect(p.x * CELL, p.y * CELL, CELL, CELL);
+    ctx.shadowBlur = 0;
+  }
+}
+
+function gameOver() {
+  running = false;
+  cancelAnimationFrame(animId);
+  let msg;
+  if (!players[0].alive && !players[1].alive) { msg = 'DRAW'; }
+  else if (!players[0].alive) { scores[1]++; msg = 'ORANGE WINS'; }
+  else { scores[0]++; msg = 'BLUE WINS'; }
+  p1sEl.textContent = scores[0]; p2sEl.textContent = scores[1];
+  overlay.querySelector('h1').textContent = msg;
+  overlay.querySelector('button').textContent = 'PLAY AGAIN';
+  overlay.classList.remove('hidden');
+}
+
+let lastTime = 0;
+const TICK = 40;
+function loop(ts) {
+  if (ts - lastTime >= TICK) {
+    lastTime = ts;
+    step();
+    if (!players[0].alive || !players[1].alive) { draw(); gameOver(); return; }
+    draw();
+  }
+  animId = requestAnimationFrame(loop);
+}
+
+function start() {
+  overlay.classList.add('hidden');
+  scoreEl.classList.remove('hidden');
+  init(); draw();
+  running = true; lastTime = 0;
+  animId = requestAnimationFrame(loop);
+}
+
+document.getElementById('startBtn').addEventListener('click', start);
+window.addEventListener('resize', resize);
+</script>
+</body>
+</html>
