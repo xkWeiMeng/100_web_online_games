@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Lane Racer</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; font-family: 'Segoe UI', sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
+canvas { display: block; border-radius: 8px; box-shadow: 0 0 40px rgba(0,200,255,0.3); }
+#ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; pointer-events: none; }
+#overlay { background: rgba(10,10,30,0.92); border-radius: 16px; padding: 40px; text-align: center; color: #fff; pointer-events: auto; max-width: 360px; }
+#overlay h1 { font-size: 2.2rem; margin-bottom: 12px; background: linear-gradient(135deg, #00d4ff, #7b2ff7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+#overlay p { color: #aab; margin-bottom: 16px; font-size: 0.95rem; line-height: 1.5; }
+#overlay button { background: linear-gradient(135deg, #00d4ff, #7b2ff7); border: none; color: #fff; padding: 14px 36px; font-size: 1.1rem; border-radius: 30px; cursor: pointer; font-weight: bold; transition: transform 0.1s; }
+#overlay button:active { transform: scale(0.95); }
+#hud { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); color: #fff; font-size: 1rem; display: none; text-align: center; }
+#hud span { margin: 0 12px; }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud"><span id="scoreDisplay">Score: 0</span><span id="speedDisplay">Speed: 60</span></div>
+<div id="ui"><div id="overlay">
+<h1>Lane Racer</h1>
+<p>Dodge traffic by switching lanes!<br>Use <b>Left/Right</b> arrows or <b>A/D</b> keys.<br>On mobile, tap left/right side of screen.<br>Survive as long as you can!</p>
+<p id="finalScore"></p>
+<button id="startBtn">Start</button>
+</div></div>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const hud = document.getElementById('hud');
+const scoreDisplay = document.getElementById('scoreDisplay');
+const speedDisplay = document.getElementById('speedDisplay');
+const finalScore = document.getElementById('finalScore');
+const startBtn = document.getElementById('startBtn');
+
+let W, H, laneW, lanes = 3, player, obstacles, score, speed, frame, running, roadOffset;
+
+function resize() {
+  const ratio = 16/9;
+  let h = Math.min(window.innerHeight * 0.95, 800);
+  let w = h / ratio;
+  if (w > window.innerWidth * 0.95) { w = window.innerWidth * 0.95; h = w * ratio; }
+  W = canvas.width = Math.floor(w);
+  H = canvas.height = Math.floor(h);
+  laneW = W / lanes;
+}
+resize();
+window.addEventListener('resize', resize);
+
+function init() {
+  player = { lane: 1, y: H - 120, w: laneW * 0.45, h: laneW * 0.8 };
+  obstacles = [];
+  score = 0; speed = 4; frame = 0; roadOffset = 0; running = true;
+  hud.style.display = 'block';
+  overlay.classList.add('hidden');
+  loop();
+}
+
+function spawnObstacle() {
+  let lane = Math.floor(Math.random() * lanes);
+  // avoid stacking same lane too close
+  if (obstacles.length && obstacles[obstacles.length-1].y < 80 && obstacles[obstacles.length-1].lane === lane) {
+    lane = (lane + 1) % lanes;
+  }
+  const colors = ['#ff4757','#ffa502','#2ed573','#1e90ff','#ff6b81'];
+  obstacles.push({ lane, y: -100, color: colors[Math.floor(Math.random()*colors.length)] });
+}
+
+function getX(lane, w) { return lane * laneW + (laneW - w) / 2; }
+
+function update() {
+  frame++;
+  speed = 4 + score / 500;
+  roadOffset = (roadOffset + speed * 2) % 40;
+
+  // spawn
+  const spawnRate = Math.max(30, 60 - score / 100);
+  if (frame % Math.floor(spawnRate) === 0) spawnObstacle();
+
+  // move obstacles
+  for (let i = obstacles.length - 1; i >= 0; i--) {
+    obstacles[i].y += speed;
+    if (obstacles[i].y > H + 100) { obstacles.splice(i, 1); score += 10; }
+  }
+
+  // collision
+  const px = getX(player.lane, player.w);
+  for (const o of obstacles) {
+    const ox = getX(o.lane, player.w);
+    if (Math.abs(px - ox) < player.w * 0.8 && o.y + player.h > player.y && o.y < player.y + player.h) {
+      gameOver(); return;
+    }
+  }
+  score += 0.1;
+  scoreDisplay.textContent = 'Score: ' + Math.floor(score);
+  speedDisplay.textContent = 'Speed: ' + Math.floor(speed * 15);
+}
+
+function draw() {
+  // road
+  ctx.fillStyle = '#2d2d44';
+  ctx.fillRect(0, 0, W, H);
+
+  // lane lines
+  ctx.setLineDash([20, 20]);
+  ctx.lineDashOffset = -roadOffset;
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 3;
+  for (let i = 1; i < lanes; i++) {
+    ctx.beginPath(); ctx.moveTo(i * laneW, 0); ctx.lineTo(i * laneW, H); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // road edges
+  ctx.fillStyle = '#7b2ff7';
+  ctx.fillRect(0, 0, 4, H);
+  ctx.fillRect(W - 4, 0, 4, H);
+
+  // obstacles
+  for (const o of obstacles) {
+    const ox = getX(o.lane, player.w);
+    ctx.fillStyle = o.color;
+    roundRect(ctx, ox, o.y, player.w, player.h, 8);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(ox + 6, o.y + 10, player.w - 12, 6);
+    ctx.fillRect(ox + 6, o.y + player.h - 16, player.w - 12, 6);
+  }
+
+  // player
+  const px = getX(player.lane, player.w);
+  ctx.fillStyle = '#00d4ff';
+  roundRect(ctx, px, player.y, player.w, player.h, 10);
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.fillRect(px + 8, player.y + 12, player.w - 16, 8);
+  ctx.fillStyle = '#005f8a';
+  ctx.fillRect(px + 8, player.y + player.h - 20, player.w - 16, 8);
+}
+
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath(); c.moveTo(x+r,y); c.lineTo(x+w-r,y); c.quadraticCurveTo(x+w,y,x+w,y+r);
+  c.lineTo(x+w,y+h-r); c.quadraticCurveTo(x+w,y+h,x+w-r,y+h); c.lineTo(x+r,y+h);
+  c.quadraticCurveTo(x,y+h,x,y+h-r); c.lineTo(x,y+r); c.quadraticCurveTo(x,y,x+r,y); c.fill();
+}
+
+function loop() {
+  if (!running) return;
+  update(); draw();
+  requestAnimationFrame(loop);
+}
+
+function gameOver() {
+  running = false;
+  hud.style.display = 'none';
+  finalScore.textContent = 'Final Score: ' + Math.floor(score);
+  startBtn.textContent = 'Play Again';
+  overlay.querySelector('h1').textContent = 'Game Over';
+  overlay.classList.remove('hidden');
+}
+
+// Input
+function moveLeft() { if (running && player.lane > 0) player.lane--; }
+function moveRight() { if (running && player.lane < lanes - 1) player.lane++; }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft' || e.key === 'a') moveLeft();
+  if (e.key === 'ArrowRight' || e.key === 'd') moveRight();
+});
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const x = e.touches[0].clientX - canvas.getBoundingClientRect().left;
+  if (x < W / 2) moveLeft(); else moveRight();
+});
+
+canvas.addEventListener('mousedown', e => {
+  const x = e.clientX - canvas.getBoundingClientRect().left;
+  if (x < W / 2) moveLeft(); else moveRight();
+});
+
+startBtn.addEventListener('click', init);
+</script>
+</body>
+</html>
