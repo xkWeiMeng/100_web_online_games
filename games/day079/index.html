@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Penalty Shootout</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', sans-serif; background: #1a472a; overflow: hidden; height: 100vh; display: flex; align-items: center; justify-content: center; }
+canvas { display: block; border-radius: 8px; box-shadow: 0 0 40px rgba(0,0,0,0.5); cursor: crosshair; }
+#ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+#overlay { pointer-events: auto; background: rgba(0,0,0,0.85); border-radius: 16px; padding: 40px; text-align: center; color: #fff; max-width: 400px; }
+#overlay h1 { font-size: 2.2em; margin-bottom: 10px; color: #4cff88; text-shadow: 0 0 10px #0f0; }
+#overlay p { margin: 10px 0; font-size: 1.05em; color: #ccc; line-height: 1.5; }
+#overlay button { margin-top: 20px; padding: 14px 40px; font-size: 1.2em; border: none; border-radius: 8px; background: linear-gradient(135deg, #4cff88, #00b347); color: #111; font-weight: bold; cursor: pointer; transition: transform 0.1s; }
+#overlay button:hover { transform: scale(1.05); }
+#overlay button:active { transform: scale(0.95); }
+.hidden { display: none !important; }
+#hud { position: absolute; top: 10px; left: 0; width: 100%; display: flex; justify-content: center; gap: 30px; pointer-events: none; }
+#hud div { background: rgba(0,0,0,0.7); padding: 8px 18px; border-radius: 8px; color: #fff; font-size: 1.1em; font-weight: bold; }
+#hud .score { color: #4cff88; }
+#message { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 2.5em; font-weight: bold; color: #fff; text-shadow: 0 0 20px #000; pointer-events: none; opacity: 0; transition: opacity 0.3s; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud" class="hidden">
+  <div>You: <span class="score" id="playerScore">0</span></div>
+  <div>Round: <span id="round">1</span>/5</div>
+  <div>CPU: <span class="score" id="cpuScore">0</span></div>
+</div>
+<div id="message"></div>
+<div id="ui">
+  <div id="overlay">
+    <h1>Penalty Shootout</h1>
+    <p>Take 5 penalty kicks against the goalkeeper!</p>
+    <p><strong>Click/tap</strong> where you want to shoot.<br>Aim for the corners to beat the keeper!</p>
+    <button id="startBtn">Play</button>
+  </div>
+</div>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const hud = document.getElementById('hud');
+const msgEl = document.getElementById('message');
+
+let W, H;
+function resize() {
+  const s = Math.min(window.innerWidth, window.innerHeight * 1.4, 800);
+  W = canvas.width = s;
+  H = canvas.height = s * 0.75;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Game state
+let state = 'menu'; // menu, aiming, shooting, saving, result, gameover
+let playerScore = 0, cpuScore = 0, round = 0, maxRounds = 5;
+let ball, keeper, shotTarget, shotTime, resultTimer;
+let lastTime = 0;
+
+const GOAL = { x: 0, y: 0, w: 0, h: 0 };
+const NET_DEPTH = 30;
+
+function initPositions() {
+  GOAL.w = W * 0.52;
+  GOAL.h = H * 0.38;
+  GOAL.x = (W - GOAL.w) / 2;
+  GOAL.y = H * 0.08;
+}
+
+function resetShot() {
+  initPositions();
+  ball = { x: W/2, y: H * 0.82, z: 0, vx: 0, vy: 0, vz: 0, radius: W*0.03 };
+  keeper = { x: W/2, y: GOAL.y + GOAL.h * 0.5, w: W*0.07, h: GOAL.h*0.85, tx: W/2, diving: false };
+  shotTarget = null;
+  state = 'aiming';
+}
+
+function showMsg(text, duration=1500) {
+  msgEl.textContent = text;
+  msgEl.style.opacity = 1;
+  setTimeout(() => msgEl.style.opacity = 0, duration);
+}
+
+function updateHUD() {
+  document.getElementById('playerScore').textContent = playerScore;
+  document.getElementById('cpuScore').textContent = cpuScore;
+  document.getElementById('round').textContent = Math.min(round + 1, maxRounds);
+}
+
+// Shoot
+canvas.addEventListener('click', (e) => {
+  if (state !== 'aiming') return;
+  const rect = canvas.getBoundingClientRect();
+  const cx = (e.clientX - rect.left) * (W / rect.width);
+  const cy = (e.clientY - rect.top) * (H / rect.height);
+  // Only allow shots toward goal area
+  if (cy > GOAL.y + GOAL.h + 20) return;
+  shotTarget = { x: cx, y: cy };
+  state = 'shooting';
+  shotTime = 0;
+  // Ball physics
+  const dx = shotTarget.x - ball.x;
+  const dy = shotTarget.y - ball.y;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  const speed = dist / 0.45;
+  ball.vx = (dx / dist) * speed;
+  ball.vy = (dy / dist) * speed;
+  ball.vz = 300;
+  // Keeper dives
+  const zones = ['left','center','right'];
+  const keeperChoice = zones[Math.floor(Math.random()*3)];
+  let tx = W/2;
+  if (keeperChoice === 'left') tx = GOAL.x + GOAL.w * 0.15;
+  else if (keeperChoice === 'right') tx = GOAL.x + GOAL.w * 0.85;
+  keeper.tx = tx;
+  keeper.diving = true;
+});
+
+function update(dt) {
+  if (state === 'shooting') {
+    shotTime += dt;
+    ball.x += ball.vx * dt;
+    ball.y += ball.vy * dt;
+    ball.vz -= 600 * dt;
+    ball.z = Math.max(0, ball.z + ball.vz * dt);
+    // Keeper movement
+    if (keeper.diving) {
+      const diff = keeper.tx - keeper.x;
+      keeper.x += diff * 6 * dt;
+    }
+    // Check if ball reached goal line
+    if (ball.y <= GOAL.y + GOAL.h * 0.5) {
+      state = 'result';
+      // Check if goal
+      const inGoalX = ball.x > GOAL.x + 10 && ball.x < GOAL.x + GOAL.w - 10;
+      const inGoalY = ball.y >= GOAL.y - 5;
+      // Check if saved
+      const kx = keeper.x, ky = keeper.y;
+      const saved = Math.abs(ball.x - kx) < keeper.w * 0.7 && Math.abs(ball.y - ky) < keeper.h * 0.5;
+      if (inGoalX && !saved) {
+        playerScore++;
+        showMsg('GOAL!', 1200);
+      } else if (saved) {
+        showMsg('SAVED!', 1200);
+      } else {
+        showMsg('MISSED!', 1200);
+      }
+      // CPU turn (auto)
+      setTimeout(() => {
+        const cpuScores = Math.random() > 0.4;
+        if (cpuScores) { cpuScore++; showMsg('CPU Scores...', 1000); }
+        else { showMsg('CPU Missed!', 1000); }
+        updateHUD();
+        setTimeout(() => {
+          round++;
+          if (round >= maxRounds) {
+            state = 'gameover';
+            let msg = playerScore > cpuScore ? 'You Win!' : playerScore < cpuScore ? 'You Lose!' : "It's a Draw!";
+            overlay.querySelector('h1').textContent = msg;
+            overlay.querySelector('h1').style.color = playerScore > cpuScore ? '#4cff88' : playerScore < cpuScore ? '#ff4c4c' : '#ffcc00';
+            overlay.querySelector('p').textContent = `Final: ${playerScore} - ${cpuScore}`;
+            overlay.querySelector('button').textContent = 'Play Again';
+            overlay.classList.remove('hidden');
+            hud.classList.add('hidden');
+          } else {
+            resetShot();
+          }
+          updateHUD();
+        }, 1200);
+      }, 1400);
+    }
+  }
+}
+
+function drawField() {
+  // Grass
+  const grd = ctx.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, '#2d8a4e');
+  grd.addColorStop(1, '#1a5c32');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, H);
+  // Perspective lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(W*0.1, H); ctx.lineTo(GOAL.x, GOAL.y + GOAL.h);
+  ctx.moveTo(W*0.9, H); ctx.lineTo(GOAL.x + GOAL.w, GOAL.y + GOAL.h);
+  ctx.stroke();
+}
+
+function drawGoal() {
+  const g = GOAL;
+  // Net
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillRect(g.x, g.y, g.w, g.h);
+  // Net lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < g.w; i += 20) {
+    ctx.beginPath(); ctx.moveTo(g.x + i, g.y); ctx.lineTo(g.x + i, g.y + g.h); ctx.stroke();
+  }
+  for (let i = 0; i < g.h; i += 20) {
+    ctx.beginPath(); ctx.moveTo(g.x, g.y + i); ctx.lineTo(g.x + g.w, g.y + i); ctx.stroke();
+  }
+  // Posts
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(g.x, g.y, g.w, g.h);
+}
+
+function drawKeeper() {
+  const k = keeper;
+  ctx.fillStyle = '#ffcc00';
+  ctx.fillRect(k.x - k.w/2, k.y - k.h/2, k.w, k.h);
+  // Head
+  ctx.beginPath();
+  ctx.arc(k.x, k.y - k.h/2 - W*0.015, W*0.015, 0, Math.PI*2);
+  ctx.fillStyle = '#ffddaa';
+  ctx.fill();
+  // Gloves
+  ctx.fillStyle = '#ff6600';
+  ctx.fillRect(k.x - k.w/2 - 8, k.y - k.h*0.2, 12, 12);
+  ctx.fillRect(k.x + k.w/2 - 4, k.y - k.h*0.2, 12, 12);
+}
+
+function drawBall() {
+  const b = ball;
+  const scale = 1 + b.z / 200;
+  const r = b.radius * scale;
+  // Shadow
+  ctx.beginPath();
+  ctx.ellipse(b.x, b.y + b.z * 0.3, r * 0.8, r * 0.4, 0, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fill();
+  // Ball
+  ctx.beginPath();
+  ctx.arc(b.x, b.y - b.z * 0.5, r, 0, Math.PI*2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // Pentagon pattern
+  ctx.beginPath();
+  ctx.arc(b.x, b.y - b.z * 0.5, r * 0.4, 0, Math.PI*2);
+  ctx.fillStyle = '#222';
+  ctx.fill();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  drawField();
+  drawGoal();
+  if (state !== 'menu' && state !== 'gameover') {
+    drawKeeper();
+    drawBall();
+    // Aiming indicator
+    if (state === 'aiming') {
+      ctx.setLineDash([5,5]);
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(ball.x, ball.y);
+      ctx.lineTo(W/2, GOAL.y + GOAL.h/2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+}
+
+function loop(ts) {
+  const dt = Math.min((ts - lastTime) / 1000, 0.05);
+  lastTime = ts;
+  if (state !== 'menu' && state !== 'gameover') update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  playerScore = 0; cpuScore = 0; round = 0;
+  overlay.classList.add('hidden');
+  hud.classList.remove('hidden');
+  updateHUD();
+  resetShot();
+});
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
