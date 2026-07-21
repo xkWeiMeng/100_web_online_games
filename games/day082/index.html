@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lucky Slots</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a0a2e;font-family:'Segoe UI',sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden;color:#fff}
+#app{text-align:center;width:100%;max-width:480px;padding:16px}
+h1{font-size:2.4rem;background:linear-gradient(135deg,#ffd700,#ff8c00);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:none;margin-bottom:4px;letter-spacing:2px}
+.subtitle{color:#c0a0ff;font-size:.85rem;margin-bottom:18px}
+.machine{background:linear-gradient(145deg,#2d1b69,#1a0a2e);border:3px solid #ffd700;border-radius:20px;padding:24px 16px 20px;box-shadow:0 0 40px rgba(255,215,0,.15),inset 0 0 30px rgba(0,0,0,.5)}
+.reels{display:flex;justify-content:center;gap:10px;margin:16px 0}
+.reel-window{width:100px;height:120px;background:#0d0520;border:2px solid #4a2d8a;border-radius:12px;overflow:hidden;position:relative}
+.reel-window::before,.reel-window::after{content:'';position:absolute;left:0;right:0;height:25px;z-index:2;pointer-events:none}
+.reel-window::before{top:0;background:linear-gradient(#0d0520,transparent)}
+.reel-window::after{bottom:0;background:linear-gradient(transparent,#0d0520)}
+.reel-strip{display:flex;flex-direction:column;align-items:center;transition:none;will-change:transform}
+.reel-strip .sym{width:100px;height:120px;display:flex;align-items:center;justify-content:center;font-size:3.2rem;flex-shrink:0}
+.payline{position:absolute;top:50%;left:-4px;right:-4px;height:3px;background:#ffd700;transform:translateY(-50%);z-index:3;opacity:.5;border-radius:2px}
+.stats{display:flex;justify-content:space-around;margin:16px 0 12px}
+.stat{background:rgba(255,255,255,.06);padding:8px 16px;border-radius:10px;min-width:100px}
+.stat-label{font-size:.65rem;color:#8a7ab5;text-transform:uppercase;letter-spacing:1px}
+.stat-value{font-size:1.4rem;font-weight:700;color:#ffd700}
+.bet-row{display:flex;align-items:center;justify-content:center;gap:10px;margin:10px 0}
+.bet-row button{width:36px;height:36px;border-radius:50%;border:2px solid #ffd700;background:transparent;color:#ffd700;font-size:1.2rem;cursor:pointer;transition:.2s}
+.bet-row button:hover{background:rgba(255,215,0,.15)}
+.bet-row span{font-size:1rem;color:#c0a0ff;min-width:80px}
+#spin-btn{width:180px;height:56px;border-radius:28px;border:none;background:linear-gradient(135deg,#ffd700,#ff8c00);color:#1a0a2e;font-size:1.2rem;font-weight:800;cursor:pointer;margin:12px 0 6px;letter-spacing:1px;transition:.15s;text-transform:uppercase}
+#spin-btn:hover{transform:scale(1.05);box-shadow:0 0 25px rgba(255,215,0,.4)}
+#spin-btn:disabled{opacity:.5;transform:none;cursor:default}
+#spin-btn:active:not(:disabled){transform:scale(.97)}
+.msg{height:28px;line-height:28px;font-size:.95rem;color:#ffd700;font-weight:600}
+.paytable{margin-top:14px;font-size:.72rem;color:#8a7ab5;line-height:1.7}
+.paytable b{color:#c0a0ff}
+#start-screen{position:fixed;inset:0;background:rgba(10,4,24,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10;padding:20px}
+#start-screen h1{font-size:3rem;margin-bottom:10px}
+#start-screen p{max-width:340px;color:#c0a0ff;line-height:1.6;font-size:.9rem;margin-bottom:24px;text-align:center}
+#start-btn{padding:14px 48px;border-radius:28px;border:none;background:linear-gradient(135deg,#ffd700,#ff8c00);color:#1a0a2e;font-size:1.2rem;font-weight:800;cursor:pointer;letter-spacing:1px;text-transform:uppercase}
+#start-btn:hover{transform:scale(1.05);box-shadow:0 0 25px rgba(255,215,0,.4)}
+.win-flash .reel-window{animation:flash .3s ease 3;border-color:#ffd700}
+@keyframes flash{50%{box-shadow:0 0 20px #ffd700,inset 0 0 20px rgba(255,215,0,.3)}}
+.jackpot-text{animation:jackpot 0.5s ease infinite alternate;display:inline-block}
+@keyframes jackpot{to{transform:scale(1.12);text-shadow:0 0 20px #ffd700}}
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+  <h1>🎰 Lucky Slots</h1>
+  <p>Spin the reels and match symbols to win big! Match 2 for a small payout, 3 for a jackpot. Adjust your bet to risk more and win more.</p>
+  <button id="start-btn" onclick="document.getElementById('start-screen').style.display='none'">Play Now</button>
+</div>
+
+<div id="app">
+  <h1>🎰 Lucky Slots</h1>
+  <div class="subtitle">Match symbols to win!</div>
+  <div class="machine">
+    <div class="reels" id="reels"></div>
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Credits</div><div class="stat-value" id="credits">1000</div></div>
+      <div class="stat"><div class="stat-label">Won</div><div class="stat-value" id="won">0</div></div>
+    </div>
+    <div class="bet-row">
+      <button onclick="changeBet(-10)">−</button>
+      <span>Bet: <b id="bet-display">10</b></span>
+      <button onclick="changeBet(10)">+</button>
+    </div>
+    <button id="spin-btn" onclick="spin()">SPIN</button>
+    <div class="msg" id="msg">&nbsp;</div>
+  </div>
+  <div class="paytable">
+    <b>Payouts (× bet):</b> 3× 💎=50 | 3× 7️⃣=30 | 3× 🍒=20 | 3× 🔔=15 | 3× 🍋=10 | 3× 🍇=8<br>
+    2 matching = 2× bet
+  </div>
+</div>
+
+<script>
+const SYMBOLS=['💎','7️⃣','🍒','🔔','🍋','🍇','⭐','🍊'];
+const PAY3={'💎':50,'7️⃣':30,'🍒':20,'🔔':15,'🍋':10,'🍇':8,'⭐':6,'🍊':5};
+const REEL_COUNT=3;
+const VISIBLE=1;
+const SYM_H=120;
+const SPIN_SYMS=25;
+
+let credits=1000,bet=10,spinning=false;
+
+const reelsEl=document.getElementById('reels');
+const strips=[];
+
+for(let i=0;i<REEL_COUNT;i++){
+  const w=document.createElement('div');
+  w.className='reel-window';
+  const s=document.createElement('div');
+  s.className='reel-strip';
+  // init with random symbols
+  for(let j=0;j<3;j++){
+    const d=document.createElement('div');
+    d.className='sym';
+    d.textContent=SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)];
+    s.appendChild(d);
+  }
+  s.style.transform=`translateY(-${SYM_H}px)`;
+  const pl=document.createElement('div');
+  pl.className='payline';
+  w.appendChild(s);
+  w.appendChild(pl);
+  reelsEl.appendChild(w);
+  strips.push(s);
+}
+
+function changeBet(d){
+  if(spinning)return;
+  bet=Math.max(10,Math.min(100,bet+d));
+  document.getElementById('bet-display').textContent=bet;
+}
+
+function spin(){
+  if(spinning)return;
+  if(credits<bet){setMsg("Not enough credits!");return}
+  spinning=true;
+  credits-=bet;
+  updUI();
+  setMsg('');
+  document.getElementById('spin-btn').disabled=true;
+  reelsEl.classList.remove('win-flash');
+
+  const results=[];
+  for(let i=0;i<REEL_COUNT;i++){
+    results.push(SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)]);
+  }
+
+  // Build long strips and animate
+  const promises=strips.map((s,i)=>{
+    return new Promise(resolve=>{
+      // build symbols
+      const syms=[];
+      for(let j=0;j<SPIN_SYMS;j++) syms.push(SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)]);
+      // last visible is the result
+      syms.push(results[i]);
+      syms.push(SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)]); // buffer below
+
+      s.innerHTML='';
+      // buffer above
+      const top=document.createElement('div');top.className='sym';
+      top.textContent=SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)];
+      s.appendChild(top);
+
+      syms.forEach(sym=>{const d=document.createElement('div');d.className='sym';d.textContent=sym;s.appendChild(d)});
+
+      s.style.transition='none';
+      s.style.transform='translateY(0px)';
+
+      requestAnimationFrame(()=>{requestAnimationFrame(()=>{
+        const totalOffset=(SPIN_SYMS+1)*SYM_H;
+        const dur=1.2+i*0.35;
+        s.style.transition=`transform ${dur}s cubic-bezier(.2,.8,.3,1)`;
+        s.style.transform=`translateY(-${totalOffset}px)`;
+        setTimeout(resolve,dur*1000);
+      })});
+    });
+  });
+
+  Promise.all(promises).then(()=>{
+    spinning=false;
+    document.getElementById('spin-btn').disabled=false;
+    checkWin(results);
+  });
+}
+
+function checkWin(r){
+  let win=0;
+  if(r[0]===r[1]&&r[1]===r[2]){
+    win=bet*(PAY3[r[0]]||5);
+    reelsEl.classList.add('win-flash');
+    if(PAY3[r[0]]>=30) setMsg(`<span class="jackpot-text">🎉 JACKPOT! +${win} 🎉</span>`);
+    else setMsg(`✨ Triple ${r[0]}! +${win}`);
+  }else if(r[0]===r[1]||r[1]===r[2]||r[0]===r[2]){
+    win=bet*2;
+    reelsEl.classList.add('win-flash');
+    setMsg(`Nice! Pair matched! +${win}`);
+  }
+  if(win){credits+=win;document.getElementById('won').textContent=win}
+  else setMsg('Try again!');
+  updUI();
+  if(credits<=0){setTimeout(()=>{setMsg('Game over! Resetting...');setTimeout(()=>{credits=1000;updUI();setMsg('')},2000)},800)}
+}
+
+function updUI(){document.getElementById('credits').textContent=credits}
+function setMsg(t){document.getElementById('msg').innerHTML=t||'&nbsp;'}
+</script>
+</body>
+</html>
