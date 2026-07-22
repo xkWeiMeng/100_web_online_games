@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scratch Card Lottery</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460); min-height: 100vh; display: flex; flex-direction: column; align-items: center; color: #fff; overflow-x: hidden; }
+h1 { margin: 20px 0 5px; font-size: 2rem; background: linear-gradient(90deg, #f7d794, #f5cd79, #f19066); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: none; }
+.subtitle { color: #aaa; margin-bottom: 15px; font-size: 0.9rem; }
+.stats { display: flex; gap: 20px; margin-bottom: 15px; font-size: 0.95rem; }
+.stats span { background: rgba(255,255,255,0.08); padding: 6px 16px; border-radius: 20px; }
+.stats b { color: #f7d794; }
+
+#start-screen { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; text-align: center; padding: 20px; }
+#start-screen h1 { font-size: 2.5rem; margin-bottom: 15px; }
+#start-screen .rules { max-width: 400px; color: #ccc; line-height: 1.7; margin-bottom: 25px; font-size: 0.95rem; }
+#start-screen .rules b { color: #f7d794; }
+#start-btn, #new-card-btn { background: linear-gradient(135deg, #f19066, #e66767); border: none; color: #fff; padding: 14px 40px; font-size: 1.1rem; border-radius: 30px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; font-weight: 600; }
+#start-btn:hover, #new-card-btn:hover { transform: scale(1.05); box-shadow: 0 5px 25px rgba(241,144,102,0.4); }
+
+.card-container { position: relative; width: 340px; height: 420px; margin-bottom: 15px; }
+.card-back { position: absolute; inset: 0; background: linear-gradient(135deg, #2d3436, #636e72); border-radius: 20px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: auto repeat(3, 1fr); gap: 0; padding: 0; overflow: hidden; border: 3px solid #f7d794; }
+.card-header { grid-column: 1 / -1; text-align: center; padding: 12px; background: linear-gradient(135deg, #f19066, #e66767); font-weight: 700; font-size: 1.1rem; letter-spacing: 1px; }
+.prize-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.1); font-size: 1.5rem; }
+.prize-cell .amount { font-size: 0.85rem; font-weight: 700; margin-top: 4px; }
+
+canvas { position: absolute; inset: 0; border-radius: 20px; cursor: crosshair; touch-action: none; }
+
+.result-banner { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); background: rgba(0,0,0,0.92); padding: 30px 40px; border-radius: 20px; text-align: center; z-index: 50; transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); border: 2px solid #f7d794; }
+.result-banner.show { transform: translate(-50%, -50%) scale(1); }
+.result-banner h2 { font-size: 1.8rem; margin-bottom: 10px; }
+.result-banner .win { color: #f7d794; }
+.result-banner .lose { color: #e66767; }
+.result-banner p { color: #aaa; margin-bottom: 20px; }
+#new-card-btn { margin-top: 10px; }
+
+.progress-bar { width: 340px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; margin-bottom: 8px; overflow: hidden; }
+.progress-bar .fill { height: 100%; background: linear-gradient(90deg, #f19066, #f7d794); border-radius: 3px; transition: width 0.3s; width: 0%; }
+.scratch-hint { color: #888; font-size: 0.8rem; margin-bottom: 5px; }
+
+@media (max-width: 400px) {
+  .card-container { width: 300px; height: 370px; }
+  .progress-bar { width: 300px; }
+  h1 { font-size: 1.6rem; }
+}
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+  <h1>🎰 Scratch Card Lottery</h1>
+  <div class="rules">
+    Scratch the silver coating to reveal prizes!<br><br>
+    <b>Match 3 symbols</b> to win that prize.<br>
+    Prizes: 🍒 <b>$5</b> · 🍋 <b>$10</b> · 🔔 <b>$25</b> · 💎 <b>$50</b> · 🌟 <b>$100</b> · 👑 <b>$500</b><br><br>
+    You start with <b>$20</b>. Each card costs <b>$5</b>.<br>
+    Try to grow your balance!
+  </div>
+  <button id="start-btn">Start Playing</button>
+</div>
+
+<h1>🎰 Scratch Card</h1>
+<p class="subtitle">Scratch to reveal your prizes!</p>
+<div class="stats">
+  <span>Balance: <b id="balance">$20</b></span>
+  <span>Cards: <b id="cards-played">0</b></span>
+  <span>Best Win: <b id="best-win">$0</b></span>
+</div>
+<div class="progress-bar"><div class="fill" id="progress-fill"></div></div>
+<p class="scratch-hint" id="scratch-hint">Scratch at least 70% to reveal result</p>
+<div class="card-container" id="card-container">
+  <div class="card-back" id="card-back"></div>
+  <canvas id="scratch-canvas"></canvas>
+</div>
+
+<div class="result-banner" id="result-banner">
+  <h2 id="result-title"></h2>
+  <p id="result-text"></p>
+  <button id="new-card-btn">New Card ($5)</button>
+</div>
+
+<script>
+const SYMBOLS = [
+  { emoji: '🍒', name: 'Cherry', prize: 5 },
+  { emoji: '🍋', name: 'Lemon', prize: 10 },
+  { emoji: '🔔', name: 'Bell', prize: 25 },
+  { emoji: '💎', name: 'Diamond', prize: 50 },
+  { emoji: '🌟', name: 'Star', prize: 100 },
+  { emoji: '👑', name: 'Crown', prize: 500 },
+];
+const CARD_COST = 5;
+const REVEAL_THRESHOLD = 0.7;
+
+let balance = 20, cardsPlayed = 0, bestWin = 0;
+let currentPrizes = [];
+let scratching = false, revealed = false;
+let canvas, ctx, cardW, cardH;
+
+function weightedRandom() {
+  const weights = [35, 25, 18, 12, 7, 3];
+  const total = weights.reduce((a, b) => a + b);
+  let r = Math.random() * total;
+  for (let i = 0; i < weights.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return SYMBOLS[i];
+  }
+  return SYMBOLS[0];
+}
+
+function generateCard() {
+  // 25% chance of a win
+  const cells = [];
+  if (Math.random() < 0.25) {
+    const winner = weightedRandom();
+    const positions = [];
+    while (positions.length < 3) {
+      const p = Math.floor(Math.random() * 9);
+      if (!positions.includes(p)) positions.push(p);
+    }
+    for (let i = 0; i < 9; i++) {
+      cells.push(positions.includes(i) ? winner : weightedRandom());
+    }
+  } else {
+    // ensure no 3-of-a-kind
+    let attempt;
+    do {
+      attempt = Array.from({ length: 9 }, () => weightedRandom());
+    } while (SYMBOLS.some(s => attempt.filter(c => c === s).length >= 3));
+    cells.push(...attempt);
+  }
+  return cells;
+}
+
+function renderCard() {
+  const back = document.getElementById('card-back');
+  back.innerHTML = '<div class="card-header">SCRATCH & WIN!</div>';
+  currentPrizes.forEach(s => {
+    const cell = document.createElement('div');
+    cell.className = 'prize-cell';
+    cell.innerHTML = `<span style="font-size:2rem">${s.emoji}</span><span class="amount" style="color:#f7d794">$${s.prize}</span>`;
+    back.appendChild(cell);
+  });
+}
+
+function initCanvas() {
+  const container = document.getElementById('card-container');
+  canvas = document.getElementById('scratch-canvas');
+  cardW = container.offsetWidth;
+  cardH = container.offsetHeight;
+  canvas.width = cardW;
+  canvas.height = cardH;
+  ctx = canvas.getContext('2d');
+
+  // Draw scratch coating
+  const grad = ctx.createLinearGradient(0, 0, cardW, cardH);
+  grad.addColorStop(0, '#b2bec3');
+  grad.addColorStop(0.5, '#a4b0be');
+  grad.addColorStop(1, '#95a5a6');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, cardW, cardH, 17);
+  ctx.fill();
+
+  // Add pattern
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  for (let y = 0; y < cardH; y += 20) {
+    for (let x = (y % 40 === 0 ? 0 : 10); x < cardW; x += 20) {
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Text
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.font = 'bold 22px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('SCRATCH HERE', cardW / 2, cardH / 2 - 10);
+  ctx.font = '14px sans-serif';
+  ctx.fillText('Use mouse or finger', cardW / 2, cardH / 2 + 15);
+}
+
+function scratch(x, y) {
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.beginPath();
+  ctx.arc(x, y, 22, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function getScratchPercent() {
+  const data = ctx.getImageData(0, 0, cardW, cardH).data;
+  let transparent = 0, total = 0;
+  for (let i = 3; i < data.length; i += 16) { // sample every 4th pixel
+    total++;
+    if (data[i] === 0) transparent++;
+  }
+  return transparent / total;
+}
+
+function checkResult() {
+  if (revealed) return;
+  const pct = getScratchPercent();
+  document.getElementById('progress-fill').style.width = Math.min(pct / REVEAL_THRESHOLD * 100, 100) + '%';
+
+  if (pct >= REVEAL_THRESHOLD) {
+    revealed = true;
+    // Clear remaining coating
+    ctx.clearRect(0, 0, cardW, cardH);
+    document.getElementById('scratch-hint').textContent = 'Revealed!';
+
+    // Check for 3-of-a-kind
+    const counts = {};
+    currentPrizes.forEach(s => { counts[s.name] = (counts[s.name] || 0) + 1; });
+    let winSymbol = null;
+    for (const [name, count] of Object.entries(counts)) {
+      if (count >= 3) { winSymbol = SYMBOLS.find(s => s.name === name); break; }
+    }
+
+    const banner = document.getElementById('result-banner');
+    const title = document.getElementById('result-title');
+    const text = document.getElementById('result-text');
+
+    if (winSymbol) {
+      balance += winSymbol.prize;
+      if (winSymbol.prize > bestWin) bestWin = winSymbol.prize;
+      title.className = 'win';
+      title.textContent = `🎉 YOU WON $${winSymbol.prize}!`;
+      text.textContent = `Matched 3× ${winSymbol.emoji} ${winSymbol.name}!`;
+    } else {
+      title.className = 'lose';
+      title.textContent = 'No Match';
+      text.textContent = 'Better luck next time!';
+    }
+
+    updateStats();
+    const btn = document.getElementById('new-card-btn');
+    btn.textContent = balance >= CARD_COST ? `New Card ($${CARD_COST})` : 'Game Over - Restart';
+    setTimeout(() => banner.classList.add('show'), 600);
+  }
+}
+
+function updateStats() {
+  document.getElementById('balance').textContent = '$' + balance;
+  document.getElementById('cards-played').textContent = cardsPlayed;
+  document.getElementById('best-win').textContent = '$' + bestWin;
+}
+
+function newCard() {
+  if (balance < CARD_COST) {
+    balance = 20; cardsPlayed = 0; bestWin = 0;
+  }
+  balance -= CARD_COST;
+  cardsPlayed++;
+  revealed = false;
+  document.getElementById('result-banner').classList.remove('show');
+  document.getElementById('progress-fill').style.width = '0%';
+  document.getElementById('scratch-hint').textContent = 'Scratch at least 70% to reveal result';
+  currentPrizes = generateCard();
+  renderCard();
+  updateStats();
+  setTimeout(initCanvas, 50);
+}
+
+// Events
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+}
+
+document.getElementById('scratch-canvas').addEventListener('mousedown', e => { scratching = true; const p = getPos(e); scratch(p.x, p.y); });
+document.addEventListener('mousemove', e => { if (!scratching || revealed) return; const p = getPos(e); scratch(p.x, p.y); });
+document.addEventListener('mouseup', () => { if (scratching) { scratching = false; checkResult(); } });
+
+document.getElementById('scratch-canvas').addEventListener('touchstart', e => { e.preventDefault(); scratching = true; const p = getPos(e); scratch(p.x, p.y); }, { passive: false });
+document.addEventListener('touchmove', e => { if (!scratching || revealed) return; const p = getPos(e); scratch(p.x, p.y); }, { passive: false });
+document.addEventListener('touchend', () => { if (scratching) { scratching = false; checkResult(); } });
+
+document.getElementById('start-btn').addEventListener('click', () => {
+  document.getElementById('start-screen').style.display = 'none';
+  newCard();
+});
+document.getElementById('new-card-btn').addEventListener('click', newCard);
+</script>
+</body>
+</html>
