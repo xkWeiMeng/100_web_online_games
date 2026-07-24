@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Concentration - Number Memory Game</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460); min-height: 100vh; display: flex; align-items: center; justify-content: center; color: #fff; }
+.container { text-align: center; padding: 20px; max-width: 500px; width: 100%; }
+h1 { font-size: 2.2rem; margin-bottom: 10px; background: linear-gradient(90deg, #e94560, #f5a623); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.subtitle { color: #8892b0; margin-bottom: 30px; }
+.btn { background: linear-gradient(135deg, #e94560, #c23152); border: none; color: #fff; padding: 14px 40px; font-size: 1.1rem; border-radius: 50px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 15px rgba(233,69,96,0.4); }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(233,69,96,0.6); }
+.btn:active { transform: scale(0.96); }
+#game { display: none; }
+#start-screen .instructions { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; margin: 20px 0; text-align: left; line-height: 1.7; border: 1px solid rgba(255,255,255,0.1); }
+.instructions li { margin: 5px 0; color: #ccd6f6; }
+.number-display { font-size: 3rem; font-weight: bold; letter-spacing: 12px; margin: 30px 0; padding: 30px; background: rgba(255,255,255,0.05); border-radius: 16px; border: 2px solid rgba(233,69,96,0.3); min-height: 100px; display: flex; align-items: center; justify-content: center; font-family: 'Courier New', monospace; color: #e94560; }
+.input-area { margin: 20px 0; }
+.input-area input { background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 14px 20px; font-size: 1.8rem; color: #fff; text-align: center; letter-spacing: 8px; width: 100%; max-width: 350px; font-family: 'Courier New', monospace; outline: none; transition: border-color 0.3s; }
+.input-area input:focus { border-color: #e94560; }
+.stats { display: flex; justify-content: space-around; margin: 20px 0; }
+.stat { background: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 10px; }
+.stat-label { font-size: 0.75rem; color: #8892b0; text-transform: uppercase; }
+.stat-value { font-size: 1.4rem; font-weight: bold; color: #e94560; }
+.message { font-size: 1.2rem; margin: 15px 0; min-height: 30px; }
+.correct { color: #4ecdc4; }
+.wrong { color: #e94560; }
+.progress-bar { width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; margin: 15px 0; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #e94560, #f5a623); transition: width 0.1s linear; border-radius: 3px; }
+#result-screen { display: none; }
+.result-score { font-size: 4rem; font-weight: bold; color: #f5a623; margin: 20px 0; }
+.result-detail { color: #8892b0; margin: 5px 0; font-size: 1.1rem; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div id="start-screen">
+    <h1>Concentration</h1>
+    <p class="subtitle">Number Memory Game</p>
+    <div class="instructions">
+      <ul>
+        <li>A sequence of numbers will flash on screen</li>
+        <li>Memorize them, then type them back</li>
+        <li>Each round adds one more digit</li>
+        <li>How far can you go?</li>
+      </ul>
+    </div>
+    <button class="btn" onclick="startGame()">Start Game</button>
+  </div>
+
+  <div id="game">
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Level</div><div class="stat-value" id="level">1</div></div>
+      <div class="stat"><div class="stat-label">Digits</div><div class="stat-value" id="digits">3</div></div>
+      <div class="stat"><div class="stat-label">Score</div><div class="stat-value" id="score">0</div></div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+    <div class="number-display" id="display"></div>
+    <div class="input-area" id="input-area" style="display:none;">
+      <input type="tel" id="answer" placeholder="Type the number..." autocomplete="off">
+      <br><br>
+      <button class="btn" onclick="submitAnswer()">Submit</button>
+    </div>
+    <div class="message" id="message"></div>
+  </div>
+
+  <div id="result-screen">
+    <h1>Game Over</h1>
+    <div class="result-score" id="final-score">0</div>
+    <p class="result-detail" id="final-level"></p>
+    <p class="result-detail" id="final-digits"></p>
+    <br>
+    <button class="btn" onclick="startGame()">Play Again</button>
+  </div>
+</div>
+
+<script>
+let level, digitCount, currentNumber, score, timer;
+const startDigits = 3;
+
+function startGame() {
+  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('result-screen').style.display = 'none';
+  document.getElementById('game').style.display = 'block';
+  level = 1; digitCount = startDigits; score = 0;
+  updateStats();
+  nextRound();
+}
+
+function updateStats() {
+  document.getElementById('level').textContent = level;
+  document.getElementById('digits').textContent = digitCount;
+  document.getElementById('score').textContent = score;
+}
+
+function generateNumber(len) {
+  let n = '';
+  for (let i = 0; i < len; i++) n += Math.floor(Math.random() * 10);
+  if (n[0] === '0') n = (Math.floor(Math.random()*9)+1) + n.slice(1);
+  return n;
+}
+
+function nextRound() {
+  const display = document.getElementById('display');
+  const inputArea = document.getElementById('input-area');
+  const msg = document.getElementById('message');
+  msg.textContent = ''; msg.className = 'message';
+  inputArea.style.display = 'none';
+  currentNumber = generateNumber(digitCount);
+  display.textContent = currentNumber;
+
+  const showTime = 1000 + digitCount * 500;
+  let elapsed = 0;
+  const prog = document.getElementById('progress');
+  prog.style.width = '100%';
+
+  const interval = setInterval(() => {
+    elapsed += 50;
+    prog.style.width = Math.max(0, (1 - elapsed/showTime)*100) + '%';
+  }, 50);
+
+  timer = setTimeout(() => {
+    clearInterval(interval);
+    prog.style.width = '0%';
+    display.textContent = '?';
+    inputArea.style.display = 'block';
+    const inp = document.getElementById('answer');
+    inp.value = ''; inp.focus();
+  }, showTime);
+}
+
+function submitAnswer() {
+  const ans = document.getElementById('answer').value.trim();
+  if (!ans) return;
+  const msg = document.getElementById('message');
+  if (ans === currentNumber) {
+    score += digitCount * 10;
+    msg.textContent = 'Correct!'; msg.className = 'message correct';
+    level++; digitCount++;
+    updateStats();
+    document.getElementById('input-area').style.display = 'none';
+    setTimeout(nextRound, 800);
+  } else {
+    msg.textContent = `Wrong! It was ${currentNumber}`; msg.className = 'message wrong';
+    setTimeout(endGame, 1500);
+  }
+}
+
+function endGame() {
+  document.getElementById('game').style.display = 'none';
+  document.getElementById('result-screen').style.display = 'block';
+  document.getElementById('final-score').textContent = score;
+  document.getElementById('final-level').textContent = `Reached Level ${level}`;
+  document.getElementById('final-digits').textContent = `Memorized up to ${digitCount-1} digits`;
+}
+
+document.getElementById('answer').addEventListener('keydown', e => { if (e.key === 'Enter') submitAnswer(); });
+</script>
+</body>
+</html>
