@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Speed Math Arithmetic Race</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460); min-height: 100vh; display: flex; align-items: center; justify-content: center; color: #fff; }
+.container { width: 100%; max-width: 500px; padding: 20px; text-align: center; }
+h1 { font-size: 2rem; margin-bottom: 10px; background: linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.screen { display: none; }
+.screen.active { display: block; }
+.btn { background: linear-gradient(135deg, #667eea, #764ba2); border: none; color: #fff; padding: 14px 32px; font-size: 1.1rem; border-radius: 12px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; margin: 8px; }
+.btn:hover { transform: scale(1.05); box-shadow: 0 4px 20px rgba(102,126,234,0.4); }
+.btn:active { transform: scale(0.97); }
+.instructions { background: rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; margin: 20px 0; text-align: left; line-height: 1.6; font-size: 0.95rem; color: #ccc; }
+.hud { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 1rem; }
+.hud span { background: rgba(255,255,255,0.1); padding: 8px 16px; border-radius: 8px; }
+.problem { font-size: 3rem; font-weight: bold; margin: 30px 0; letter-spacing: 2px; }
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
+.choice-btn { background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); color: #fff; padding: 18px; font-size: 1.4rem; border-radius: 12px; cursor: pointer; transition: all 0.15s; }
+.choice-btn:hover { background: rgba(102,126,234,0.3); border-color: #667eea; }
+.choice-btn.correct { background: rgba(46,213,115,0.4); border-color: #2ed573; animation: pop 0.3s; }
+.choice-btn.wrong { background: rgba(255,71,87,0.4); border-color: #ff4757; animation: shake 0.3s; }
+@keyframes pop { 50% { transform: scale(1.1); } }
+@keyframes shake { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+.timer-bar { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin-bottom: 10px; }
+.timer-fill { height: 100%; background: linear-gradient(90deg, #ff6b6b, #feca57, #2ed573); transition: width 0.1s linear; border-radius: 4px; }
+.race-track { display: flex; align-items: center; margin: 15px 0; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 8px 12px; }
+.race-track .car { font-size: 1.5rem; transition: margin-left 0.3s; }
+.race-track .finish { margin-left: auto; font-size: 1.2rem; }
+.final-score { font-size: 3rem; font-weight: bold; color: #feca57; margin: 20px 0; }
+.stats { background: rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; margin: 15px 0; text-align: left; line-height: 2; }
+.difficulty-btns { display: flex; justify-content: center; gap: 10px; margin: 15px 0; }
+.diff-btn { padding: 10px 20px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.2); background: transparent; color: #fff; cursor: pointer; font-size: 0.9rem; transition: all 0.15s; }
+.diff-btn.selected { border-color: #667eea; background: rgba(102,126,234,0.3); }
+.diff-btn:hover { border-color: #667eea; }
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- Title Screen -->
+  <div class="screen active" id="title-screen">
+    <h1>Speed Math<br>Arithmetic Race</h1>
+    <div class="instructions">
+      <strong>How to play:</strong><br>
+      🏎️ Solve math problems to race your car to the finish line!<br>
+      ⚡ Answer quickly for bonus points<br>
+      ❌ Wrong answers cost you time<br>
+      🏁 Complete 20 problems to finish the race
+    </div>
+    <p style="margin-bottom:5px; color:#aaa;">Difficulty:</p>
+    <div class="difficulty-btns">
+      <button class="diff-btn selected" data-diff="easy">Easy</button>
+      <button class="diff-btn" data-diff="medium">Medium</button>
+      <button class="diff-btn" data-diff="hard">Hard</button>
+    </div>
+    <button class="btn" id="start-btn">Start Race!</button>
+  </div>
+
+  <!-- Game Screen -->
+  <div class="screen" id="game-screen">
+    <div class="timer-bar"><div class="timer-fill" id="timer-fill"></div></div>
+    <div class="hud">
+      <span>⏱️ <b id="time-display">0.0s</b></span>
+      <span>🎯 <b id="score-display">0</b></span>
+      <span>📝 <b id="progress-display">0/20</b></span>
+    </div>
+    <div class="race-track">
+      <span class="car" id="car">🏎️</span>
+      <span class="finish">🏁</span>
+    </div>
+    <div class="problem" id="problem">?</div>
+    <div class="choices" id="choices"></div>
+  </div>
+
+  <!-- Results Screen -->
+  <div class="screen" id="results-screen">
+    <h1>🏁 Race Complete!</h1>
+    <div class="final-score" id="final-score">0</div>
+    <p style="color:#aaa;">points</p>
+    <div class="stats" id="stats"></div>
+    <button class="btn" id="restart-btn">Race Again</button>
+  </div>
+</div>
+
+<script>
+const TOTAL_PROBLEMS = 20;
+let difficulty = 'easy';
+let score = 0, solved = 0, streak = 0, maxStreak = 0, wrong = 0;
+let timeLeft, timerInterval, startTime, problemStart;
+
+const diffBtns = document.querySelectorAll('.diff-btn');
+diffBtns.forEach(b => b.addEventListener('click', () => {
+  diffBtns.forEach(x => x.classList.remove('selected'));
+  b.classList.add('selected');
+  difficulty = b.dataset.diff;
+}));
+
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('restart-btn').addEventListener('click', () => showScreen('title-screen'));
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function startGame() {
+  score = 0; solved = 0; streak = 0; maxStreak = 0; wrong = 0;
+  timeLeft = difficulty === 'easy' ? 60 : difficulty === 'medium' ? 45 : 35;
+  startTime = Date.now();
+  showScreen('game-screen');
+  updateHUD();
+  updateCar();
+  nextProblem();
+  timerInterval = setInterval(tick, 100);
+}
+
+function tick() {
+  const elapsed = (Date.now() - startTime) / 1000;
+  const remaining = Math.max(0, timeLeft - elapsed);
+  document.getElementById('time-display').textContent = remaining.toFixed(1) + 's';
+  document.getElementById('timer-fill').style.width = (remaining / timeLeft * 100) + '%';
+  if (remaining <= 0) endGame();
+}
+
+function generateProblem() {
+  let a, b, op, answer;
+  const ops = difficulty === 'easy' ? ['+', '-'] : difficulty === 'medium' ? ['+', '-', '×'] : ['+', '-', '×', '÷'];
+  op = ops[Math.floor(Math.random() * ops.length)];
+  const max = difficulty === 'easy' ? 20 : difficulty === 'medium' ? 50 : 100;
+
+  if (op === '+') { a = rand(1, max); b = rand(1, max); answer = a + b; }
+  else if (op === '-') { a = rand(1, max); b = rand(1, a); answer = a - b; }
+  else if (op === '×') { a = rand(2, 12); b = rand(2, difficulty === 'hard' ? 15 : 12); answer = a * b; }
+  else { answer = rand(2, 12); b = rand(2, 12); a = answer * b; op = '÷'; }
+
+  return { text: `${a} ${op} ${b}`, answer };
+}
+
+function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+function nextProblem() {
+  if (solved >= TOTAL_PROBLEMS) { endGame(); return; }
+  const prob = generateProblem();
+  document.getElementById('problem').textContent = prob.text;
+  problemStart = Date.now();
+
+  const choices = generateChoices(prob.answer);
+  const container = document.getElementById('choices');
+  container.innerHTML = '';
+  choices.forEach(val => {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = val;
+    btn.addEventListener('click', () => handleAnswer(btn, val, prob.answer));
+    container.appendChild(btn);
+  });
+}
+
+function generateChoices(answer) {
+  const set = new Set([answer]);
+  while (set.size < 4) {
+    const offset = rand(1, Math.max(5, Math.abs(answer) * 0.3 | 0));
+    set.add(answer + (Math.random() > 0.5 ? offset : -offset));
+  }
+  return [...set].sort(() => Math.random() - 0.5);
+}
+
+function handleAnswer(btn, selected, correct) {
+  document.querySelectorAll('.choice-btn').forEach(b => b.style.pointerEvents = 'none');
+  if (selected === correct) {
+    btn.classList.add('correct');
+    const speed = (Date.now() - problemStart) / 1000;
+    const bonus = speed < 2 ? 50 : speed < 4 ? 30 : 10;
+    score += bonus;
+    streak++; if (streak > maxStreak) maxStreak = streak;
+    if (streak >= 3) score += streak * 5;
+    solved++;
+  } else {
+    btn.classList.add('wrong');
+    document.querySelectorAll('.choice-btn').forEach(b => { if (parseInt(b.textContent) === correct) b.classList.add('correct'); });
+    wrong++;
+    streak = 0;
+    timeLeft -= 3;
+  }
+  updateHUD();
+  updateCar();
+  setTimeout(nextProblem, 600);
+}
+
+function updateHUD() {
+  document.getElementById('score-display').textContent = score;
+  document.getElementById('progress-display').textContent = `${solved}/${TOTAL_PROBLEMS}`;
+}
+
+function updateCar() {
+  const pct = Math.min(solved / TOTAL_PROBLEMS, 1);
+  document.getElementById('car').style.marginLeft = `calc(${pct * 80}% )`;
+}
+
+function endGame() {
+  clearInterval(timerInterval);
+  const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+  document.getElementById('final-score').textContent = score;
+  document.getElementById('stats').innerHTML = `
+    ⏱️ Time: ${totalTime}s<br>
+    ✅ Correct: ${solved} / ${solved + wrong}<br>
+    🔥 Best Streak: ${maxStreak}<br>
+    📊 Accuracy: ${solved + wrong > 0 ? ((solved / (solved + wrong)) * 100).toFixed(0) : 0}%<br>
+    🎮 Difficulty: ${difficulty}
+  `;
+  showScreen('results-screen');
+}
+</script>
+</body>
+</html>
