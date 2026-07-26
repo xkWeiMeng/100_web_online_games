@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Periodic Table Element Quiz</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+#app { width: 100%; max-width: 600px; padding: 20px; text-align: center; }
+h1 { font-size: 2rem; margin-bottom: 8px; background: linear-gradient(135deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.subtitle { color: #94a3b8; margin-bottom: 24px; }
+.btn { background: linear-gradient(135deg, #3b82f6, #8b5cf6); border: none; color: white; padding: 14px 32px; border-radius: 12px; font-size: 1.1rem; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(99,102,241,0.4); }
+.btn:active { transform: scale(0.97); }
+#start-screen .instructions { background: #1e293b; border-radius: 12px; padding: 20px; margin: 20px 0; text-align: left; line-height: 1.7; color: #cbd5e1; }
+#start-screen .instructions li { margin-left: 16px; }
+.mode-select { display: flex; gap: 10px; justify-content: center; margin: 16px 0; flex-wrap: wrap; }
+.mode-btn { padding: 10px 18px; border-radius: 8px; border: 2px solid #334155; background: #1e293b; color: #e2e8f0; cursor: pointer; transition: all 0.2s; }
+.mode-btn.active { border-color: #8b5cf6; background: #2e1065; }
+/* Quiz screen */
+.hud { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 0.95rem; color: #94a3b8; }
+.progress-bar { height: 6px; background: #1e293b; border-radius: 3px; margin-bottom: 24px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); transition: width 0.4s; }
+.question-card { background: #1e293b; border-radius: 16px; padding: 32px 24px; margin-bottom: 24px; }
+.element-symbol { font-size: 4rem; font-weight: 700; color: #f8fafc; }
+.element-number { font-size: 1.1rem; color: #64748b; margin-bottom: 8px; }
+.question-text { font-size: 1.2rem; color: #cbd5e1; margin-top: 12px; }
+.options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.option { padding: 14px; border-radius: 10px; border: 2px solid #334155; background: #1e293b; color: #e2e8f0; font-size: 1rem; cursor: pointer; transition: all 0.2s; }
+.option:hover { border-color: #6366f1; background: #1e1b4b; }
+.option.correct { border-color: #22c55e; background: #052e16; color: #4ade80; }
+.option.wrong { border-color: #ef4444; background: #350808; color: #f87171; }
+.option.disabled { pointer-events: none; }
+/* Result */
+.result-card { background: #1e293b; border-radius: 16px; padding: 40px 24px; }
+.score-big { font-size: 4rem; font-weight: 700; background: linear-gradient(135deg, #22c55e, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.score-label { color: #94a3b8; margin: 8px 0 24px; font-size: 1.1rem; }
+.stars { font-size: 2rem; margin-bottom: 16px; }
+.hidden { display: none; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="start-screen">
+    <h1>Periodic Table Quiz</h1>
+    <p class="subtitle">Test your chemistry knowledge!</p>
+    <div class="instructions">
+      <ul>
+        <li>Answer questions about chemical elements</li>
+        <li>Choose from 4 options per question</li>
+        <li>10 questions per round</li>
+        <li>Score points for correct answers</li>
+      </ul>
+    </div>
+    <p style="color:#94a3b8;margin-bottom:8px;">Select quiz mode:</p>
+    <div class="mode-select">
+      <button class="mode-btn active" data-mode="name">Name → Symbol</button>
+      <button class="mode-btn" data-mode="symbol">Symbol → Name</button>
+      <button class="mode-btn" data-mode="number">Number → Name</button>
+      <button class="mode-btn" data-mode="mixed">Mixed</button>
+    </div>
+    <button class="btn" id="start-btn">Start Quiz</button>
+  </div>
+  <div id="quiz-screen" class="hidden">
+    <div class="hud"><span id="q-counter">1 / 10</span><span id="score-display">Score: 0</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+    <div class="question-card" id="question-card"></div>
+    <div class="options" id="options"></div>
+  </div>
+  <div id="result-screen" class="hidden">
+    <div class="result-card">
+      <div class="stars" id="stars"></div>
+      <div class="score-big" id="final-score"></div>
+      <div class="score-label" id="score-msg"></div>
+      <button class="btn" id="restart-btn">Play Again</button>
+    </div>
+  </div>
+</div>
+<script>
+const ELEMENTS=[{n:1,s:"H",name:"Hydrogen"},{n:2,s:"He",name:"Helium"},{n:3,s:"Li",name:"Lithium"},{n:4,s:"Be",name:"Beryllium"},{n:5,s:"B",name:"Boron"},{n:6,s:"C",name:"Carbon"},{n:7,s:"N",name:"Nitrogen"},{n:8,s:"O",name:"Oxygen"},{n:9,s:"F",name:"Fluorine"},{n:10,s:"Ne",name:"Neon"},{n:11,s:"Na",name:"Sodium"},{n:12,s:"Mg",name:"Magnesium"},{n:13,s:"Al",name:"Aluminum"},{n:14,s:"Si",name:"Silicon"},{n:15,s:"P",name:"Phosphorus"},{n:16,s:"S",name:"Sulfur"},{n:17,s:"Cl",name:"Chlorine"},{n:18,s:"Ar",name:"Argon"},{n:19,s:"K",name:"Potassium"},{n:20,s:"Ca",name:"Calcium"},{n:21,s:"Sc",name:"Scandium"},{n:22,s:"Ti",name:"Titanium"},{n:23,s:"V",name:"Vanadium"},{n:24,s:"Cr",name:"Chromium"},{n:25,s:"Mn",name:"Manganese"},{n:26,s:"Fe",name:"Iron"},{n:27,s:"Co",name:"Cobalt"},{n:28,s:"Ni",name:"Nickel"},{n:29,s:"Cu",name:"Copper"},{n:30,s:"Zn",name:"Zinc"},{n:31,s:"Ga",name:"Gallium"},{n:32,s:"Ge",name:"Germanium"},{n:33,s:"As",name:"Arsenic"},{n:34,s:"Se",name:"Selenium"},{n:35,s:"Br",name:"Bromine"},{n:36,s:"Kr",name:"Krypton"},{n:37,s:"Rb",name:"Rubidium"},{n:38,s:"Sr",name:"Strontium"},{n:39,s:"Y",name:"Yttrium"},{n:40,s:"Zr",name:"Zirconium"},{n:41,s:"Nb",name:"Niobium"},{n:42,s:"Mo",name:"Molybdenum"},{n:43,s:"Tc",name:"Technetium"},{n:44,s:"Ru",name:"Ruthenium"},{n:45,s:"Rh",name:"Rhodium"},{n:46,s:"Pd",name:"Palladium"},{n:47,s:"Ag",name:"Silver"},{n:48,s:"Cd",name:"Cadmium"},{n:49,s:"In",name:"Indium"},{n:50,s:"Sn",name:"Tin"},{n:51,s:"Sb",name:"Antimony"},{n:52,s:"Te",name:"Tellurium"},{n:53,s:"I",name:"Iodine"},{n:54,s:"Xe",name:"Xenon"},{n:55,s:"Cs",name:"Cesium"},{n:56,s:"Ba",name:"Barium"},{n:57,s:"La",name:"Lanthanum"},{n:58,s:"Ce",name:"Cerium"},{n:59,s:"Pr",name:"Praseodymium"},{n:60,s:"Nd",name:"Neodymium"},{n:72,s:"Hf",name:"Hafnium"},{n:73,s:"Ta",name:"Tantalum"},{n:74,s:"W",name:"Tungsten"},{n:75,s:"Re",name:"Rhenium"},{n:76,s:"Os",name:"Osmium"},{n:77,s:"Ir",name:"Iridium"},{n:78,s:"Pt",name:"Platinum"},{n:79,s:"Au",name:"Gold"},{n:80,s:"Hg",name:"Mercury"},{n:81,s:"Tl",name:"Thallium"},{n:82,s:"Pb",name:"Lead"},{n:83,s:"Bi",name:"Bismuth"},{n:84,s:"Po",name:"Polonium"},{n:86,s:"Rn",name:"Radon"},{n:92,s:"U",name:"Uranium"},{n:94,s:"Pu",name:"Plutonium"}];
+const TOTAL=10;
+let mode="name",score=0,current=0,questions=[];
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+function generateQuestions(){
+  const pool=shuffle([...ELEMENTS]).slice(0,TOTAL);
+  questions=pool.map(el=>{
+    const m=mode==="mixed"?["name","symbol","number"][Math.floor(Math.random()*3)]:mode;
+    let prompt,answer,optionKey;
+    const distractors=shuffle(ELEMENTS.filter(e=>e.n!==el.n)).slice(0,3);
+    if(m==="name"){prompt=`What is the symbol for <strong>${el.name}</strong>?`;answer=el.s;optionKey="s";distractors.forEach(d=>d._opt=d.s);}
+    else if(m==="symbol"){prompt=`What element has the symbol <strong>${el.s}</strong>?`;answer=el.name;optionKey="name";distractors.forEach(d=>d._opt=d.name);}
+    else{prompt=`Which element has atomic number <strong>${el.n}</strong>?`;answer=el.name;optionKey="name";distractors.forEach(d=>d._opt=d.name);}
+    const opts=shuffle([answer,...distractors.map(d=>d._opt||d[optionKey])]);
+    return{el,prompt,answer,opts,mode:m};
+  });
+}
+
+function show(id){document.querySelectorAll('#app > div').forEach(d=>d.classList.add('hidden'));document.getElementById(id).classList.remove('hidden');}
+
+function renderQuestion(){
+  const q=questions[current];
+  document.getElementById('q-counter').textContent=`${current+1} / ${TOTAL}`;
+  document.getElementById('score-display').textContent=`Score: ${score}`;
+  document.getElementById('progress').style.width=`${(current/TOTAL)*100}%`;
+  const card=document.getElementById('question-card');
+  if(q.mode==="name") card.innerHTML=`<div class="element-number">#${q.el.n}</div><div class="question-text">${q.prompt}</div>`;
+  else if(q.mode==="symbol") card.innerHTML=`<div class="element-symbol">${q.el.s}</div><div class="element-number">#${q.el.n}</div><div class="question-text">${q.prompt}</div>`;
+  else card.innerHTML=`<div class="element-symbol" style="font-size:3rem">#${q.el.n}</div><div class="question-text">${q.prompt}</div>`;
+  const optDiv=document.getElementById('options');
+  optDiv.innerHTML=q.opts.map((o,i)=>`<button class="option" data-i="${i}">${o}</button>`).join('');
+  optDiv.querySelectorAll('.option').forEach(btn=>btn.addEventListener('click',handleAnswer));
+}
+
+function handleAnswer(e){
+  const q=questions[current];
+  const picked=e.target.textContent;
+  document.querySelectorAll('.option').forEach(b=>{b.classList.add('disabled');if(b.textContent===q.answer)b.classList.add('correct');});
+  if(picked===q.answer){score++;}else{e.target.classList.add('wrong');}
+  setTimeout(()=>{current++;if(current<TOTAL)renderQuestion();else showResult();},900);
+}
+
+function showResult(){
+  show('result-screen');
+  const pct=Math.round((score/TOTAL)*100);
+  document.getElementById('final-score').textContent=`${pct}%`;
+  document.getElementById('score-msg').textContent=`${score} out of ${TOTAL} correct`;
+  const s=score>=9?'★★★':score>=7?'★★☆':score>=5?'★☆☆':'☆☆☆';
+  document.getElementById('stars').textContent=s;
+}
+
+// Mode buttons
+document.querySelectorAll('.mode-btn').forEach(b=>b.addEventListener('click',e=>{document.querySelectorAll('.mode-btn').forEach(x=>x.classList.remove('active'));e.target.classList.add('active');mode=e.target.dataset.mode;}));
+
+document.getElementById('start-btn').addEventListener('click',()=>{score=0;current=0;generateQuestions();show('quiz-screen');renderQuestion();});
+document.getElementById('restart-btn').addEventListener('click',()=>{show('start-screen');});
+</script>
+</body>
+</html>
