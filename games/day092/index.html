@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Particle Fireworks Show</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a1a; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+canvas { display: block; }
+#ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+#ui > * { pointer-events: auto; }
+#hud { position: absolute; top: 15px; left: 15px; color: #fff; font-size: 14px; opacity: 0.9; }
+#hud div { margin-bottom: 6px; }
+#score-val { color: #ffd700; font-weight: bold; font-size: 18px; }
+#combo-val { color: #ff6b6b; }
+#start-screen {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at center, #1a1a3e 0%, #0a0a1a 70%);
+}
+#start-screen h1 {
+  font-size: clamp(28px, 6vw, 56px); color: #fff;
+  text-shadow: 0 0 20px #ff6b6b, 0 0 40px #ffd700;
+  margin-bottom: 20px;
+}
+#start-screen p { color: #aaa; max-width: 400px; text-align: center; line-height: 1.6; margin-bottom: 10px; font-size: 14px; }
+#start-btn {
+  margin-top: 20px; padding: 14px 40px; font-size: 18px;
+  background: linear-gradient(135deg, #ff6b6b, #ffd700); border: none;
+  border-radius: 30px; color: #1a1a3e; font-weight: bold; cursor: pointer;
+  transition: transform 0.2s;
+}
+#start-btn:hover { transform: scale(1.05); }
+#timer-bar { position: absolute; bottom: 0; left: 0; height: 4px; background: linear-gradient(90deg, #ff6b6b, #ffd700); transition: width 0.1s; }
+#game-over {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(10,10,26,0.92);
+}
+#game-over h2 { font-size: 36px; color: #ffd700; margin-bottom: 10px; }
+#game-over p { color: #ccc; margin-bottom: 8px; font-size: 18px; }
+#restart-btn {
+  margin-top: 20px; padding: 12px 36px; font-size: 16px;
+  background: linear-gradient(135deg, #6b8cff, #a855f7); border: none;
+  border-radius: 30px; color: #fff; font-weight: bold; cursor: pointer;
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div id="hud" style="display:none;">
+    <div>Score: <span id="score-val">0</span></div>
+    <div>Combo: <span id="combo-val">x1</span></div>
+    <div>Launches: <span id="launches-val">0</span></div>
+  </div>
+  <div id="timer-bar" style="width:100%"></div>
+  <div id="start-screen">
+    <h1>🎆 Fireworks Show</h1>
+    <p><strong>Tap or click</strong> anywhere to launch fireworks!</p>
+    <p>Chain explosions quickly for <strong>combo multipliers</strong>. Earn bonus points for multi-color bursts and perfect timing.</p>
+    <p>You have <strong>60 seconds</strong> to create the most spectacular show!</p>
+    <button id="start-btn">Start Show</button>
+  </div>
+  <div id="game-over">
+    <h2>Show's Over!</h2>
+    <p>Final Score: <span id="final-score">0</span></p>
+    <p>Total Launches: <span id="final-launches">0</span></p>
+    <p>Best Combo: <span id="final-combo">x1</span></p>
+    <button id="restart-btn">Watch Again</button>
+  </div>
+</div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+
+const particles = [];
+const rockets = [];
+let score = 0, combo = 1, comboTimer = 0, launches = 0, bestCombo = 1;
+let gameActive = false, timeLeft = 60, lastTime = 0;
+
+const COLORS = ['#ff6b6b','#ffd700','#6bffb8','#6b8cff','#ff6bff','#fff','#ff9f43','#a855f7'];
+
+class Particle {
+  constructor(x, y, vx, vy, color, life, size) {
+    this.x = x; this.y = y; this.vx = vx; this.vy = vy;
+    this.color = color; this.life = life; this.maxLife = life;
+    this.size = size; this.alpha = 1;
+  }
+  update(dt) {
+    this.x += this.vx * dt; this.y += this.vy * dt;
+    this.vy += 120 * dt; this.vx *= 0.99;
+    this.life -= dt; this.alpha = Math.max(0, this.life / this.maxLife);
+  }
+  draw() {
+    ctx.globalAlpha = this.alpha;
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size * this.alpha, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+class Rocket {
+  constructor(x, y, tx, ty) {
+    this.x = x; this.y = H;
+    this.tx = tx; this.ty = ty;
+    const angle = Math.atan2(ty - H, tx - x);
+    const speed = 500 + Math.random() * 200;
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed;
+    this.life = 1.5; this.trail = 0;
+  }
+  update(dt) {
+    this.x += this.vx * dt; this.y += this.vy * dt;
+    this.life -= dt; this.trail += dt;
+    if (this.trail > 0.02) {
+      this.trail = 0;
+      particles.push(new Particle(this.x, this.y, (Math.random()-0.5)*20, (Math.random()-0.5)*20, '#ffd700', 0.4, 2));
+    }
+    const dist = Math.hypot(this.x - this.tx, this.y - this.ty);
+    if (dist < 30 || this.life <= 0) { this.explode(); return false; }
+    return true;
+  }
+  explode() {
+    const numColors = 1 + Math.floor(Math.random() * 3);
+    const colors = [];
+    for (let i = 0; i < numColors; i++) colors.push(COLORS[Math.floor(Math.random() * COLORS.length)]);
+    const count = 60 + Math.floor(Math.random() * 80);
+    const pattern = Math.random();
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3;
+      let speed = 100 + Math.random() * 200;
+      if (pattern > 0.7) speed *= (i % 2 === 0) ? 1.3 : 0.6;
+      const vx = Math.cos(angle) * speed;
+      const vy = Math.sin(angle) * speed;
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      particles.push(new Particle(this.x, this.y, vx, vy, color, 1 + Math.random() * 1.5, 2 + Math.random() * 2));
+    }
+    // Scoring
+    const pts = (10 + numColors * 5) * combo;
+    score += pts;
+    comboTimer = 1.5;
+    combo++;
+    if (combo > bestCombo) bestCombo = combo;
+  }
+  draw() {
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function launch(x, y) {
+  if (!gameActive) return;
+  const startX = x + (Math.random() - 0.5) * 40;
+  rockets.push(new Rocket(startX, H, x, y));
+  launches++;
+}
+
+function update(dt) {
+  if (!gameActive) return;
+  timeLeft -= dt;
+  comboTimer -= dt;
+  if (comboTimer <= 0) combo = 1;
+  if (timeLeft <= 0) { timeLeft = 0; endGame(); }
+
+  for (let i = rockets.length - 1; i >= 0; i--) {
+    if (!rockets[i].update(dt)) rockets.splice(i, 1);
+  }
+  for (let i = particles.length - 1; i >= 0; i--) {
+    particles[i].update(dt);
+    if (particles[i].life <= 0) particles.splice(i, 1);
+  }
+
+  document.getElementById('score-val').textContent = score;
+  document.getElementById('combo-val').textContent = 'x' + combo;
+  document.getElementById('launches-val').textContent = launches;
+  document.getElementById('timer-bar').style.width = (timeLeft / 60 * 100) + '%';
+}
+
+function draw() {
+  ctx.globalAlpha = 0.15;
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = 1;
+  for (const p of particles) p.draw();
+  for (const r of rockets) r.draw();
+}
+
+function loop(ts) {
+  const dt = Math.min((ts - lastTime) / 1000, 0.05);
+  lastTime = ts;
+  update(dt); draw();
+  requestAnimationFrame(loop);
+}
+
+function startGame() {
+  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  score = 0; combo = 1; launches = 0; bestCombo = 1; timeLeft = 60;
+  particles.length = 0; rockets.length = 0;
+  gameActive = true;
+}
+
+function endGame() {
+  gameActive = false;
+  document.getElementById('game-over').style.display = 'flex';
+  document.getElementById('final-score').textContent = score;
+  document.getElementById('final-launches').textContent = launches;
+  document.getElementById('final-combo').textContent = 'x' + bestCombo;
+}
+
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('restart-btn').addEventListener('click', () => {
+  document.getElementById('game-over').style.display = 'none';
+  startGame();
+});
+
+canvas.addEventListener('click', e => launch(e.clientX, e.clientY));
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) launch(t.clientX, t.clientY);
+}, { passive: false });
+
+lastTime = performance.now();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
