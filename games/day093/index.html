@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Kaleidoscope Drawing Tool</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+#startScreen { position: fixed; inset: 0; background: radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a0f 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; color: #fff; text-align: center; padding: 20px; }
+#startScreen h1 { font-size: clamp(2rem, 6vw, 3.5rem); background: linear-gradient(135deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 16px; }
+#startScreen p { color: #aaa; max-width: 500px; line-height: 1.6; margin-bottom: 8px; font-size: 0.95rem; }
+#startBtn { margin-top: 24px; padding: 14px 40px; font-size: 1.1rem; border: none; border-radius: 30px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; cursor: pointer; transition: transform .2s; }
+#startBtn:hover { transform: scale(1.05); }
+#toolbar { display: none; background: #12121a; padding: 8px 12px; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; border-bottom: 1px solid #222; }
+#toolbar.active { display: flex; }
+.tool-group { display: flex; align-items: center; gap: 6px; }
+.tool-group label { color: #999; font-size: 0.75rem; text-transform: uppercase; }
+#toolbar input[type=range] { width: 80px; accent-color: #764ba2; }
+#toolbar input[type=color] { width: 32px; height: 32px; border: none; border-radius: 50%; cursor: pointer; background: none; }
+#toolbar button { padding: 6px 14px; border: 1px solid #333; border-radius: 16px; background: #1a1a2e; color: #ddd; cursor: pointer; font-size: 0.8rem; transition: background .2s; }
+#toolbar button:hover { background: #2a2a4e; }
+#toolbar button.active { background: #764ba2; border-color: #764ba2; }
+#toolbar select { background: #1a1a2e; color: #ddd; border: 1px solid #333; border-radius: 8px; padding: 4px 8px; font-size: 0.8rem; }
+canvas { flex: 1; display: none; cursor: crosshair; }
+canvas.active { display: block; }
+</style>
+</head>
+<body>
+<div id="startScreen">
+  <h1>Kaleidoscope</h1>
+  <p>Draw beautiful symmetric patterns with automatic mirroring.</p>
+  <p style="font-size:0.85rem;">Drag to draw. Change segments, colors, brush size, and toggle mirror mode for endless creative possibilities.</p>
+  <button id="startBtn">Start Drawing</button>
+</div>
+<div id="toolbar">
+  <div class="tool-group"><label>Segments</label><input type="range" id="segments" min="2" max="24" value="8"><span id="segVal" style="color:#fff;font-size:0.8rem;">8</span></div>
+  <div class="tool-group"><label>Size</label><input type="range" id="brushSize" min="1" max="30" value="4"></div>
+  <div class="tool-group"><label>Color</label><input type="color" id="colorPick" value="#ff6b6b"></div>
+  <div class="tool-group"><button id="rainbowBtn">Rainbow</button></div>
+  <div class="tool-group"><button id="mirrorBtn" class="active">Mirror</button></div>
+  <div class="tool-group"><label>BG</label><select id="bgColor"><option value="#0a0a0f">Black</option><option value="#ffffff">White</option><option value="#1a1a2e">Dark Blue</option></select></div>
+  <div class="tool-group"><button id="clearBtn">Clear</button></div>
+  <div class="tool-group"><button id="saveBtn">Save</button></div>
+</div>
+<canvas id="c"></canvas>
+<script>
+const $ = id => document.getElementById(id);
+const canvas = $('c'), ctx = canvas.getContext('2d');
+let drawing = false, lastX, lastY, rainbow = false, mirror = true;
+let hue = 0;
+
+$('startBtn').onclick = () => {
+  $('startScreen').style.display = 'none';
+  $('toolbar').classList.add('active');
+  canvas.classList.add('active');
+  resize();
+};
+
+$('segments').oninput = e => $('segVal').textContent = e.target.value;
+$('rainbowBtn').onclick = e => { rainbow = !rainbow; e.target.classList.toggle('active'); };
+$('mirrorBtn').onclick = e => { mirror = !mirror; e.target.classList.toggle('active'); };
+$('clearBtn').onclick = clearCanvas;
+$('saveBtn').onclick = () => { const a = document.createElement('a'); a.download = 'kaleidoscope.png'; a.href = canvas.toDataURL(); a.click(); };
+$('bgColor').onchange = () => clearCanvas();
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight - $('toolbar').offsetHeight;
+  clearCanvas();
+}
+window.onresize = resize;
+
+function clearCanvas() {
+  ctx.fillStyle = $('bgColor').value;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function getPos(e) {
+  const r = canvas.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return [t.clientX - r.left, t.clientY - r.top];
+}
+
+function draw(x, y) {
+  const cx = canvas.width / 2, cy = canvas.height / 2;
+  const segments = +$('segments').value;
+  const size = +$('brushSize').value;
+  const angle = (Math.PI * 2) / segments;
+
+  if (rainbow) { hue = (hue + 2) % 360; ctx.strokeStyle = `hsl(${hue},90%,60%)`; }
+  else { ctx.strokeStyle = $('colorPick').value; }
+  ctx.lineWidth = size;
+  ctx.lineCap = 'round';
+
+  const dx = x - cx, dy = y - cy;
+  const ldx = lastX - cx, ldy = lastY - cy;
+
+  for (let i = 0; i < segments; i++) {
+    const a = angle * i;
+    const cos = Math.cos(a), sin = Math.sin(a);
+    ctx.beginPath();
+    ctx.moveTo(cx + ldx * cos - ldy * sin, cy + ldx * sin + ldy * cos);
+    ctx.lineTo(cx + dx * cos - dy * sin, cy + dx * sin + dy * cos);
+    ctx.stroke();
+    if (mirror) {
+      ctx.beginPath();
+      ctx.moveTo(cx + ldx * cos + ldy * sin, cy - ldx * sin + ldy * cos);
+      ctx.lineTo(cx + dx * cos + dy * sin, cy - dx * sin + dy * cos);
+      ctx.stroke();
+    }
+  }
+  lastX = x; lastY = y;
+}
+
+canvas.onmousedown = e => { drawing = true; [lastX, lastY] = getPos(e); };
+canvas.onmousemove = e => { if (!drawing) return; const [x,y] = getPos(e); draw(x,y); };
+canvas.onmouseup = canvas.onmouseleave = () => drawing = false;
+canvas.ontouchstart = e => { e.preventDefault(); drawing = true; [lastX, lastY] = getPos(e); };
+canvas.ontouchmove = e => { e.preventDefault(); if (!drawing) return; const [x,y] = getPos(e); draw(x,y); };
+canvas.ontouchend = () => drawing = false;
+</script>
+</body>
+</html>
