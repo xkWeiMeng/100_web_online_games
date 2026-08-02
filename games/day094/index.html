@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Etch-a-Sketch Digital Drawing</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-user-select:none;user-select:none}
+body{background:#1a1a2e;font-family:'Segoe UI',system-ui,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden;color:#eee}
+
+#app{display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px;width:100%;max-width:700px}
+
+h1{font-size:1.6rem;color:#e94560;text-shadow:0 0 20px rgba(233,69,96,.4);letter-spacing:2px}
+
+#frame{background:linear-gradient(145deg,#c0392b,#e74c3c,#c0392b);border-radius:24px;padding:24px 24px 60px;box-shadow:0 20px 60px rgba(0,0,0,.5),inset 0 2px 4px rgba(255,255,255,.2);position:relative}
+
+#screen-wrap{background:#b8d4b8;border-radius:8px;overflow:hidden;box-shadow:inset 0 4px 20px rgba(0,0,0,.3);position:relative}
+
+canvas{display:block;cursor:crosshair;image-rendering:pixelated}
+
+.knob{position:absolute;bottom:-36px;width:48px;height:48px;border-radius:50%;background:linear-gradient(145deg,#ddd,#999);box-shadow:0 4px 10px rgba(0,0,0,.4),inset 0 2px 4px rgba(255,255,255,.6);cursor:grab;display:flex;align-items:center;justify-content:center;font-size:.6rem;color:#555;font-weight:700}
+.knob::after{content:'';width:20px;height:3px;background:#888;border-radius:2px;position:absolute}
+#knob-left{left:24px}
+#knob-right{right:24px}
+
+#controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center}
+
+button,.color-btn{background:#16213e;border:2px solid #0f3460;color:#eee;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:.85rem;transition:all .15s}
+button:hover,.color-btn:hover{background:#0f3460;transform:translateY(-1px)}
+button:active{transform:translateY(1px)}
+
+.color-btn{width:32px;height:32px;padding:0;border-radius:50%;border:3px solid transparent}
+.color-btn.active{border-color:#fff;box-shadow:0 0 10px rgba(255,255,255,.4)}
+
+#size-display{font-size:.75rem;color:#aaa;min-width:60px;text-align:center}
+
+#instructions{background:rgba(255,255,255,.05);border-radius:12px;padding:12px 20px;font-size:.8rem;color:#aaa;line-height:1.6;text-align:center;max-width:500px}
+
+#start-screen{position:fixed;inset:0;background:rgba(10,10,30,.95);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;z-index:100;text-align:center;padding:20px}
+#start-screen h1{font-size:2.4rem;margin-bottom:0}
+#start-screen p{color:#aaa;max-width:400px;line-height:1.7;font-size:.95rem}
+#start-btn{font-size:1.2rem;padding:14px 40px;background:#e94560;border:none;border-radius:12px;color:#fff;cursor:pointer;transition:transform .15s}
+#start-btn:hover{transform:scale(1.05)}
+
+.shake{animation:shake .4s ease}
+@keyframes shake{0%,100%{transform:rotate(0)}25%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}75%{transform:rotate(-1deg)}}
+
+#gallery-count{font-size:.75rem;color:#aaa}
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+  <h1>🎨 Etch-a-Sketch</h1>
+  <p>Draw with your mouse or finger. Use the toolbar to change colors, brush size, and more. Shake to erase!</p>
+  <p style="font-size:.8rem;color:#666">Arrow keys also work — just like the real thing.</p>
+  <button id="start-btn">Start Drawing</button>
+</div>
+
+<div id="app" style="display:none">
+  <h1>Etch-a-Sketch</h1>
+  <div id="frame">
+    <div id="screen-wrap"><canvas id="canvas"></canvas></div>
+    <div class="knob" id="knob-left">L/R</div>
+    <div class="knob" id="knob-right">U/D</div>
+  </div>
+
+  <div id="controls">
+    <button id="btn-shake" title="Shake to erase">🔄 Shake</button>
+    <button id="btn-undo" title="Undo last stroke">↩ Undo</button>
+    <span id="size-display">3px</span>
+    <input type="range" id="size-slider" min="1" max="20" value="3" style="width:80px;accent-color:#e94560">
+    <button id="btn-mode">✏️ Free</button>
+    <button id="btn-save">💾 Save</button>
+  </div>
+
+  <div id="controls">
+    <div class="color-btn active" data-color="#333333" style="background:#333"></div>
+    <div class="color-btn" data-color="#e94560" style="background:#e94560"></div>
+    <div class="color-btn" data-color="#0f3460" style="background:#0f3460"></div>
+    <div class="color-btn" data-color="#16c79a" style="background:#16c79a"></div>
+    <div class="color-btn" data-color="#f5a623" style="background:#f5a623"></div>
+    <div class="color-btn" data-color="#8e44ad" style="background:#8e44ad"></div>
+    <div class="color-btn" data-color="#ffffff" style="background:#fff"></div>
+    <input type="color" id="custom-color" value="#333333" title="Custom color" style="width:32px;height:32px;border:none;border-radius:50%;cursor:pointer;background:none">
+  </div>
+
+  <div id="instructions">
+    <strong>Controls:</strong> Draw with mouse/touch · Arrow keys for classic mode · [Shake] to erase · [Undo] to revert · [Save] to download
+  </div>
+  <div id="gallery-count">Drawings saved: 0</div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const canvas = $('#canvas');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+function resize() {
+  const maxW = Math.min(window.innerWidth - 80, 600);
+  const maxH = Math.min(window.innerHeight - 300, 500);
+  W = Math.max(300, Math.min(maxW, maxH * 1.25)) | 0;
+  H = (W * 0.8) | 0;
+  // Save image data
+  let img = null;
+  try { img = ctx.getImageData(0, 0, canvas.width, canvas.height); } catch(e) {}
+  canvas.width = W; canvas.height = H;
+  clearCanvas();
+  if (img) ctx.putImageData(img, 0, 0);
+}
+
+let drawing = false;
+let lastX, lastY;
+let color = '#333333';
+let lineWidth = 3;
+let mode = 'free'; // free | etch
+let undoStack = [];
+let savedCount = 0;
+
+// Cursor position for etch mode
+let etchX, etchY;
+
+function clearCanvas() {
+  ctx.fillStyle = '#b8d4b8';
+  ctx.fillRect(0, 0, W, H);
+}
+
+function saveState() {
+  if (undoStack.length > 30) undoStack.shift();
+  undoStack.push(canvas.toDataURL());
+}
+
+function undo() {
+  if (!undoStack.length) return;
+  const img = new Image();
+  img.onload = () => { ctx.clearRect(0, 0, W, H); ctx.drawImage(img, 0, 0); };
+  img.src = undoStack.pop();
+}
+
+function getPos(e) {
+  const r = canvas.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return [(t.clientX - r.left) * (W / r.width), (t.clientY - r.top) * (H / r.height)];
+}
+
+function drawLine(x0, y0, x1, y1) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1, y1);
+  ctx.stroke();
+}
+
+function startDraw(e) {
+  e.preventDefault();
+  drawing = true;
+  saveState();
+  [lastX, lastY] = getPos(e);
+}
+
+function moveDraw(e) {
+  if (!drawing) return;
+  e.preventDefault();
+  const [x, y] = getPos(e);
+  drawLine(lastX, lastY, x, y);
+  lastX = x; lastY = y;
+}
+
+function endDraw(e) {
+  drawing = false;
+}
+
+canvas.addEventListener('mousedown', startDraw);
+canvas.addEventListener('mousemove', moveDraw);
+canvas.addEventListener('mouseup', endDraw);
+canvas.addEventListener('mouseleave', endDraw);
+canvas.addEventListener('touchstart', startDraw, {passive:false});
+canvas.addEventListener('touchmove', moveDraw, {passive:false});
+canvas.addEventListener('touchend', endDraw);
+
+// Etch mode — arrow keys
+function initEtch() { etchX = W / 2; etchY = H / 2; }
+
+document.addEventListener('keydown', e => {
+  if (mode !== 'etch') return;
+  const step = lineWidth + 1;
+  let nx = etchX, ny = etchY;
+  if (e.key === 'ArrowLeft') nx -= step;
+  if (e.key === 'ArrowRight') nx += step;
+  if (e.key === 'ArrowUp') ny -= step;
+  if (e.key === 'ArrowDown') ny += step;
+  if (nx === etchX && ny === etchY) return;
+  e.preventDefault();
+  nx = Math.max(0, Math.min(W, nx));
+  ny = Math.max(0, Math.min(H, ny));
+  if (!drawing) { saveState(); drawing = true; }
+  drawLine(etchX, etchY, nx, ny);
+  etchX = nx; etchY = ny;
+  clearTimeout(window._etchTimer);
+  window._etchTimer = setTimeout(() => { drawing = false; }, 300);
+});
+
+// Shake to erase
+$('#btn-shake').onclick = () => {
+  saveState();
+  const frame = $('#frame');
+  frame.classList.remove('shake');
+  void frame.offsetWidth;
+  frame.classList.add('shake');
+  setTimeout(clearCanvas, 200);
+};
+
+$('#btn-undo').onclick = undo;
+
+$('#size-slider').oninput = function() {
+  lineWidth = +this.value;
+  $('#size-display').textContent = lineWidth + 'px';
+};
+
+$('#btn-mode').onclick = function() {
+  mode = mode === 'free' ? 'etch' : 'free';
+  this.textContent = mode === 'free' ? '✏️ Free' : '🎛️ Etch';
+  if (mode === 'etch') initEtch();
+  canvas.style.cursor = mode === 'free' ? 'crosshair' : 'none';
+};
+
+$('#btn-save').onclick = () => {
+  const a = document.createElement('a');
+  a.download = 'etch-a-sketch.png';
+  a.href = canvas.toDataURL();
+  a.click();
+  savedCount++;
+  $('#gallery-count').textContent = 'Drawings saved: ' + savedCount;
+};
+
+document.querySelectorAll('.color-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    color = btn.dataset.color;
+    $('#custom-color').value = color;
+  };
+});
+
+$('#custom-color').oninput = function() {
+  color = this.value;
+  document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+};
+
+// Start screen
+$('#start-btn').onclick = () => {
+  $('#start-screen').style.display = 'none';
+  $('#app').style.display = 'flex';
+  resize();
+  clearCanvas();
+  initEtch();
+};
+
+window.addEventListener('resize', resize);
+</script>
+</body>
+</html>
