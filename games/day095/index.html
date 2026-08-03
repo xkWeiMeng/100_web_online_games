@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Magnetic Poetry</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Georgia', serif; background: #2c3e50; min-height: 100vh; overflow: hidden; user-select: none; }
+#start-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; color: #fff; text-align: center; padding: 20px; }
+#start-screen h1 { font-size: 3em; margin-bottom: 10px; text-shadow: 0 0 20px rgba(255,255,255,0.3); }
+#start-screen p { max-width: 500px; line-height: 1.6; margin-bottom: 20px; color: #aab; font-size: 1.1em; }
+#start-btn { padding: 15px 40px; font-size: 1.3em; border: none; border-radius: 8px; background: linear-gradient(135deg, #e74c3c, #c0392b); color: #fff; cursor: pointer; font-family: inherit; transition: transform 0.2s; }
+#start-btn:hover { transform: scale(1.05); }
+#game { display: none; height: 100vh; flex-direction: column; }
+#toolbar { background: #1a1a2e; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+#toolbar h2 { color: #fff; font-size: 1.2em; }
+#score { color: #f1c40f; font-size: 1.1em; }
+#controls { display: flex; gap: 8px; }
+#controls button { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-family: inherit; transition: background 0.2s; }
+#new-words-btn { background: #3498db; color: #fff; }
+#clear-btn { background: #e67e22; color: #fff; }
+#check-btn { background: #27ae60; color: #fff; }
+#canvas-area { flex: 1; position: relative; background: #ddd url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4" fill="%23ccc"/><rect width="2" height="2" fill="%23c8c8c8"/></svg>'); background-size: 8px 8px; overflow: hidden; }
+#sentence-zone { position: absolute; bottom: 0; left: 0; right: 0; height: 120px; background: rgba(44, 62, 80, 0.9); border-top: 3px dashed #f39c12; display: flex; align-items: center; padding: 10px 20px; flex-wrap: wrap; gap: 6px; }
+#sentence-zone::before { content: 'Drop words here to form sentences'; position: absolute; top: 8px; left: 20px; color: #888; font-size: 0.8em; }
+.word-tile { position: absolute; padding: 8px 14px; background: #fff; border: 1px solid #999; border-radius: 4px; box-shadow: 2px 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.8); cursor: grab; font-size: 1em; white-space: nowrap; transition: box-shadow 0.2s; z-index: 10; }
+.word-tile:active { cursor: grabbing; box-shadow: 4px 4px 12px rgba(0,0,0,0.4); z-index: 100; }
+.word-tile.in-zone { position: relative; left: auto !important; top: auto !important; }
+.word-tile.highlight { background: #fffde7; border-color: #f1c40f; }
+#message { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.85); color: #fff; padding: 30px 50px; border-radius: 12px; font-size: 1.4em; z-index: 500; display: none; text-align: center; }
+#word-bank { position: absolute; top: 10px; left: 10px; right: 10px; bottom: 130px; }
+</style>
+</head>
+<body>
+<div id="start-screen">
+<h1>🧲 Magnetic Poetry</h1>
+<p>Drag word tiles to arrange them into sentences. Drop them in the sentence zone at the bottom. Form valid English phrases to score points! The longer and more creative, the better.</p>
+<p><strong>Controls:</strong> Drag tiles with mouse or touch. Use "Check" to score your sentence, "New Words" for fresh tiles, "Clear" to reset the zone.</p>
+<button id="start-btn">Start Playing</button>
+</div>
+<div id="game">
+<div id="toolbar">
+<h2>🧲 Magnetic Poetry</h2>
+<span id="score">Score: 0</span>
+<div id="controls">
+<button id="new-words-btn">New Words</button>
+<button id="clear-btn">Clear Zone</button>
+<button id="check-btn">✓ Check Sentence</button>
+</div>
+</div>
+<div id="canvas-area">
+<div id="word-bank"></div>
+<div id="sentence-zone"></div>
+</div>
+</div>
+<div id="message"></div>
+<script>
+const words = {
+nouns: ['love','heart','sky','moon','sun','rain','dream','night','day','time','life','world','soul','mind','fire','water','light','dark','star','wind','ocean','mountain','river','flower','bird','tree','shadow','music','silence','voice','stone','cloud','earth','garden','door','window','road','city','home','child','god','angel','ghost','memory','hope','fear','joy','pain','beauty','truth'],
+verbs: ['is','was','are','were','have','has','had','will','would','could','should','can','do','did','make','take','give','come','go','see','know','think','feel','want','need','love','hate','run','walk','fly','fall','rise','sing','dance','dream','sleep','wake','cry','laugh','whisper','scream','touch','hold','break','burn','grow','die','live','breathe','shine'],
+adjectives: ['beautiful','dark','bright','soft','hard','cold','warm','sweet','bitter','wild','gentle','silent','loud','deep','shallow','old','new','lost','found','broken','whole','empty','full','sacred','strange','tender','fierce','lonely','free','endless','small','vast','golden','silver','crimson','blue','green','white','black','purple'],
+prepositions: ['in','on','at','to','from','with','without','under','over','through','between','behind','before','after','into','above','below','around','beyond','within','upon','beside','against','toward','near'],
+articles: ['the','a','an','this','that','my','your','his','her','our','their','its','some','every','no','all','each'],
+adverbs: ['never','always','sometimes','here','there','now','then','still','yet','already','soon','slowly','quickly','softly','gently','deeply','only','just','even','almost','forever','away','together','alone']
+};
+
+let score = 0;
+let dragTarget = null;
+let offsetX = 0, offsetY = 0;
+const sentenceZone = document.getElementById('sentence-zone');
+const wordBank = document.getElementById('word-bank');
+const scoreEl = document.getElementById('score');
+
+document.getElementById('start-btn').onclick = () => {
+  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('game').style.display = 'flex';
+  generateWords();
+};
+
+function generateWords() {
+  wordBank.innerHTML = '';
+  const bankRect = wordBank.getBoundingClientRect();
+  const allCategories = Object.keys(words);
+  const count = 30;
+  for (let i = 0; i < count; i++) {
+    const cat = allCategories[Math.floor(Math.random() * allCategories.length)];
+    const list = words[cat];
+    const word = list[Math.floor(Math.random() * list.length)];
+    const tile = document.createElement('div');
+    tile.className = 'word-tile';
+    tile.textContent = word;
+    tile.dataset.cat = cat;
+    const x = 20 + Math.random() * (Math.min(bankRect.width, window.innerWidth - 100) - 100);
+    const y = 20 + Math.random() * (Math.min(bankRect.height, window.innerHeight - 250) - 50);
+    tile.style.left = x + 'px';
+    tile.style.top = y + 'px';
+    wordBank.appendChild(tile);
+    addDrag(tile);
+  }
+}
+
+function addDrag(el) {
+  el.addEventListener('mousedown', startDrag);
+  el.addEventListener('touchstart', startDrag, { passive: false });
+}
+
+function startDrag(e) {
+  e.preventDefault();
+  dragTarget = e.currentTarget;
+  dragTarget.style.zIndex = 100;
+  const rect = dragTarget.getBoundingClientRect();
+  const pt = e.touches ? e.touches[0] : e;
+  offsetX = pt.clientX - rect.left;
+  offsetY = pt.clientY - rect.top;
+  // If in zone, move back to bank
+  if (dragTarget.classList.contains('in-zone')) {
+    dragTarget.classList.remove('in-zone');
+    sentenceZone.removeChild(dragTarget);
+    wordBank.appendChild(dragTarget);
+    dragTarget.style.left = (pt.clientX - offsetX - wordBank.getBoundingClientRect().left) + 'px';
+    dragTarget.style.top = (pt.clientY - offsetY - wordBank.getBoundingClientRect().top) + 'px';
+  }
+}
+
+document.addEventListener('mousemove', moveDrag);
+document.addEventListener('touchmove', moveDrag, { passive: false });
+function moveDrag(e) {
+  if (!dragTarget || dragTarget.classList.contains('in-zone')) return;
+  e.preventDefault();
+  const pt = e.touches ? e.touches[0] : e;
+  const bankRect = wordBank.getBoundingClientRect();
+  dragTarget.style.left = (pt.clientX - offsetX - bankRect.left) + 'px';
+  dragTarget.style.top = (pt.clientY - offsetY - bankRect.top) + 'px';
+}
+
+document.addEventListener('mouseup', endDrag);
+document.addEventListener('touchend', endDrag);
+function endDrag(e) {
+  if (!dragTarget) return;
+  const rect = sentenceZone.getBoundingClientRect();
+  const tileRect = dragTarget.getBoundingClientRect();
+  if (tileRect.bottom > rect.top && tileRect.top < rect.bottom) {
+    dragTarget.classList.add('in-zone');
+    dragTarget.style.zIndex = 10;
+    wordBank.removeChild(dragTarget);
+    sentenceZone.appendChild(dragTarget);
+  } else {
+    dragTarget.style.zIndex = 10;
+  }
+  dragTarget = null;
+}
+
+document.getElementById('new-words-btn').onclick = generateWords;
+document.getElementById('clear-btn').onclick = () => {
+  const tiles = [...sentenceZone.querySelectorAll('.word-tile')];
+  tiles.forEach(t => {
+    t.classList.remove('in-zone');
+    t.style.left = (20 + Math.random() * 300) + 'px';
+    t.style.top = (20 + Math.random() * 200) + 'px';
+    sentenceZone.removeChild(t);
+    wordBank.appendChild(t);
+  });
+};
+
+document.getElementById('check-btn').onclick = () => {
+  const tiles = [...sentenceZone.querySelectorAll('.word-tile')];
+  if (tiles.length < 3) { showMsg('Use at least 3 words!', 1500); return; }
+  const sentence = tiles.map(t => t.textContent).join(' ');
+  // Score based on length, variety, structure
+  const cats = new Set(tiles.map(t => t.dataset.cat));
+  let pts = tiles.length * 5;
+  pts += cats.size * 10;
+  if (cats.has('nouns') && cats.has('verbs')) pts += 20;
+  if (cats.has('adjectives')) pts += 10;
+  if (tiles.length >= 6) pts += 15;
+  score += pts;
+  scoreEl.textContent = 'Score: ' + score;
+  showMsg(`"${sentence}"\n+${pts} points!`, 2500);
+  // Clear zone after scoring
+  setTimeout(() => {
+    tiles.forEach(t => t.remove());
+  }, 500);
+};
+
+function showMsg(text, dur) {
+  const m = document.getElementById('message');
+  m.textContent = text;
+  m.style.display = 'block';
+  setTimeout(() => m.style.display = 'none', dur);
+}
+</script>
+</body>
+</html>
