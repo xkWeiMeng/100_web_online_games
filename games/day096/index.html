@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beat Maker Drum Machine</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+h1 { margin: 20px 0 10px; font-size: 1.8rem; background: linear-gradient(90deg, #e94560, #0f3460); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.controls { display: flex; gap: 12px; margin: 10px 0; flex-wrap: wrap; justify-content: center; align-items: center; }
+button { background: #16213e; border: 1px solid #0f3460; color: #eee; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+button:hover { background: #0f3460; }
+button.active { background: #e94560; border-color: #e94560; }
+select, input[type=range] { background: #16213e; color: #eee; border: 1px solid #0f3460; border-radius: 6px; padding: 6px 10px; }
+input[type=range] { width: 100px; }
+.grid { display: grid; grid-template-columns: 100px repeat(16, 1fr); gap: 3px; margin: 10px; width: min(95vw, 900px); }
+.row-label { display: flex; align-items: center; font-size: 0.75rem; font-weight: bold; padding-right: 6px; justify-content: flex-end; white-space: nowrap; }
+.cell { aspect-ratio: 1; border-radius: 4px; cursor: pointer; transition: all 0.1s; border: 1px solid #16213e; }
+.cell.off { background: #16213e; }
+.cell.on { border-color: transparent; }
+.cell.playing { transform: scale(1.15); filter: brightness(1.5); }
+.col-highlight .cell.off { background: #1f2b47; }
+#start-screen { position: fixed; inset: 0; background: #1a1a2e; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; text-align: center; padding: 20px; }
+#start-screen h1 { font-size: 2.5rem; margin-bottom: 20px; }
+#start-screen p { max-width: 500px; line-height: 1.6; margin-bottom: 8px; color: #aaa; }
+#start-btn { font-size: 1.2rem; padding: 14px 40px; background: #e94560; border: none; margin-top: 20px; }
+#start-btn:hover { background: #ff6b6b; }
+.score-bar { display: flex; gap: 20px; margin: 5px 0; font-size: 0.85rem; color: #aaa; }
+.kit-colors { display: flex; gap: 4px; margin: 0 8px; }
+.kit-dot { width: 12px; height: 12px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+.kit-dot.selected { border-color: #fff; }
+</style>
+</head>
+<body>
+<div id="start-screen">
+<h1>🥁 Beat Maker</h1>
+<p><strong>Drum Machine & Sequencer</strong></p>
+<p>Click cells in the grid to place beats. Press Play to hear your creation loop. Each row is a different drum sound. Experiment with tempo and kits!</p>
+<p><strong>Controls:</strong> Click grid cells to toggle beats on/off. Use Play/Stop to control playback. Change BPM for speed. Try different sound kits!</p>
+<p><strong>Score:</strong> Fill more cells and maintain longer play streaks to increase your groove score!</p>
+<button id="start-btn" onclick="startApp()">Start Jamming</button>
+</div>
+
+<div id="app" style="display:none; width:100%; display:none; flex-direction:column; align-items:center;">
+<h1>🥁 Beat Maker</h1>
+<div class="score-bar">
+<span>Groove Score: <strong id="score">0</strong></span>
+<span>Beats Placed: <strong id="beat-count">0</strong></span>
+<span>Bars Looped: <strong id="loops">0</strong></span>
+</div>
+<div class="controls">
+<button id="play-btn" onclick="togglePlay()">▶ Play</button>
+<button onclick="clearAll()">✖ Clear</button>
+<label>BPM: <input type="range" id="bpm" min="60" max="200" value="120" oninput="updateBPM()"><span id="bpm-val">120</span></label>
+<label>Kit:
+<span class="kit-colors" id="kit-selector"></span>
+</label>
+<button onclick="randomize()">🎲 Random</button>
+</div>
+<div class="grid" id="grid"></div>
+</div>
+
+<script>
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let ctx, playing = false, step = 0, timer = null, bpm = 120, score = 0, loops = 0, currentKit = 0;
+
+const kits = [
+  { name: 'Classic', colors: ['#e94560','#f5a623','#7ed321','#4a90d2','#bd10e0','#50e3c2','#e6e6e6','#ff6b6b'] },
+  { name: 'Neon', colors: ['#ff00ff','#00ffff','#ffff00','#ff8800','#00ff88','#8800ff','#ff0088','#88ff00'] },
+  { name: 'Pastel', colors: ['#ffb3ba','#bae1ff','#baffc9','#ffffba','#e8baff','#ffd4ba','#baffee','#ffbaee'] }
+];
+
+const drums = ['Kick','Snare','HiHat','OpenHH','Tom Hi','Tom Lo','Clap','Rim'];
+const STEPS = 16;
+let grid = Array.from({length: 8}, () => Array(STEPS).fill(false));
+
+function startApp() {
+  document.getElementById('start-screen').style.display = 'none';
+  const app = document.getElementById('app');
+  app.style.display = 'flex';
+  ctx = new AudioCtx();
+  buildKitSelector();
+  buildGrid();
+}
+
+function buildKitSelector() {
+  const el = document.getElementById('kit-selector');
+  el.innerHTML = '';
+  kits.forEach((k, i) => {
+    const dot = document.createElement('span');
+    dot.className = 'kit-dot' + (i === currentKit ? ' selected' : '');
+    dot.style.background = k.colors[0];
+    dot.title = k.name;
+    dot.onclick = () => { currentKit = i; buildKitSelector(); buildGrid(); };
+    el.appendChild(dot);
+  });
+}
+
+function buildGrid() {
+  const el = document.getElementById('grid');
+  el.innerHTML = '';
+  for (let r = 0; r < 8; r++) {
+    const label = document.createElement('div');
+    label.className = 'row-label';
+    label.textContent = drums[r];
+    el.appendChild(label);
+    for (let c = 0; c < STEPS; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell ' + (grid[r][c] ? 'on' : 'off');
+      if (grid[r][c]) cell.style.background = kits[currentKit].colors[r];
+      cell.dataset.r = r; cell.dataset.c = c;
+      cell.onclick = () => toggleCell(r, c, cell);
+      el.appendChild(cell);
+    }
+  }
+}
+
+function toggleCell(r, c, cell) {
+  grid[r][c] = !grid[r][c];
+  cell.className = 'cell ' + (grid[r][c] ? 'on' : 'off');
+  cell.style.background = grid[r][c] ? kits[currentKit].colors[r] : '';
+  if (grid[r][c]) playSound(r);
+  updateScore();
+}
+
+function togglePlay() {
+  if (!ctx) ctx = new AudioCtx();
+  playing = !playing;
+  document.getElementById('play-btn').textContent = playing ? '⏸ Stop' : '▶ Play';
+  document.getElementById('play-btn').classList.toggle('active', playing);
+  if (playing) { step = 0; scheduleStep(); } else { clearTimeout(timer); clearHighlight(); }
+}
+
+function scheduleStep() {
+  if (!playing) return;
+  clearHighlight();
+  highlightCol(step);
+  for (let r = 0; r < 8; r++) { if (grid[r][step]) playSound(r); }
+  step = (step + 1) % STEPS;
+  if (step === 0) { loops++; document.getElementById('loops').textContent = loops; updateScore(); }
+  timer = setTimeout(scheduleStep, (60000 / bpm) / 4);
+}
+
+function highlightCol(c) {
+  const cells = document.querySelectorAll(`.cell[data-c="${c}"]`);
+  cells.forEach(cell => cell.classList.add('playing'));
+}
+function clearHighlight() {
+  document.querySelectorAll('.cell.playing').forEach(c => c.classList.remove('playing'));
+}
+
+function playSound(type) {
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const noise = () => { const b = ctx.createBuffer(1, ctx.sampleRate * 0.1, ctx.sampleRate); const d = b.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1; const s = ctx.createBufferSource(); s.buffer=b; return s; };
+
+  switch(type) {
+    case 0: // Kick
+      osc.frequency.setValueAtTime(150, t);
+      osc.frequency.exponentialRampToValueAtTime(0.01, t+0.2);
+      gain.gain.setValueAtTime(1, t);
+      gain.gain.exponentialRampToValueAtTime(0.01, t+0.2);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(t); osc.stop(t+0.2); break;
+    case 1: // Snare
+      const n = noise(); const ng = ctx.createGain();
+      ng.gain.setValueAtTime(0.8, t); ng.gain.exponentialRampToValueAtTime(0.01, t+0.15);
+      n.connect(ng); ng.connect(ctx.destination); n.start(t); n.stop(t+0.15);
+      osc.frequency.setValueAtTime(200, t);
+      gain.gain.setValueAtTime(0.5, t); gain.gain.exponentialRampToValueAtTime(0.01, t+0.1);
+      osc.connect(gain); gain.connect(ctx.destination); osc.start(t); osc.stop(t+0.1); break;
+    case 2: // HiHat closed
+      const n2 = noise(); const ng2 = ctx.createGain();
+      ng2.gain.setValueAtTime(0.3, t); ng2.gain.exponentialRampToValueAtTime(0.01, t+0.05);
+      const hp = ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=7000;
+      n2.connect(hp); hp.connect(ng2); ng2.connect(ctx.destination); n2.start(t); n2.stop(t+0.05); return;
+    case 3: // Open HH
+      const n3 = noise(); const ng3 = ctx.createGain();
+      ng3.gain.setValueAtTime(0.3, t); ng3.gain.exponentialRampToValueAtTime(0.01, t+0.2);
+      const hp2 = ctx.createBiquadFilter(); hp2.type='highpass'; hp2.frequency.value=6000;
+      n3.connect(hp2); hp2.connect(ng3); ng3.connect(ctx.destination); n3.start(t); n3.stop(t+0.2); return;
+    case 4: // Tom Hi
+      osc.frequency.setValueAtTime(300, t); osc.frequency.exponentialRampToValueAtTime(100, t+0.15);
+      gain.gain.setValueAtTime(0.6, t); gain.gain.exponentialRampToValueAtTime(0.01, t+0.15);
+      osc.connect(gain); gain.connect(ctx.destination); osc.start(t); osc.stop(t+0.15); break;
+    case 5: // Tom Lo
+      osc.frequency.setValueAtTime(200, t); osc.frequency.exponentialRampToValueAtTime(60, t+0.2);
+      gain.gain.setValueAtTime(0.6, t); gain.gain.exponentialRampToValueAtTime(0.01, t+0.2);
+      osc.connect(gain); gain.connect(ctx.destination); osc.start(t); osc.stop(t+0.2); break;
+    case 6: // Clap
+      const n4 = noise(); const ng4 = ctx.createGain();
+      const bp = ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=2000; bp.Q.value=2;
+      ng4.gain.setValueAtTime(0.7, t); ng4.gain.exponentialRampToValueAtTime(0.01, t+0.12);
+      n4.connect(bp); bp.connect(ng4); ng4.connect(ctx.destination); n4.start(t); n4.stop(t+0.12); return;
+    case 7: // Rim
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(800, t);
+      gain.gain.setValueAtTime(0.4, t); gain.gain.exponentialRampToValueAtTime(0.01, t+0.03);
+      osc.connect(gain); gain.connect(ctx.destination); osc.start(t); osc.stop(t+0.03); break;
+  }
+}
+
+function updateBPM() { bpm = +document.getElementById('bpm').value; document.getElementById('bpm-val').textContent = bpm; }
+function clearAll() { grid = Array.from({length:8}, ()=>Array(STEPS).fill(false)); buildGrid(); updateScore(); }
+function randomize() {
+  for(let r=0;r<8;r++) for(let c=0;c<STEPS;c++) grid[r][c] = Math.random() < (r<2?0.25:r<4?0.4:0.15);
+  buildGrid(); updateScore();
+}
+function updateScore() {
+  const beats = grid.flat().filter(Boolean).length;
+  document.getElementById('beat-count').textContent = beats;
+  score = beats * 10 + loops * 5;
+  document.getElementById('score').textContent = score;
+}
+</script>
+</body>
+</html>
