@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tower of Hanoi</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460); min-height: 100vh; color: #fff; display: flex; flex-direction: column; align-items: center; overflow-x: hidden; }
+h1 { margin-top: 20px; font-size: 2rem; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+#stats { display: flex; gap: 30px; margin: 10px 0; font-size: 1.1rem; opacity: 0.9; }
+#game-area { display: flex; justify-content: center; align-items: flex-end; gap: 10px; margin: 20px auto; width: 95%; max-width: 900px; height: 350px; position: relative; }
+.tower { display: flex; flex-direction: column-reverse; align-items: center; justify-content: flex-start; width: 30%; height: 100%; position: relative; cursor: pointer; border-bottom: 6px solid #e94560; border-radius: 0 0 4px 4px; transition: background 0.2s; }
+.tower::before { content: ''; position: absolute; bottom: 0; width: 6px; height: 85%; background: #e94560; border-radius: 3px 3px 0 0; }
+.tower:hover { background: rgba(233,69,96,0.08); }
+.tower.selected { background: rgba(233,69,96,0.15); box-shadow: inset 0 0 20px rgba(233,69,96,0.2); }
+.disk { border-radius: 8px; height: 30px; margin: 2px 0; position: relative; z-index: 1; transition: all 0.2s ease; box-shadow: 0 3px 6px rgba(0,0,0,0.3); }
+.disk.lifted { transform: translateY(-20px); opacity: 0.8; }
+#controls { display: flex; gap: 15px; margin: 10px 0; flex-wrap: wrap; justify-content: center; }
+button { padding: 10px 24px; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; background: #e94560; color: #fff; transition: transform 0.1s, background 0.2s; }
+button:hover { background: #ff6b6b; transform: scale(1.05); }
+button:active { transform: scale(0.95); }
+#disk-select { padding: 10px; border-radius: 8px; border: none; font-size: 1rem; background: #233; color: #fff; }
+#message { margin: 10px; font-size: 1.2rem; min-height: 1.5em; text-align: center; color: #ffd700; }
+#start-screen { position: fixed; inset: 0; background: rgba(10,10,30,0.97); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; text-align: center; padding: 20px; }
+#start-screen h1 { font-size: 3rem; margin-bottom: 20px; }
+#start-screen p { max-width: 500px; line-height: 1.6; margin-bottom: 10px; opacity: 0.85; }
+#start-screen button { margin-top: 20px; font-size: 1.2rem; padding: 14px 40px; }
+.hidden { display: none !important; }
+@media (max-width: 600px) { h1 { font-size: 1.4rem; } #game-area { height: 260px; } .disk { height: 24px; } }
+</style>
+</head>
+<body>
+<div id="start-screen">
+  <h1>Tower of Hanoi</h1>
+  <p>Move all disks from the left tower to the right tower.</p>
+  <p><strong>Rules:</strong> Move one disk at a time. A larger disk can never be placed on a smaller disk.</p>
+  <p>Try to solve it in the minimum number of moves!</p>
+  <label style="margin-top:20px;">Number of disks:
+    <select id="disk-select"><option>3</option><option>4</option><option selected>5</option><option>6</option><option>7</option></select>
+  </label>
+  <button onclick="startGame()">Play</button>
+</div>
+
+<h1>Tower of Hanoi</h1>
+<div id="stats"><span>Moves: <b id="move-count">0</b></span><span>Minimum: <b id="min-moves">31</b></span><span id="timer-display">Time: <b id="timer">0:00</b></span></div>
+<div id="message"></div>
+<div id="game-area">
+  <div class="tower" data-i="0" onclick="clickTower(0)"></div>
+  <div class="tower" data-i="1" onclick="clickTower(1)"></div>
+  <div class="tower" data-i="2" onclick="clickTower(2)"></div>
+</div>
+<div id="controls">
+  <button onclick="document.getElementById('start-screen').classList.remove('hidden')">New Game</button>
+  <button onclick="undoMove()">Undo</button>
+</div>
+
+<script>
+const colors = ['#e94560','#f7b731','#20bf6b','#4b7bec','#a55eea','#fd9644','#2bcbba'];
+let towers=[[],[],[]], numDisks=5, moves=0, selected=null, history=[], timerInterval, seconds=0, won=false;
+
+function startGame(){
+  document.getElementById('start-screen').classList.add('hidden');
+  numDisks = +document.getElementById('disk-select').value;
+  towers=[[],[],[]];
+  for(let i=numDisks;i>=1;i--) towers[0].push(i);
+  moves=0; history=[]; selected=null; won=false; seconds=0;
+  document.getElementById('move-count').textContent=0;
+  document.getElementById('min-moves').textContent=Math.pow(2,numDisks)-1;
+  document.getElementById('message').textContent='';
+  document.getElementById('timer').textContent='0:00';
+  clearInterval(timerInterval);
+  timerInterval=setInterval(()=>{if(!won){seconds++;let m=Math.floor(seconds/60),s=seconds%60;document.getElementById('timer').textContent=m+':'+(s<10?'0':'')+s;}},1000);
+  render();
+}
+
+function render(){
+  document.querySelectorAll('.tower').forEach((el,i)=>{
+    el.innerHTML='';
+    towers[i].forEach((d,j)=>{
+      let div=document.createElement('div');
+      div.className='disk';
+      let w=20+d*(80/numDisks);
+      div.style.width=w+'%';
+      div.style.background=colors[(d-1)%colors.length];
+      if(selected===i && j===towers[i].length-1) div.classList.add('lifted');
+      el.appendChild(div);
+    });
+    el.classList.toggle('selected', selected===i);
+  });
+}
+
+function clickTower(i){
+  if(won) return;
+  if(selected===null){
+    if(towers[i].length===0) return;
+    selected=i;
+  } else if(selected===i){
+    selected=null;
+  } else {
+    let disk=towers[selected][towers[selected].length-1];
+    let top=towers[i].length?towers[i][towers[i].length-1]:Infinity;
+    if(disk<top){
+      history.push({from:selected,to:i});
+      towers[i].push(towers[selected].pop());
+      moves++;
+      document.getElementById('move-count').textContent=moves;
+      selected=null;
+      if(towers[2].length===numDisks) win();
+    } else {
+      selected=i; // select new tower instead
+      if(towers[i].length===0) selected=null;
+    }
+  }
+  render();
+}
+
+function undoMove(){
+  if(!history.length||won) return;
+  let m=history.pop();
+  towers[m.from].push(towers[m.to].pop());
+  moves++; document.getElementById('move-count').textContent=moves;
+  selected=null; render();
+}
+
+function win(){
+  won=true; clearInterval(timerInterval);
+  let min=Math.pow(2,numDisks)-1;
+  let msg=moves===min?'Perfect! Solved in minimum moves!':'Solved in '+moves+' moves (minimum: '+min+')';
+  document.getElementById('message').textContent='🎉 '+msg+' — Time: '+document.getElementById('timer').textContent;
+}
+
+startGame();
+</script>
+</body>
+</html>
