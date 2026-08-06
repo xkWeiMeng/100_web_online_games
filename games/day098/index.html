@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>15 Puzzle</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a1a2e;color:#eee;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;user-select:none}
+h1{font-size:2rem;margin-bottom:.5rem;background:linear-gradient(135deg,#e94560,#f5a623);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.info{color:#aaa;margin-bottom:1rem;text-align:center;max-width:320px;font-size:.85rem}
+.stats{display:flex;gap:2rem;margin-bottom:1rem;font-size:1.1rem}
+.stats span{color:#f5a623}
+#board{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;width:min(85vw,360px);height:min(85vw,360px);background:#16213e;border-radius:12px;padding:6px;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.tile{display:flex;align-items:center;justify-content:center;font-size:1.8rem;font-weight:700;border-radius:8px;cursor:pointer;transition:transform .12s,background .2s;background:linear-gradient(145deg,#0f3460,#1a1a4e);color:#eee;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.tile:active{transform:scale(.95)}
+.tile.empty{background:transparent;box-shadow:none;cursor:default}
+.tile.correct{background:linear-gradient(145deg,#1b4332,#2d6a4f);color:#95d5b2}
+button{margin-top:1rem;padding:.6rem 1.5rem;font-size:1rem;border:none;border-radius:8px;background:#e94560;color:#fff;cursor:pointer;font-weight:600;transition:background .2s}
+button:hover{background:#c0392b}
+#win{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);align-items:center;justify-content:center;flex-direction:column;z-index:10}
+#win.show{display:flex}
+#win h2{font-size:2.5rem;color:#f5a623;margin-bottom:1rem}
+#win p{font-size:1.2rem;margin-bottom:1.5rem}
+</style>
+</head>
+<body>
+<h1>15 Puzzle</h1>
+<p class="info">Slide tiles to arrange numbers 1–15 in order. Click or tap a tile adjacent to the empty space.</p>
+<div class="stats"><div>Moves: <span id="moves">0</span></div><div>Time: <span id="time">0:00</span></div></div>
+<div id="board"></div>
+<button onclick="init()">New Game</button>
+<div id="win"><h2>🎉 You Win!</h2><p id="winMsg"></p><button onclick="document.getElementById('win').classList.remove('show');init()">Play Again</button></div>
+<script>
+const board=document.getElementById('board'),movesEl=document.getElementById('moves'),timeEl=document.getElementById('time');
+let tiles,empty,moves,timer,seconds;
+
+function init(){
+  clearInterval(timer);moves=0;seconds=0;movesEl.textContent='0';timeEl.textContent='0:00';
+  tiles=[...Array(15).keys()].map(i=>i+1);tiles.push(0);
+  // shuffle with even parity
+  do{for(let i=14;i>0;i--){let j=Math.random()*i|0;[tiles[i],tiles[j]]=[tiles[j],tiles[i]]}}while(!solvable());
+  empty=tiles.indexOf(0);
+  render();
+  timer=setInterval(()=>{seconds++;timeEl.textContent=`${seconds/60|0}:${String(seconds%60).padStart(2,'0')}`},1000);
+}
+
+function solvable(){
+  let inv=0;
+  for(let i=0;i<16;i++)for(let j=i+1;j<16;j++)if(tiles[i]&&tiles[j]&&tiles[i]>tiles[j])inv++;
+  let row=4-(tiles.indexOf(0)/4|0);
+  return(inv+row)%2===0;
+}
+
+function render(){
+  board.innerHTML='';
+  tiles.forEach((v,i)=>{
+    const d=document.createElement('div');
+    d.className='tile'+(v===0?' empty':'')+(v===i+1?' correct':'');
+    d.textContent=v||'';
+    d.onclick=()=>move(i);
+    board.appendChild(d);
+  });
+}
+
+function move(i){
+  const r=i/4|0,c=i%4,er=empty/4|0,ec=empty%4;
+  if((Math.abs(r-er)+Math.abs(c-ec))!==1)return;
+  [tiles[i],tiles[empty]]=[tiles[empty],tiles[i]];
+  empty=i;moves++;movesEl.textContent=moves;
+  render();
+  if(tiles.every((v,idx)=>idx===15?v===0:v===idx+1)){
+    clearInterval(timer);
+    document.getElementById('winMsg').textContent=`${moves} moves in ${timeEl.textContent}`;
+    document.getElementById('win').classList.add('show');
+  }
+}
+
+init();
+</script>
+</body>
+</html>
