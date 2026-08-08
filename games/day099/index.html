@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Battleship</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #0c1445 0%, #1a237e 50%, #0d47a1 100%); min-height: 100vh; display: flex; flex-direction: column; align-items: center; color: #fff; padding: 10px; }
+h1 { font-size: 1.8rem; margin: 10px 0; text-shadow: 0 0 20px rgba(100,181,246,0.5); }
+#start-screen { position: fixed; inset: 0; background: rgba(0,0,0,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; padding: 20px; text-align: center; }
+#start-screen h1 { font-size: 2.5rem; margin-bottom: 20px; }
+#start-screen p { max-width: 500px; line-height: 1.6; margin-bottom: 10px; color: #b0bec5; }
+#start-btn { margin-top: 30px; padding: 15px 50px; font-size: 1.2rem; background: #1565c0; color: #fff; border: none; border-radius: 8px; cursor: pointer; transition: transform 0.2s, background 0.2s; }
+#start-btn:hover { background: #1e88e5; transform: scale(1.05); }
+#info { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; margin: 10px 0; font-size: 0.95rem; }
+#info span { background: rgba(255,255,255,0.1); padding: 6px 14px; border-radius: 6px; }
+.grid-container { display: flex; flex-wrap: wrap; gap: 30px; justify-content: center; margin-top: 10px; }
+.grid-section h2 { text-align: center; font-size: 1rem; margin-bottom: 8px; color: #90caf9; }
+.grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; background: rgba(255,255,255,0.05); padding: 2px; border-radius: 6px; }
+.cell { width: 34px; height: 34px; background: #1a237e; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; transition: background 0.2s; cursor: pointer; user-select: none; }
+.cell.own { cursor: default; }
+.cell:not(.hit):not(.miss):not(.own):hover { background: #283593; }
+.cell.ship { background: #37474f; }
+.cell.hit { background: #c62828; }
+.cell.miss { background: #1565c0; }
+.cell.sunk { background: #b71c1c; }
+#message { margin-top: 15px; font-size: 1.1rem; min-height: 1.5em; text-align: center; color: #fdd835; }
+#game-over { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; flex-direction: column; align-items: center; justify-content: center; }
+#game-over h2 { font-size: 2rem; margin-bottom: 15px; }
+#game-over p { color: #b0bec5; margin-bottom: 20px; }
+#restart-btn { padding: 12px 40px; font-size: 1.1rem; background: #1565c0; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+@media (max-width: 600px) { .cell { width: 28px; height: 28px; font-size: 0.9rem; } h1 { font-size: 1.4rem; } }
+</style>
+</head>
+<body>
+<div id="start-screen">
+  <h1>⚓ Battleship</h1>
+  <p><strong>How to play:</strong> Click cells on the enemy grid to fire shots. Red = hit, blue = miss. Sink all 5 enemy ships before the computer sinks yours!</p>
+  <p><strong>Ships:</strong> Carrier (5), Battleship (4), Cruiser (3), Submarine (3), Destroyer (2)</p>
+  <button id="start-btn">Start Game</button>
+</div>
+<div id="game-over"><h2 id="go-title"></h2><p id="go-msg"></p><button id="restart-btn">Play Again</button></div>
+
+<h1>⚓ Battleship</h1>
+<div id="info">
+  <span>Shots: <strong id="shots">0</strong></span>
+  <span>Hits: <strong id="hits">0</strong></span>
+  <span>Enemy ships left: <strong id="enemy-left">5</strong></span>
+  <span>Your ships left: <strong id="your-left">5</strong></span>
+</div>
+<div class="grid-container">
+  <div class="grid-section"><h2>Enemy Waters</h2><div class="grid" id="enemy-grid"></div></div>
+  <div class="grid-section"><h2>Your Waters</h2><div class="grid" id="player-grid"></div></div>
+</div>
+<div id="message">Fire at the enemy grid!</div>
+
+<script>
+const SHIPS = [5,4,3,3,2];
+const SIZE = 10;
+let playerBoard, enemyBoard, playerShips, enemyShips, shots, hitCount, gameActive;
+let aiHits = [], aiQueue = [];
+
+function init() {
+  shots = 0; hitCount = 0; gameActive = true;
+  aiHits = []; aiQueue = [];
+  playerBoard = Array.from({length:SIZE}, ()=>Array(SIZE).fill(0));
+  enemyBoard = Array.from({length:SIZE}, ()=>Array(SIZE).fill(0));
+  playerShips = placeShips(playerBoard);
+  enemyShips = placeShips(enemyBoard);
+  render();
+  updateInfo();
+  document.getElementById('message').textContent = 'Fire at the enemy grid!';
+}
+
+function placeShips(board) {
+  let ships = [];
+  for (let len of SHIPS) {
+    let placed = false;
+    while (!placed) {
+      let dir = Math.random() < 0.5 ? 'h' : 'v';
+      let r = Math.floor(Math.random() * (dir==='v' ? SIZE-len : SIZE));
+      let c = Math.floor(Math.random() * (dir==='h' ? SIZE-len : SIZE));
+      let cells = [];
+      let ok = true;
+      for (let i = 0; i < len; i++) {
+        let nr = dir==='v' ? r+i : r, nc = dir==='h' ? c+i : c;
+        if (board[nr][nc] !== 0) { ok = false; break; }
+        cells.push([nr, nc]);
+      }
+      if (ok) { cells.forEach(([r,c])=>board[r][c]=1); ships.push({cells, hits:0, len}); placed = true; }
+    }
+  }
+  return ships;
+}
+
+function render() {
+  let eg = document.getElementById('enemy-grid');
+  let pg = document.getElementById('player-grid');
+  eg.innerHTML = ''; pg.innerHTML = '';
+  for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) {
+    let cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.dataset.r = r; cell.dataset.c = c;
+    cell.addEventListener('click', ()=>fire(r,c));
+    eg.appendChild(cell);
+
+    let pc = document.createElement('div');
+    pc.className = 'cell own';
+    if (playerBoard[r][c] === 1) pc.classList.add('ship');
+    pg.appendChild(pc);
+  }
+}
+
+function fire(r, c) {
+  if (!gameActive) return;
+  let eg = document.getElementById('enemy-grid');
+  let idx = r * SIZE + c;
+  let cell = eg.children[idx];
+  if (cell.classList.contains('hit') || cell.classList.contains('miss')) return;
+
+  shots++;
+  if (enemyBoard[r][c] === 1) {
+    cell.classList.add('hit'); cell.textContent = '💥'; hitCount++;
+    let ship = enemyShips.find(s=>s.cells.some(([sr,sc])=>sr===r&&sc===c));
+    ship.hits++;
+    if (ship.hits === ship.len) {
+      ship.cells.forEach(([sr,sc])=>{ let cl=eg.children[sr*SIZE+sc]; cl.classList.add('sunk'); cl.textContent='🔥'; });
+      document.getElementById('message').textContent = 'You sunk a ship!';
+    } else {
+      document.getElementById('message').textContent = 'Hit!';
+    }
+  } else {
+    cell.classList.add('miss'); cell.textContent = '•';
+    document.getElementById('message').textContent = 'Miss...';
+  }
+  updateInfo();
+  if (enemyShips.every(s=>s.hits===s.len)) return endGame(true);
+  setTimeout(aiTurn, 400);
+}
+
+function aiTurn() {
+  let r, c, pg = document.getElementById('player-grid');
+  if (aiQueue.length) {
+    [r, c] = aiQueue.shift();
+  } else {
+    do { r = Math.floor(Math.random()*SIZE); c = Math.floor(Math.random()*SIZE); }
+    while (pg.children[r*SIZE+c].classList.contains('hit') || pg.children[r*SIZE+c].classList.contains('miss'));
+  }
+  let cell = pg.children[r*SIZE+c];
+  if (cell.classList.contains('hit') || cell.classList.contains('miss')) { aiTurn(); return; }
+
+  if (playerBoard[r][c] === 1) {
+    cell.classList.add('hit'); cell.textContent = '💥';
+    let ship = playerShips.find(s=>s.cells.some(([sr,sc])=>sr===r&&sc===c));
+    ship.hits++;
+    if (ship.hits === ship.len) { ship.cells.forEach(([sr,sc])=>pg.children[sr*SIZE+sc].classList.add('sunk')); }
+    aiHits.push([r,c]);
+    [[r-1,c],[r+1,c],[r,c-1],[r,c+1]].forEach(([nr,nc])=>{
+      if (nr>=0&&nr<SIZE&&nc>=0&&nc<SIZE&&!pg.children[nr*SIZE+nc].classList.contains('hit')&&!pg.children[nr*SIZE+nc].classList.contains('miss'))
+        if (!aiQueue.some(([qr,qc])=>qr===nr&&qc===nc)) aiQueue.push([nr,nc]);
+    });
+  } else {
+    cell.classList.add('miss'); cell.textContent = '•';
+  }
+  updateInfo();
+  if (playerShips.every(s=>s.hits===s.len)) endGame(false);
+}
+
+function updateInfo() {
+  document.getElementById('shots').textContent = shots;
+  document.getElementById('hits').textContent = hitCount;
+  document.getElementById('enemy-left').textContent = enemyShips.filter(s=>s.hits<s.len).length;
+  document.getElementById('your-left').textContent = playerShips.filter(s=>s.hits<s.len).length;
+}
+
+function endGame(won) {
+  gameActive = false;
+  let go = document.getElementById('game-over');
+  go.style.display = 'flex';
+  document.getElementById('go-title').textContent = won ? '🎉 Victory!' : '💀 Defeat';
+  document.getElementById('go-msg').textContent = won ? `You sunk all ships in ${shots} shots!` : 'The enemy sunk all your ships.';
+}
+
+document.getElementById('start-btn').onclick = ()=>{ document.getElementById('start-screen').style.display='none'; init(); };
+document.getElementById('restart-btn').onclick = ()=>{ document.getElementById('game-over').style.display='none'; init(); };
+</script>
+</body>
+</html>
