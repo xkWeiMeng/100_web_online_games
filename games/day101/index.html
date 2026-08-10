@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Neon Snake</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a0f;
+  display: flex; justify-content: center; align-items: center;
+  min-height: 100vh; font-family: 'Courier New', monospace;
+  overflow: hidden; touch-action: none;
+}
+#game-container {
+  position: relative; display: flex; flex-direction: column;
+  align-items: center; gap: 10px;
+}
+#header {
+  display: flex; justify-content: space-between; width: 100%;
+  padding: 0 5px; color: #0ff; font-size: 16px;
+  text-shadow: 0 0 10px #0ff, 0 0 20px #0ff;
+}
+canvas {
+  border: 2px solid #0ff;
+  box-shadow: 0 0 15px #0ff, inset 0 0 15px rgba(0,255,255,0.05);
+  border-radius: 4px; display: block;
+}
+#overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; flex-direction: column; justify-content: center;
+  align-items: center; background: rgba(0,0,0,0.85);
+  color: #fff; text-align: center; padding: 20px; border-radius: 4px;
+}
+#overlay.hidden { display: none; }
+#overlay h1 {
+  font-size: 36px; color: #0f0;
+  text-shadow: 0 0 10px #0f0, 0 0 30px #0f0, 0 0 60px #0f0;
+  margin-bottom: 20px;
+}
+#overlay p { color: #aaa; margin: 5px 0; font-size: 14px; }
+#overlay button {
+  margin-top: 20px; padding: 12px 30px; font-size: 18px;
+  background: transparent; color: #0ff; border: 2px solid #0ff;
+  border-radius: 4px; cursor: pointer; font-family: inherit;
+  text-shadow: 0 0 5px #0ff; box-shadow: 0 0 10px #0ff;
+  transition: all 0.2s;
+}
+#overlay button:hover { background: rgba(0,255,255,0.1); }
+#game-over-score { font-size: 24px; color: #f0f; text-shadow: 0 0 10px #f0f; margin: 10px 0; }
+</style>
+</head>
+<body>
+<div id="game-container">
+  <div id="header">
+    <span id="score-display">SCORE: 0</span>
+    <span id="high-score-display">BEST: 0</span>
+  </div>
+  <canvas id="canvas"></canvas>
+  <div id="overlay">
+    <h1>NEON SNAKE</h1>
+    <p>Use Arrow Keys / WASD / Swipe to move</p>
+    <p>Eat the glowing food to grow</p>
+    <p>Don't hit walls or yourself!</p>
+    <button id="start-btn">START</button>
+  </div>
+</div>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const startBtn = document.getElementById('start-btn');
+const scoreDisplay = document.getElementById('score-display');
+const highScoreDisplay = document.getElementById('high-score-display');
+
+const CELL = 20;
+let COLS, ROWS, snake, dir, nextDir, food, score, highScore, running, speed, lastTime;
+
+function resize() {
+  const max = Math.min(window.innerWidth - 20, window.innerHeight - 80, 500);
+  COLS = Math.floor(max / CELL);
+  ROWS = Math.floor(max / CELL);
+  canvas.width = COLS * CELL;
+  canvas.height = ROWS * CELL;
+}
+resize();
+
+highScore = parseInt(localStorage.getItem('neonSnakeHigh') || '0');
+highScoreDisplay.textContent = 'BEST: ' + highScore;
+
+function init() {
+  const cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2);
+  snake = [{x: cx, y: cy}, {x: cx-1, y: cy}, {x: cx-2, y: cy}];
+  dir = {x: 1, y: 0}; nextDir = {x: 1, y: 0};
+  score = 0; speed = 120; scoreDisplay.textContent = 'SCORE: 0';
+  placeFood();
+  overlay.classList.add('hidden');
+  running = true; lastTime = 0;
+  requestAnimationFrame(loop);
+}
+
+function placeFood() {
+  let pos;
+  do { pos = {x: Math.floor(Math.random()*COLS), y: Math.floor(Math.random()*ROWS)}; }
+  while (snake.some(s => s.x === pos.x && s.y === pos.y));
+  food = pos;
+}
+
+function loop(ts) {
+  if (!running) return;
+  if (ts - lastTime >= speed) {
+    lastTime = ts; update();
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function update() {
+  dir = nextDir;
+  const head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
+  if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS || snake.some(s => s.x === head.x && s.y === head.y)) {
+    gameOver(); return;
+  }
+  snake.unshift(head);
+  if (head.x === food.x && head.y === food.y) {
+    score++; scoreDisplay.textContent = 'SCORE: ' + score;
+    if (speed > 60) speed -= 2;
+    placeFood();
+  } else { snake.pop(); }
+}
+
+function draw() {
+  ctx.fillStyle = '#0a0a0f'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // grid
+  ctx.strokeStyle = 'rgba(0,255,255,0.03)';
+  for (let i = 0; i <= COLS; i++) { ctx.beginPath(); ctx.moveTo(i*CELL,0); ctx.lineTo(i*CELL,canvas.height); ctx.stroke(); }
+  for (let i = 0; i <= ROWS; i++) { ctx.beginPath(); ctx.moveTo(0,i*CELL); ctx.lineTo(canvas.width,i*CELL); ctx.stroke(); }
+  // food
+  ctx.shadowColor = '#f0f'; ctx.shadowBlur = 15;
+  ctx.fillStyle = '#f0f';
+  ctx.beginPath(); ctx.arc(food.x*CELL+CELL/2, food.y*CELL+CELL/2, CELL/2-2, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+  // snake
+  snake.forEach((s, i) => {
+    const t = 1 - i/snake.length;
+    ctx.shadowColor = `hsl(${120+i*3}, 100%, 50%)`;
+    ctx.shadowBlur = 10 + t*10;
+    ctx.fillStyle = `hsl(${120+i*3}, 100%, ${40+t*20}%)`;
+    ctx.fillRect(s.x*CELL+1, s.y*CELL+1, CELL-2, CELL-2);
+  });
+  ctx.shadowBlur = 0;
+}
+
+function gameOver() {
+  running = false;
+  if (score > highScore) { highScore = score; localStorage.setItem('neonSnakeHigh', highScore); highScoreDisplay.textContent = 'BEST: ' + highScore; }
+  overlay.classList.remove('hidden');
+  overlay.innerHTML = `<h1>GAME OVER</h1><p id="game-over-score">Score: ${score}</p><p>Best: ${highScore}</p><button id="start-btn">PLAY AGAIN</button>`;
+  overlay.querySelector('button').onclick = init;
+}
+
+startBtn.onclick = init;
+
+document.addEventListener('keydown', e => {
+  const map = {ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0},
+    w:{x:0,y:-1},s:{x:0,y:1},a:{x:-1,y:0},d:{x:1,y:0}};
+  const d = map[e.key];
+  if (d && (d.x + dir.x !== 0 || d.y + dir.y !== 0)) { nextDir = d; e.preventDefault(); }
+});
+
+// Touch
+let tx, ty;
+canvas.addEventListener('touchstart', e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; e.preventDefault(); });
+canvas.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+  if (Math.abs(dx) < 20 && Math.abs(dy) < 20) return;
+  let d;
+  if (Math.abs(dx) > Math.abs(dy)) d = dx > 0 ? {x:1,y:0} : {x:-1,y:0};
+  else d = dy > 0 ? {x:0,y:1} : {x:0,y:-1};
+  if (d.x + dir.x !== 0 || d.y + dir.y !== 0) nextDir = d;
+  e.preventDefault();
+});
+
+window.addEventListener('resize', () => { if (!running) resize(); });
+</script>
+</body>
+</html>
