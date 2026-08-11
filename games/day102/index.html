@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Tetris - Particle Edition</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;color:#fff;font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden;height:100vh;display:flex;justify-content:center;align-items:center;touch-action:none}
+canvas{display:block}
+#ui{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;display:flex;justify-content:center;align-items:center}
+#overlay{pointer-events:auto;text-align:center;background:rgba(5,5,20,.92);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:40px 48px;backdrop-filter:blur(12px);max-width:420px}
+#overlay.hidden{display:none}
+#overlay h1{font-size:2.4rem;margin-bottom:8px;background:linear-gradient(135deg,#00f0ff,#b44aff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#overlay p{color:#aaa;font-size:.9rem;line-height:1.6;margin:12px 0}
+#overlay .keys{display:inline-block;text-align:left;color:#888;font-size:.82rem;line-height:1.8;margin:8px 0 20px}
+#overlay .keys b{color:#ccc}
+button{pointer-events:auto;background:linear-gradient(135deg,#00c8ff,#8844ff);border:none;color:#fff;font-size:1.1rem;padding:12px 36px;border-radius:8px;cursor:pointer;font-weight:600;letter-spacing:.5px;transition:transform .15s}
+button:hover{transform:scale(1.05)}
+button:active{transform:scale(.97)}
+#score-hud{position:absolute;top:16px;right:16px;text-align:right;font-size:.85rem;color:#aaa;line-height:1.8}
+#score-hud .val{color:#fff;font-size:1.1rem;font-weight:700}
+#mobile-controls{position:absolute;bottom:12px;left:0;width:100%;display:none;justify-content:center;gap:10px;pointer-events:auto}
+#mobile-controls button{width:56px;height:56px;border-radius:50%;padding:0;font-size:1.4rem;opacity:.55;background:rgba(255,255,255,.12)}
+@media(max-width:600px){#mobile-controls{display:flex}#score-hud{top:8px;right:8px;font-size:.75rem}#overlay{padding:28px 24px}#overlay h1{font-size:1.8rem}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="score-hud" class="hidden">
+  <div>SCORE <span class="val" id="hud-score">0</span></div>
+  <div>LINES <span class="val" id="hud-lines">0</span></div>
+  <div>LEVEL <span class="val" id="hud-level">1</span></div>
+</div>
+<div id="ui">
+  <div id="overlay">
+    <h1>TETRIS</h1>
+    <p style="font-size:.75rem;color:#666;margin-top:0">Particle Edition</p>
+    <p id="overlay-msg">Classic block-stacking with modern flair.</p>
+    <div class="keys" id="instructions">
+      <b>←→</b> Move &nbsp; <b>↑</b> Rotate<br>
+      <b>↓</b> Soft drop &nbsp; <b>Space</b> Hard drop<br>
+      <b>P</b> Pause &nbsp; <b>C</b> Hold
+    </div>
+    <button id="btn">PLAY</button>
+  </div>
+</div>
+<div id="mobile-controls">
+  <button id="mb-left">◀</button>
+  <button id="mb-rot">↻</button>
+  <button id="mb-down">▼</button>
+  <button id="mb-drop">⤓</button>
+  <button id="mb-right">▶</button>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const canvas = $('c'), ctx = canvas.getContext('2d');
+const overlay = $('overlay'), overlayMsg = $('overlay-msg'), btn = $('btn');
+const hudScore = $('hud-score'), hudLines = $('hud-lines'), hudLevel = $('hud-level'), scoreHud = $('score-hud');
+
+const COLS = 10, ROWS = 20, BLOCK = 32;
+let W, H, offX, offY, scale = 1;
+
+function resize() {
+  canvas.width = W = innerWidth;
+  canvas.height = H = innerHeight;
+  const bw = COLS * BLOCK, bh = ROWS * BLOCK;
+  scale = Math.min((W * .55) / bw, (H * .85) / bh, 1.2);
+  offX = (W - bw * scale) / 2;
+  offY = (H - bh * scale) / 2;
+}
+resize();
+addEventListener('resize', resize);
+
+const COLORS = ['#00f0f0','#f0f000','#a000f0','#00f000','#f00000','#0000f0','#f0a000'];
+const GLOW   = ['#00f0f0','#f0f000','#a000f0','#00f000','#f00000','#4444ff','#f0a000'];
+const SHAPES = [
+  [[1,1,1,1]],
+  [[1,1],[1,1]],
+  [[0,1,0],[1,1,1]],
+  [[0,1,1],[1,1,0]],
+  [[1,1,0],[0,1,1]],
+  [[1,0,0],[1,1,1]],
+  [[0,0,1],[1,1,1]]
+];
+
+let board, piece, next, hold, holdUsed, score, lines, level, gameOver, paused, dropTimer, dropInterval, particles, shakeT;
+let state = 'menu'; // menu | play | over
+
+class Particle {
+  constructor(x, y, color) {
+    this.x = x; this.y = y;
+    this.vx = (Math.random() - .5) * 6;
+    this.vy = -Math.random() * 5 - 2;
+    this.life = 1;
+    this.decay = .015 + Math.random() * .025;
+    this.size = 2 + Math.random() * 3;
+    this.color = color;
+  }
+  update() { this.x += this.vx; this.y += this.vy; this.vy += .12; this.life -= this.decay; }
+  draw(ctx) {
+    ctx.globalAlpha = this.life;
+    ctx.fillStyle = this.color;
+    ctx.shadowColor = this.color;
+    ctx.shadowBlur = 8;
+    ctx.fillRect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+}
+
+function spawnParticlesRow(row) {
+  for (let c = 0; c < COLS; c++) {
+    const color = COLORS[board[row][c] - 1] || '#fff';
+    const bx = offX + (c + .5) * BLOCK * scale;
+    const by = offY + (row + .5) * BLOCK * scale;
+    for (let i = 0; i < 6; i++) particles.push(new Particle(bx, by, color));
+  }
+}
+
+function spawnLandParticles(p) {
+  p.shape.forEach((r, dy) => r.forEach((v, dx) => {
+    if (!v) return;
+    const bx = offX + (p.x + dx + .5) * BLOCK * scale;
+    const by = offY + (p.y + dy + 1) * BLOCK * scale;
+    for (let i = 0; i < 3; i++) particles.push(new Particle(bx, by, COLORS[p.type]));
+  }));
+}
+
+function newBoard() { return Array.from({length: ROWS}, () => new Array(COLS).fill(0)); }
+
+function randomType() { return Math.floor(Math.random() * 7); }
+
+function newPiece(type) {
+  const t = type !== undefined ? type : randomType();
+  return { shape: SHAPES[t].map(r => [...r]), x: Math.floor((COLS - SHAPES[t][0].length) / 2), y: 0, type: t };
+}
+
+function rotate(shape) {
+  const rows = shape.length, cols = shape[0].length;
+  return Array.from({length: cols}, (_, c) => Array.from({length: rows}, (_, r) => shape[rows - 1 - r][c]));
+}
+
+function valid(p, dx = 0, dy = 0, s) {
+  const sh = s || p.shape;
+  return sh.every((r, ry) => r.every((v, rx) => {
+    if (!v) return true;
+    const nx = p.x + rx + dx, ny = p.y + ry + dy;
+    return nx >= 0 && nx < COLS && ny < ROWS && (ny < 0 || !board[ny][nx]);
+  }));
+}
+
+function lock(p) {
+  p.shape.forEach((r, dy) => r.forEach((v, dx) => {
+    if (v) { const y = p.y + dy; if (y >= 0) board[y][p.x + dx] = p.type + 1; }
+  }));
+  spawnLandParticles(p);
+  let cleared = 0;
+  for (let r = ROWS - 1; r >= 0; r--) {
+    if (board[r].every(c => c)) {
+      spawnParticlesRow(r);
+      board.splice(r, 1);
+      board.unshift(new Array(COLS).fill(0));
+      cleared++; r++;
+    }
+  }
+  if (cleared) {
+    const pts = [0, 100, 300, 500, 800];
+    score += (pts[cleared] || 800) * level;
+    lines += cleared;
+    level = Math.floor(lines / 10) + 1;
+    dropInterval = Math.max(50, 500 - (level - 1) * 40);
+    shakeT = 10 + cleared * 4;
+  }
+}
+
+function startGame() {
+  board = newBoard(); score = 0; lines = 0; level = 1; gameOver = false; paused = false;
+  dropTimer = 0; dropInterval = 500; particles = []; shakeT = 0; hold = null; holdUsed = false;
+  next = randomType();
+  spawn();
+  state = 'play';
+  overlay.classList.add('hidden');
+  scoreHud.classList.remove('hidden');
+}
+
+function spawn() {
+  piece = newPiece(next);
+  next = randomType();
+  holdUsed = false;
+  if (!valid(piece)) { state = 'over'; showOver(); }
+}
+
+function showOver() {
+  scoreHud.classList.add('hidden');
+  overlayMsg.textContent = `Game Over! Score: ${score} — Lines: ${lines}`;
+  $('instructions').style.display = 'none';
+  btn.textContent = 'RETRY';
+  overlay.classList.remove('hidden');
+}
+
+function hardDrop() {
+  while (valid(piece, 0, 1)) piece.y++;
+  lock(piece); spawn();
+}
+
+function doHold() {
+  if (holdUsed) return;
+  holdUsed = true;
+  const t = piece.type;
+  if (hold !== null) { piece = newPiece(hold); hold = t; }
+  else { hold = t; spawn(); }
+}
+
+function ghostY() {
+  let gy = 0;
+  while (valid(piece, 0, gy + 1)) gy++;
+  return piece.y + gy;
+}
+
+// Input
+const keys = {};
+addEventListener('keydown', e => {
+  if (state !== 'play' || gameOver) return;
+  if (e.code === 'KeyP') { paused = !paused; return; }
+  if (paused) return;
+  if (e.code === 'ArrowLeft' && valid(piece, -1)) piece.x--;
+  if (e.code === 'ArrowRight' && valid(piece, 1)) piece.x++;
+  if (e.code === 'ArrowDown' && valid(piece, 0, 1)) { piece.y++; score++; }
+  if (e.code === 'ArrowUp') {
+    const r = rotate(piece.shape);
+    if (valid(piece, 0, 0, r)) piece.shape = r;
+    else if (valid(piece, 1, 0, r)) { piece.shape = r; piece.x++; }
+    else if (valid(piece, -1, 0, r)) { piece.shape = r; piece.x--; }
+    else if (valid(piece, 2, 0, r)) { piece.shape = r; piece.x += 2; }
+    else if (valid(piece, -2, 0, r)) { piece.shape = r; piece.x -= 2; }
+  }
+  if (e.code === 'Space') { e.preventDefault(); hardDrop(); }
+  if (e.code === 'KeyC') doHold();
+});
+
+// Mobile
+$('mb-left').ontouchstart = e => { e.preventDefault(); if (state==='play'&&valid(piece,-1)) piece.x--; };
+$('mb-right').ontouchstart = e => { e.preventDefault(); if (state==='play'&&valid(piece,1)) piece.x++; };
+$('mb-down').ontouchstart = e => { e.preventDefault(); if (state==='play'&&valid(piece,0,1)){piece.y++;score++;} };
+$('mb-drop').ontouchstart = e => { e.preventDefault(); if (state==='play') hardDrop(); };
+$('mb-rot').ontouchstart = e => {
+  e.preventDefault(); if (state!=='play') return;
+  const r=rotate(piece.shape);
+  if(valid(piece,0,0,r))piece.shape=r;
+  else if(valid(piece,1,0,r)){piece.shape=r;piece.x++;}
+  else if(valid(piece,-1,0,r)){piece.shape=r;piece.x--;}
+};
+
+// Touch swipe
+let tx, ty;
+canvas.addEventListener('touchstart', e => { const t = e.touches[0]; tx = t.clientX; ty = t.clientY; });
+canvas.addEventListener('touchend', e => {
+  if (state !== 'play') return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - tx, dy = t.clientY - ty;
+  if (Math.abs(dx) < 20 && Math.abs(dy) < 20) {
+    const r = rotate(piece.shape);
+    if (valid(piece, 0, 0, r)) piece.shape = r;
+  }
+});
+
+btn.onclick = () => { startGame(); };
+
+// Draw helpers
+function drawBlock(x, y, type, alpha = 1) {
+  const bx = x * BLOCK * scale, by = y * BLOCK * scale;
+  const s = BLOCK * scale;
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = COLORS[type];
+  ctx.shadowColor = GLOW[type];
+  ctx.shadowBlur = 10 * scale;
+  ctx.fillRect(bx + 1, by + 1, s - 2, s - 2);
+  ctx.shadowBlur = 0;
+  // highlight
+  ctx.fillStyle = 'rgba(255,255,255,.18)';
+  ctx.fillRect(bx + 2, by + 2, s - 4, (s - 4) * .35);
+  ctx.globalAlpha = 1;
+}
+
+function drawSmallBlock(sx, sy, type, bs) {
+  ctx.fillStyle = COLORS[type];
+  ctx.shadowColor = GLOW[type];
+  ctx.shadowBlur = 6;
+  ctx.fillRect(sx, sy, bs - 1, bs - 1);
+  ctx.shadowBlur = 0;
+}
+
+function drawPreview(label, type, px, py) {
+  ctx.fillStyle = '#aaa';
+  ctx.font = `${11 * scale}px sans-serif`;
+  ctx.fillText(label, px, py);
+  if (type === null) return;
+  const sh = SHAPES[type];
+  const bs = 14 * scale;
+  sh.forEach((r, dy) => r.forEach((v, dx) => {
+    if (v) drawSmallBlock(px + dx * bs, py + 8 * scale + dy * bs, type, bs);
+  }));
+}
+
+let lastTime = 0;
+function loop(ts) {
+  const dt = ts - lastTime; lastTime = ts;
+  requestAnimationFrame(loop);
+
+  // Update
+  if (state === 'play' && !paused && !gameOver) {
+    dropTimer += dt;
+    if (dropTimer >= dropInterval) {
+      dropTimer = 0;
+      if (valid(piece, 0, 1)) piece.y++;
+      else { lock(piece); spawn(); }
+    }
+  }
+
+  particles = particles.filter(p => { p.update(); return p.life > 0; });
+  if (shakeT > 0) shakeT -= 1;
+
+  // HUD
+  if (state === 'play') {
+    hudScore.textContent = score;
+    hudLines.textContent = lines;
+    hudLevel.textContent = level;
+  }
+
+  // Draw
+  ctx.clearRect(0, 0, W, H);
+
+  // Background grid glow
+  ctx.save();
+  const shx = shakeT > 0 ? (Math.random() - .5) * shakeT * .6 : 0;
+  const shy = shakeT > 0 ? (Math.random() - .5) * shakeT * .6 : 0;
+  ctx.translate(offX + shx, offY + shy);
+
+  // Board bg
+  ctx.fillStyle = 'rgba(10,10,30,.85)';
+  ctx.fillRect(0, 0, COLS * BLOCK * scale, ROWS * BLOCK * scale);
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,.04)';
+  ctx.lineWidth = 1;
+  for (let r = 0; r <= ROWS; r++) {
+    ctx.beginPath(); ctx.moveTo(0, r * BLOCK * scale); ctx.lineTo(COLS * BLOCK * scale, r * BLOCK * scale); ctx.stroke();
+  }
+  for (let c = 0; c <= COLS; c++) {
+    ctx.beginPath(); ctx.moveTo(c * BLOCK * scale, 0); ctx.lineTo(c * BLOCK * scale, ROWS * BLOCK * scale); ctx.stroke();
+  }
+
+  // Locked blocks
+  board && board.forEach((row, r) => row.forEach((v, c) => { if (v) drawBlock(c, r, v - 1); }));
+
+  // Ghost
+  if (state === 'play' && piece) {
+    const gy = ghostY();
+    piece.shape.forEach((r, dy) => r.forEach((v, dx) => { if (v) drawBlock(piece.x + dx, gy + dy - piece.y + piece.y + dy - dy + (gy - piece.y), piece.type, .15); }));
+    // simplified ghost
+    const gOff = gy - piece.y;
+    piece.shape.forEach((r, dy) => r.forEach((v, dx) => { if (v) drawBlock(piece.x + dx, piece.y + dy + gOff, piece.type, .18); }));
+
+    // Active piece
+    piece.shape.forEach((r, dy) => r.forEach((v, dx) => { if (v) drawBlock(piece.x + dx, piece.y + dy, piece.type); }));
+  }
+
+  // Border
+  ctx.strokeStyle = 'rgba(100,140,255,.25)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(0, 0, COLS * BLOCK * scale, ROWS * BLOCK * scale);
+
+  ctx.restore();
+
+  // Previews
+  if (state === 'play') {
+    const px = offX + COLS * BLOCK * scale + 20 * scale;
+    drawPreview('NEXT', next, px, offY + 10);
+    drawPreview('HOLD', hold, px, offY + 100 * scale);
+  }
+
+  // Particles (screen space)
+  ctx.save();
+  ctx.translate(shx, shy);
+  particles.forEach(p => p.draw(ctx));
+  ctx.restore();
+
+  // Pause overlay
+  if (state === 'play' && paused) {
+    ctx.fillStyle = 'rgba(0,0,0,.6)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 32px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('PAUSED', W / 2, H / 2);
+    ctx.textAlign = 'start';
+  }
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
