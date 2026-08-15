@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>2048</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#faf8ef;display:flex;justify-content:center;align-items:center;min-height:100vh;touch-action:none;user-select:none}
+#app{width:min(500px,95vw);text-align:center}
+h1{font-size:3rem;color:#776e65;font-weight:800;margin-bottom:.2em}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.scores{display:flex;gap:8px}
+.score-box{background:#bbada0;color:#fff;border-radius:6px;padding:6px 16px;text-align:center;min-width:80px}
+.score-box .label{font-size:.65rem;text-transform:uppercase;letter-spacing:1px}
+.score-box .value{font-size:1.3rem;font-weight:700}
+.controls{display:flex;gap:8px}
+button{background:#8f7a66;color:#f9f6f2;border:none;border-radius:6px;padding:8px 16px;font-size:.85rem;font-weight:700;cursor:pointer}
+button:hover{background:#9f8b77}
+.msg{font-size:.8rem;color:#776e65;margin-bottom:10px}
+#board{position:relative;background:#bbada0;border-radius:8px;padding:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;aspect-ratio:1}
+.cell{background:rgba(238,228,218,.35);border-radius:6px}
+.tile{position:absolute;display:flex;justify-content:center;align-items:center;border-radius:6px;font-weight:800;transition:top .12s,left .12s;z-index:1}
+.tile.merged{animation:pop .2s}
+.tile.new{animation:appear .2s}
+@keyframes pop{50%{transform:scale(1.15)}}
+@keyframes appear{0%{transform:scale(0)}100%{transform:scale(1)}}
+#overlay{position:absolute;inset:0;background:rgba(238,228,218,.7);border-radius:8px;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:10;display:none}
+#overlay.show{display:flex}
+#overlay h2{font-size:2rem;color:#776e65;margin-bottom:12px}
+#overlay.win h2{color:#edc22e}
+#overlay button{font-size:1rem;padding:10px 24px}
+</style>
+</head>
+<body>
+<div id="app">
+<div class="header">
+<h1>2048</h1>
+<div class="scores">
+<div class="score-box"><div class="label">Score</div><div class="value" id="score">0</div></div>
+<div class="score-box"><div class="label">Best</div><div class="value" id="best">0</div></div>
+</div>
+</div>
+<div class="controls"><button onclick="newGame()">New Game</button></div>
+<p class="msg">Swipe or use arrow keys to merge tiles. Reach 2048 to win!</p>
+<div id="board">
+<div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+<div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+<div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+<div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+<div id="overlay"><h2 id="ovText">Game Over</h2><button onclick="newGame()">Try Again</button></div>
+</div>
+</div>
+<script>
+const COLORS={2:'#eee4da',4:'#ede0c8',8:'#f2b179',16:'#f59563',32:'#f67c5f',64:'#f65e3b',128:'#edcf72',256:'#edcc61',512:'#edc850',1024:'#edc53f',2048:'#edc22e'};
+const DARK=new Set([8,16,32,64,128,256,512,1024,2048]);
+let grid,score,best=+localStorage.getItem('best2048')||0,won,moved;
+const board=document.getElementById('board');
+
+function cellSize(){const r=board.getBoundingClientRect();return{s:(r.width-40)/4,pad:8,bx:r.left}}
+function newGame(){score=0;won=false;grid=Array.from({length:4},()=>Array(4).fill(0));addRandom();addRandom();render();document.getElementById('overlay').className='';document.getElementById('overlay').style.display='none'}
+function addRandom(){const e=[];grid.forEach((r,i)=>r.forEach((v,j)=>{if(!v)e.push([i,j])}));if(!e.length)return;const[r,c]=e[Math.random()*e.length|0];grid[r][c]=Math.random()<.9?2:4}
+function render(){board.querySelectorAll('.tile').forEach(t=>t.remove());const{s,pad}=cellSize();const gap=pad;grid.forEach((row,r)=>row.forEach((v,c)=>{if(!v)return;const t=document.createElement('div');t.className='tile';const fs=v>512?Math.max(s*.28,16):v>64?s*.35:s*.42;Object.assign(t.style,{width:s+'px',height:s+'px',top:(pad+r*(s+gap))+'px',left:(pad+c*(s+gap))+'px',background:COLORS[v]||(v>2048?'#3c3a32':'#cdc1b4'),color:DARK.has(v)||v>2048?'#f9f6f2':'#776e65',fontSize:fs+'px'});t.textContent=v;board.appendChild(t)}));document.getElementById('score').textContent=score;if(score>best){best=score;localStorage.setItem('best2048',best)}document.getElementById('best').textContent=best}
+
+function slide(row){let a=row.filter(v=>v),merged=false;for(let i=0;i<a.length-1;i++){if(a[i]===a[i+1]){a[i]*=2;score+=a[i];if(a[i]===2048)won=true;a.splice(i+1,1);merged=true}}while(a.length<4)a.push(0);return a}
+function move(dir){moved=false;let g=grid.map(r=>[...r]);if(dir==='left')grid=grid.map(r=>slide(r));
+else if(dir==='right')grid=grid.map(r=>slide([...r].reverse()).reverse());
+else if(dir==='up'){for(let c=0;c<4;c++){let col=grid.map(r=>r[c]);col=slide(col);col.forEach((v,r)=>grid[r][c]=v)}}
+else{for(let c=0;c<4;c++){let col=grid.map(r=>r[c]).reverse();col=slide(col).reverse();col.forEach((v,r)=>grid[r][c]=v)}}
+for(let r=0;r<4;r++)for(let c=0;c<4;c++)if(grid[r][c]!==g[r][c])moved=true;
+if(moved){addRandom();render();if(won){const o=document.getElementById('overlay');o.className='show win';document.getElementById('ovText').textContent='You Win!'}else if(isOver()){const o=document.getElementById('overlay');o.className='show';document.getElementById('ovText').textContent='Game Over'}}}
+function isOver(){for(let r=0;r<4;r++)for(let c=0;c<4;c++){if(!grid[r][c])return false;if(c<3&&grid[r][c]===grid[r][c+1])return false;if(r<3&&grid[r][c]===grid[r+1][c])return false}return true}
+
+document.addEventListener('keydown',e=>{const m={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down'};if(m[e.key]){e.preventDefault();move(m[e.key])}});
+let tx,ty;
+board.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY});
+board.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;if(Math.max(Math.abs(dx),Math.abs(dy))<30)return;if(Math.abs(dx)>Math.abs(dy))move(dx>0?'right':'left');else move(dy>0?'down':'up')});
+newGame();
+</script>
+</body>
+</html>
