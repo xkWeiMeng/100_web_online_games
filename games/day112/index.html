@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Pong+ | AI & Power-Ups</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden;color:#fff;touch-action:none}
+canvas{display:block;border-radius:8px;box-shadow:0 0 40px rgba(0,200,255,.15)}
+#ui{position:absolute;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center}
+h1{font-size:3rem;letter-spacing:.15em;text-transform:uppercase;background:linear-gradient(135deg,#00c6ff,#ff6ec7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{color:#8899aa;font-size:.95rem;max-width:420px;line-height:1.6}
+button{background:linear-gradient(135deg,#00c6ff,#0072ff);border:none;color:#fff;padding:14px 48px;font-size:1.1rem;border-radius:40px;cursor:pointer;letter-spacing:.08em;transition:transform .15s,box-shadow .15s}
+button:hover{transform:scale(1.05);box-shadow:0 0 20px rgba(0,198,255,.4)}
+.keys{display:flex;gap:24px;color:#667;font-size:.85rem}
+.keys span{background:#161628;padding:6px 14px;border-radius:6px;border:1px solid #2a2a4a}
+#hud{position:absolute;top:16px;width:100%;display:flex;justify-content:center;gap:40px;font-size:1.4rem;letter-spacing:.1em;pointer-events:none;display:none}
+#hud div{min-width:60px;text-align:center}
+#powerup-label{position:absolute;bottom:18px;font-size:.8rem;color:#8899aa;pointer-events:none;display:none;letter-spacing:.06em}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <h1>Pong+</h1>
+  <p class="sub">Classic pong with an AI opponent and power-ups.<br>First to <b>7</b> wins. Collect power-ups for an edge!</p>
+  <div class="keys"><span>W / S</span> or <span>↑ / ↓</span> or <span>Touch</span></div>
+  <button id="start">Play</button>
+</div>
+<div id="hud"><div id="s1">0</div><div>—</div><div id="s2">0</div></div>
+<div id="powerup-label"></div>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+const ui=document.getElementById('ui'),hud=document.getElementById('hud'),pLabel=document.getElementById('powerup-label');
+const s1El=document.getElementById('s1'),s2El=document.getElementById('s2');
+let W,H,dpr;
+
+function resize(){
+  dpr=Math.min(devicePixelRatio,2);
+  W=Math.min(innerWidth-20,800);H=Math.min(innerHeight-20,500);
+  C.width=W*dpr;C.height=H*dpr;C.style.width=W+'px';C.style.height=H+'px';
+  X.setTransform(dpr,0,0,dpr,0,0);
+}
+resize();addEventListener('resize',resize);
+
+const WIN=7,PW=12,PH=80,BR=8,SPEED=5.5;
+let state='menu',score=[0,0],keys={};
+let ball,p1,p2,powerUp,particles,activeEffects,lastTime;
+
+function initRound(){
+  const dir=Math.random()>.5?1:-1;
+  const ang=(Math.random()-.5)*1.2;
+  ball={x:W/2,y:H/2,vx:SPEED*dir*Math.cos(ang),vy:SPEED*Math.sin(ang),r:BR,speed:SPEED,trail:[]};
+  p1={x:20,y:H/2-PH/2,w:PW,h:PH,color:'#00c6ff'};
+  p2={x:W-20-PW,y:H/2-PH/2,w:PW,h:PH,color:'#ff6ec7'};
+  powerUp=null;activeEffects={};particles=[];
+}
+
+function spawnPowerUp(){
+  const types=['big','small','fast','slow','multi'];
+  const t=types[Math.random()*types.length|0];
+  const colors={big:'#00ff88',small:'#ff4444',fast:'#ffcc00',slow:'#8866ff',multi:'#ff8800'};
+  powerUp={x:W/4+Math.random()*W/2,y:40+Math.random()*(H-80),r:12,type:t,color:colors[t],age:0};
+}
+
+function addParticles(x,y,col,n=8){
+  for(let i=0;i<n;i++) particles.push({x,y,vx:(Math.random()-.5)*4,vy:(Math.random()-.5)*4,life:1,color:col,r:3});
+}
+
+document.getElementById('start').onclick=()=>{score=[0,0];state='play';initRound();ui.style.display='none';hud.style.display='flex';pLabel.style.display='block';lastTime=performance.now();loop()};
+
+addEventListener('keydown',e=>keys[e.key]=true);
+addEventListener('keyup',e=>keys[e.key]=false);
+
+let touchY=null;
+C.addEventListener('touchstart',e=>{e.preventDefault();touchY=e.touches[0].clientY-C.getBoundingClientRect().top},{passive:false});
+C.addEventListener('touchmove',e=>{e.preventDefault();touchY=e.touches[0].clientY-C.getBoundingClientRect().top},{passive:false});
+C.addEventListener('touchend',()=>touchY=null);
+
+function update(dt){
+  const s=dt*60;
+  // player movement
+  let mv=0;
+  if(keys['w']||keys['W']||keys['ArrowUp'])mv=-6*s;
+  if(keys['s']||keys['S']||keys['ArrowDown'])mv=6*s;
+  if(touchY!==null){const target=touchY-p1.h/2;mv=Math.sign(target-p1.y)*Math.min(6*s,Math.abs(target-p1.y));}
+  p1.y=Math.max(0,Math.min(H-p1.h,p1.y+mv));
+
+  // AI
+  const aiSpeed=(4.2+(score[1]*.15))*s;
+  const target=ball.y-p2.h/2+(ball.vx<0?0:(ball.vy>0?15:-15));
+  const diff=target-p2.y;
+  p2.y+=Math.sign(diff)*Math.min(aiSpeed,Math.abs(diff));
+  p2.y=Math.max(0,Math.min(H-p2.h,p2.y));
+
+  // ball
+  const sp=activeEffects.fast?1.5:activeEffects.slow?.7:1;
+  ball.x+=ball.vx*s*sp;ball.y+=ball.vy*s*sp;
+  ball.trail.push({x:ball.x,y:ball.y,a:1});
+  if(ball.trail.length>16)ball.trail.shift();
+
+  if(ball.y-ball.r<0){ball.y=ball.r;ball.vy=Math.abs(ball.vy);}
+  if(ball.y+ball.r>H){ball.y=H-ball.r;ball.vy=-Math.abs(ball.vy);}
+
+  // paddle collision
+  [p1,p2].forEach((p,i)=>{
+    if(ball.x-ball.r<p.x+p.w&&ball.x+ball.r>p.x&&ball.y>p.y&&ball.y<p.y+p.h){
+      const hit=(ball.y-(p.y+p.h/2))/(p.h/2);
+      const ang=hit*Math.PI/3;
+      const spd=ball.speed*1.05;
+      ball.speed=Math.min(spd,12);
+      ball.vx=(i===0?1:-1)*Math.cos(ang)*ball.speed;
+      ball.vy=Math.sin(ang)*ball.speed;
+      ball.x=i===0?p.x+p.w+ball.r:p.x-ball.r;
+      addParticles(ball.x,ball.y,p.color);
+    }
+  });
+
+  // scoring
+  if(ball.x<-20){score[1]++;scored();}
+  if(ball.x>W+20){score[0]++;scored();}
+
+  // power-up
+  if(!powerUp&&Math.random()<.003*s)spawnPowerUp();
+  if(powerUp){
+    powerUp.age+=dt;
+    if(powerUp.age>8){powerUp=null;}
+    else{
+      const dx=ball.x-powerUp.x,dy=ball.y-powerUp.y;
+      if(Math.sqrt(dx*dx+dy*dy)<ball.r+powerUp.r){
+        applyPowerUp(powerUp.type);
+        addParticles(powerUp.x,powerUp.y,powerUp.color,14);
+        powerUp=null;
+      }
+    }
+  }
+
+  // particles
+  particles.forEach(p=>{p.x+=p.vx*s;p.y+=p.vy*s;p.life-=.03*s;p.r*=.97;});
+  particles=particles.filter(p=>p.life>0);
+
+  // effects decay
+  for(const k in activeEffects){activeEffects[k]-=dt;if(activeEffects[k]<=0){resetEffect(k);delete activeEffects[k];}}
+  updateLabel();
+}
+
+function applyPowerUp(t){
+  if(t==='big'){p1.h=120;activeEffects.big=6;}
+  if(t==='small'){p2.h=50;activeEffects.small=6;}
+  if(t==='fast'){activeEffects.fast=5;}
+  if(t==='slow'){activeEffects.slow=5;}
+  if(t==='multi'){score[0]++;s1El.textContent=score[0];if(score[0]>=WIN)endGame(0);}
+}
+function resetEffect(t){if(t==='big')p1.h=PH;if(t==='small')p2.h=PH;}
+function updateLabel(){
+  const parts=[];
+  for(const k in activeEffects){parts.push(k.toUpperCase()+' '+activeEffects[k].toFixed(1)+'s');}
+  pLabel.textContent=parts.join('  ·  ');
+}
+
+function scored(){
+  s1El.textContent=score[0];s2El.textContent=score[1];
+  if(score[0]>=WIN)endGame(0);
+  else if(score[1]>=WIN)endGame(1);
+  else initRound();
+}
+
+function endGame(winner){
+  state='over';hud.style.display='none';pLabel.style.display='none';
+  ui.innerHTML=`<h1>${winner===0?'You Win!':'AI Wins'}</h1><p class="sub">${score[0]} — ${score[1]}</p><button id="restart">Play Again</button>`;
+  ui.style.display='flex';
+  document.getElementById('restart').onclick=()=>{score=[0,0];state='play';initRound();ui.style.display='none';hud.style.display='flex';pLabel.style.display='block';s1El.textContent='0';s2El.textContent='0';lastTime=performance.now();loop();};
+}
+
+function draw(){
+  X.fillStyle='#0a0a1a';X.fillRect(0,0,W,H);
+  // center line
+  X.setLineDash([6,8]);X.strokeStyle='#1a1a3a';X.lineWidth=2;
+  X.beginPath();X.moveTo(W/2,0);X.lineTo(W/2,H);X.stroke();X.setLineDash([]);
+
+  // trail
+  ball.trail.forEach((t,i)=>{const a=i/ball.trail.length*.3;X.fillStyle=`rgba(255,255,255,${a})`;X.beginPath();X.arc(t.x,t.y,ball.r*.6,0,Math.PI*2);X.fill();});
+
+  // ball
+  X.fillStyle='#fff';X.shadowColor='#fff';X.shadowBlur=12;
+  X.beginPath();X.arc(ball.x,ball.y,ball.r,0,Math.PI*2);X.fill();X.shadowBlur=0;
+
+  // paddles
+  [p1,p2].forEach(p=>{X.fillStyle=p.color;X.shadowColor=p.color;X.shadowBlur=10;
+    X.beginPath();X.roundRect(p.x,p.y,p.w,p.h,6);X.fill();X.shadowBlur=0;});
+
+  // power-up
+  if(powerUp){
+    const pulse=1+.15*Math.sin(powerUp.age*5);
+    X.fillStyle=powerUp.color;X.globalAlpha=.8;X.shadowColor=powerUp.color;X.shadowBlur=14;
+    X.beginPath();X.arc(powerUp.x,powerUp.y,powerUp.r*pulse,0,Math.PI*2);X.fill();
+    X.shadowBlur=0;X.globalAlpha=1;
+    X.fillStyle='#fff';X.font='bold 10px sans-serif';X.textAlign='center';X.textBaseline='middle';
+    const labels={big:'BIG',small:'SML',fast:'SPD',slow:'SLO',multi:'+1'};
+    X.fillText(labels[powerUp.type],powerUp.x,powerUp.y);
+  }
+
+  // particles
+  particles.forEach(p=>{X.globalAlpha=p.life;X.fillStyle=p.color;X.beginPath();X.arc(p.x,p.y,p.r,0,Math.PI*2);X.fill();});
+  X.globalAlpha=1;
+}
+
+function loop(){
+  if(state!=='play')return;
+  const now=performance.now(),dt=Math.min((now-lastTime)/1000,.05);lastTime=now;
+  update(dt);draw();requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
