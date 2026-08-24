@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Typing Speed Test</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f172a;--surface:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;--accent:#38bdf8;--correct:#4ade80;--wrong:#f87171;--highlight:#fbbf24}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1rem}
+h1{font-size:2rem;font-weight:700;margin-bottom:.25rem;background:linear-gradient(135deg,var(--accent),#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{color:var(--muted);margin-bottom:1.5rem;font-size:.95rem}
+.container{width:100%;max-width:720px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:1.25rem}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:.75rem;text-align:center}
+.stat-val{font-size:1.75rem;font-weight:700;color:var(--accent)}
+.stat-label{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:.15rem}
+.text-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.5rem;font-size:1.15rem;line-height:1.9;margin-bottom:1rem;min-height:140px;position:relative;user-select:none}
+.text-box span{transition:color .05s}
+.char-correct{color:var(--correct)}
+.char-wrong{color:var(--wrong);text-decoration:underline}
+.char-current{background:var(--accent);color:var(--bg);border-radius:2px;padding:0 1px}
+.char-pending{color:var(--muted)}
+#input-box{width:100%;padding:.85rem 1rem;font-size:1.1rem;border:2px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);outline:none;transition:border-color .2s}
+#input-box:focus{border-color:var(--accent)}
+.timer-bar{height:4px;background:var(--border);border-radius:2px;margin-bottom:1rem;overflow:hidden}
+.timer-fill{height:100%;background:linear-gradient(90deg,var(--accent),#a78bfa);transition:width .25s linear;border-radius:2px}
+.btn{display:inline-block;padding:.7rem 1.75rem;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;background:linear-gradient(135deg,var(--accent),#818cf8);color:#0f172a;transition:transform .15s,box-shadow .15s;margin-top:.75rem}
+.btn:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(56,189,248,.3)}
+.center{text-align:center}
+#start-screen .instructions{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem;margin:1rem 0;text-align:left;color:var(--muted);line-height:1.7;font-size:.95rem}
+#start-screen .instructions li{margin:.25rem 0}
+.duration-btns{display:flex;gap:.5rem;justify-content:center;margin:.75rem 0}
+.dur-btn{padding:.45rem 1rem;border:2px solid var(--border);border-radius:8px;background:transparent;color:var(--text);cursor:pointer;font-size:.9rem;font-weight:600;transition:all .15s}
+.dur-btn.active{border-color:var(--accent);background:rgba(56,189,248,.12);color:var(--accent)}
+.hidden{display:none!important}
+#result-screen .result-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:2rem;margin:1rem 0}
+.big-wpm{font-size:4rem;font-weight:800;background:linear-gradient(135deg,var(--accent),#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.result-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem;margin-top:1.25rem}
+.result-stat{text-align:center;padding:.5rem}
+.result-stat .val{font-size:1.4rem;font-weight:700;color:var(--highlight)}
+.result-stat .lbl{font-size:.75rem;color:var(--muted);text-transform:uppercase}
+@media(max-width:500px){.stats{grid-template-columns:repeat(2,1fr)}.text-box{font-size:1rem;padding:1rem}.stat-val{font-size:1.3rem}h1{font-size:1.5rem}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- START SCREEN -->
+<div id="start-screen" class="center">
+<h1>Typing Speed Test</h1>
+<p class="subtitle">How fast can you type?</p>
+<div class="instructions">
+<ul>
+<li>A passage will appear — type it as fast and accurately as you can.</li>
+<li>The timer starts when you type the first character.</li>
+<li><strong>WPM</strong> (words per minute) and <strong>accuracy</strong> update live.</li>
+<li>Mistakes are shown in <span style="color:var(--wrong)">red</span>.</li>
+</ul>
+</div>
+<p style="color:var(--muted);font-size:.85rem;margin-bottom:.25rem">Duration</p>
+<div class="duration-btns">
+<button class="dur-btn" data-dur="30">30s</button>
+<button class="dur-btn active" data-dur="60">60s</button>
+<button class="dur-btn" data-dur="120">2m</button>
+</div>
+<button class="btn" id="start-btn">Start Typing</button>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="game-screen" class="hidden">
+<div class="stats">
+<div class="stat"><div class="stat-val" id="wpm">0</div><div class="stat-label">WPM</div></div>
+<div class="stat"><div class="stat-val" id="accuracy">100%</div><div class="stat-label">Accuracy</div></div>
+<div class="stat"><div class="stat-val" id="errors">0</div><div class="stat-label">Errors</div></div>
+<div class="stat"><div class="stat-val" id="timer">60</div><div class="stat-label">Seconds</div></div>
+</div>
+<div class="timer-bar"><div class="timer-fill" id="timer-fill" style="width:100%"></div></div>
+<div class="text-box" id="text-display"></div>
+<input type="text" id="input-box" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Start typing here...">
+</div>
+
+<!-- RESULT SCREEN -->
+<div id="result-screen" class="hidden center">
+<h1>Results</h1>
+<div class="result-card">
+<div class="big-wpm" id="final-wpm">0</div>
+<p style="color:var(--muted)">Words Per Minute</p>
+<div class="result-grid">
+<div class="result-stat"><div class="val" id="final-acc">0%</div><div class="lbl">Accuracy</div></div>
+<div class="result-stat"><div class="val" id="final-chars">0</div><div class="lbl">Characters</div></div>
+<div class="result-stat"><div class="val" id="final-correct">0</div><div class="lbl">Correct</div></div>
+<div class="result-stat"><div class="val" id="final-errors">0</div><div class="lbl">Errors</div></div>
+</div>
+</div>
+<button class="btn" id="restart-btn">Try Again</button>
+</div>
+
+</div>
+<script>
+const paragraphs=[
+"The quick brown fox jumps over the lazy dog near the riverbank while the sun sets behind the mountains casting golden light across the meadow.",
+"Programming is the art of telling a computer what to do through a precise set of instructions that must be written in a language the machine can understand.",
+"Every great developer was once a beginner who refused to give up and kept practicing until the complex patterns of code began to feel like second nature.",
+"The ocean waves crashed against the rocky shore sending white spray high into the salty air as seagulls circled overhead looking for their next meal.",
+"Technology continues to evolve at an extraordinary pace transforming how we communicate work and play in ways that were unimaginable just a decade ago.",
+"A well designed user interface should feel invisible to the person using it guiding them naturally through each task without confusion or frustration.",
+"The stars twinkled in the clear night sky forming ancient patterns that humans have used for navigation and storytelling for thousands of years.",
+"Learning to type quickly and accurately is one of the most practical skills you can develop in the modern world where keyboards are everywhere.",
+"Coffee shops around the world serve as informal offices where freelancers and remote workers gather to find focus and a sense of community.",
+"The forest was silent except for the gentle rustling of leaves in the breeze and the distant call of a bird echoing through the tall trees.",
+"Open source software has revolutionized the technology industry by allowing developers to collaborate freely and build upon each others work without restriction.",
+"Music has the remarkable ability to transport us to different times and places evoking powerful emotions and memories with just a few notes.",
+"The city skyline glowed with thousands of lights as evening traffic flowed through the streets like rivers of white and red stretching to the horizon.",
+"Good writing is clear thinking made visible on the page where every word serves a purpose and every sentence moves the reader forward with intention."
+];
+
+let duration=60,timeLeft,interval,started=false,finished=false;
+let text="",pos=0,correctCount=0,errorCount=0,totalTyped=0,startTime;
+
+const $=id=>document.getElementById(id);
+const screens={start:$('start-screen'),game:$('game-screen'),result:$('result-screen')};
+const show=s=>{Object.values(screens).forEach(e=>e.classList.add('hidden'));s.classList.remove('hidden')};
+
+// duration buttons
+document.querySelectorAll('.dur-btn').forEach(b=>{
+b.onclick=()=>{document.querySelectorAll('.dur-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');duration=+b.dataset.dur}
+});
+
+$('start-btn').onclick=startGame;
+$('restart-btn').onclick=()=>show(screens.start);
+
+function startGame(){
+text=paragraphs.sort(()=>Math.random()-.5).slice(0,3).join(' ');
+pos=0;correctCount=0;errorCount=0;totalTyped=0;started=false;finished=false;
+timeLeft=duration;
+$('timer').textContent=timeLeft;$('wpm').textContent='0';$('accuracy').textContent='100%';$('errors').textContent='0';
+$('timer-fill').style.width='100%';
+renderText();
+show(screens.game);
+$('input-box').value='';
+$('input-box').focus();
+}
+
+function renderText(){
+const display=$('text-display');
+let html='';
+for(let i=0;i<text.length;i++){
+let cls='char-pending';
+if(i<pos){cls=i<pos?'char-correct':'char-pending'}
+if(i===pos)cls='char-current';
+html+=`<span class="${cls}" data-i="${i}">${text[i]==' '?'&nbsp;':escHtml(text[i])}</span>`;
+}
+display.innerHTML=html;
+}
+
+function escHtml(c){return c.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+$('input-box').addEventListener('input',e=>{
+if(finished)return;
+if(!started){started=true;startTime=Date.now();startTimer()}
+const val=e.target.value;
+// process last char
+if(val.length===0)return;
+const typed=val[val.length-1];
+const expected=text[pos];
+totalTyped++;
+if(typed===expected){correctCount++;updateChar(pos,'char-correct');pos++}
+else{errorCount++;updateChar(pos,'char-wrong');pos++}
+e.target.value='';
+// update current
+if(pos<text.length){updateChar(pos,'char-current')}
+updateStats();
+if(pos>=text.length)endGame();
+});
+
+// allow backspace on empty input via keydown
+$('input-box').addEventListener('keydown',e=>{
+if(e.key==='Backspace'&&pos>0&&$('input-box').value===''){
+e.preventDefault();
+pos--;totalTyped=Math.max(0,totalTyped-1);
+// re-check? just mark pending
+updateChar(pos,'char-current');
+if(pos+1<text.length)updateChar(pos+1,'char-pending');
+updateStats();
+}
+});
+
+function updateChar(i,cls){
+const span=$('text-display').children[i];
+if(span){span.className=cls}
+}
+
+function startTimer(){
+interval=setInterval(()=>{
+timeLeft--;
+$('timer').textContent=timeLeft;
+$('timer-fill').style.width=(timeLeft/duration*100)+'%';
+updateStats();
+if(timeLeft<=0)endGame();
+},1000);
+}
+
+function updateStats(){
+const elapsed=(Date.now()-startTime)/60000;
+const wpm=elapsed>0?Math.round((correctCount/5)/elapsed):0;
+const acc=totalTyped>0?Math.round(correctCount/totalTyped*100):100;
+$('wpm').textContent=wpm;$('accuracy').textContent=acc+'%';$('errors').textContent=errorCount;
+}
+
+function endGame(){
+finished=true;clearInterval(interval);
+const elapsed=(Date.now()-startTime)/60000;
+const wpm=elapsed>0?Math.round((correctCount/5)/elapsed):0;
+const acc=totalTyped>0?Math.round(correctCount/totalTyped*100):100;
+$('final-wpm').textContent=wpm;
+$('final-acc').textContent=acc+'%';
+$('final-chars').textContent=totalTyped;
+$('final-correct').textContent=correctCount;
+$('final-errors').textContent=errorCount;
+show(screens.result);
+}
+</script>
+</body>
+</html>
