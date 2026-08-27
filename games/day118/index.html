@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connect Four</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
+h1{font-size:2.2rem;margin-bottom:.3rem;background:linear-gradient(135deg,#f59e0b,#ef4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{font-size:.85rem;color:#94a3b8;margin-bottom:1rem}
+#title-screen{text-align:center;animation:fadeIn .5s}
+#title-screen p.instructions{max-width:360px;font-size:.85rem;color:#94a3b8;line-height:1.5;margin:1rem auto}
+button{background:linear-gradient(135deg,#3b82f6,#6366f1);border:none;color:#fff;padding:.7rem 2rem;border-radius:8px;font-size:1rem;cursor:pointer;transition:transform .15s,box-shadow .15s}
+button:hover{transform:translateY(-2px);box-shadow:0 4px 20px #6366f180}
+button:active{transform:translateY(0)}
+.diff-btns{display:flex;gap:.6rem;margin:1rem 0;justify-content:center}
+.diff-btns button{padding:.5rem 1.2rem;font-size:.85rem}
+.diff-btns button.active{box-shadow:0 0 0 2px #fff}
+#game-screen{display:none;text-align:center;animation:fadeIn .3s}
+.status{font-size:1.1rem;height:2rem;line-height:2rem;margin-bottom:.5rem}
+.scores{display:flex;gap:2rem;justify-content:center;margin-bottom:.8rem;font-size:.85rem}
+.scores span{padding:.3rem .8rem;border-radius:6px;background:#1e293b}
+.scores .you{border:2px solid #facc15}
+.scores .ai{border:2px solid #ef4444}
+.board-wrap{position:relative;display:inline-block}
+.board{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;background:linear-gradient(180deg,#1e40af,#1e3a8a);padding:10px;border-radius:12px;box-shadow:0 8px 30px #0008}
+.cell{width:clamp(38px,11vw,62px);height:clamp(38px,11vw,62px);background:#0f172a;border-radius:50%;cursor:pointer;transition:background .2s,transform .15s;position:relative}
+.cell:hover{background:#1e293b}
+.cell.p1{background:#facc15;box-shadow:inset 0 -3px 6px #b4590080}
+.cell.p2{background:#ef4444;box-shadow:inset 0 -3px 6px #7f1d1d80}
+.cell.win{animation:pulse .6s infinite alternate}
+.cell.drop{animation:drop .35s ease-in}
+.col-hover{position:absolute;top:-48px;left:0;right:0;display:flex;pointer-events:none}
+.col-hover div{flex:1;display:flex;justify-content:center}
+.col-hover .preview{width:clamp(30px,9vw,50px);height:clamp(30px,9vw,50px);border-radius:50%;opacity:0;transition:opacity .15s}
+.col-hover .preview.show{opacity:.5}
+.col-hover .preview.p1{background:#facc15}
+.col-hover .preview.p2{background:#ef4444}
+.btns{margin-top:1rem;display:flex;gap:.6rem;justify-content:center}
+.btns button{padding:.45rem 1rem;font-size:.85rem}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{to{filter:brightness(1.4);transform:scale(1.08)}}
+@keyframes drop{from{transform:translateY(-200px);opacity:.7}to{transform:translateY(0);opacity:1}}
+</style>
+</head>
+<body>
+
+<div id="title-screen">
+  <h1>Connect Four</h1>
+  <p class="subtitle">vs AI Opponent</p>
+  <p class="instructions">Drop your yellow discs into the grid. Connect four in a row — horizontally, vertically, or diagonally — to win. The AI plays red.</p>
+  <p style="font-size:.85rem;color:#94a3b8;margin-bottom:.4rem">Difficulty</p>
+  <div class="diff-btns">
+    <button data-d="2">Easy</button>
+    <button data-d="4" class="active">Medium</button>
+    <button data-d="6">Hard</button>
+  </div>
+  <button id="start-btn">Play</button>
+</div>
+
+<div id="game-screen">
+  <h1>Connect Four</h1>
+  <div class="scores">
+    <span class="you">You: <b id="s1">0</b></span>
+    <span class="ai">AI: <b id="s2">0</b></span>
+    <span>Draws: <b id="sd">0</b></span>
+  </div>
+  <div class="status" id="status">Your turn</div>
+  <div class="board-wrap">
+    <div class="col-hover" id="col-hover"></div>
+    <div class="board" id="board"></div>
+  </div>
+  <div class="btns">
+    <button id="restart-btn">New Game</button>
+    <button id="menu-btn">Menu</button>
+  </div>
+</div>
+
+<script>
+const ROWS=6,COLS=7,EMPTY=0,P1=1,P2=2;
+let board,turn,gameOver,depth=4,scores={p1:0,p2:0,draws:0},hoverCol=-1;
+
+const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
+const boardEl=$('#board'),statusEl=$('#status'),colHoverEl=$('#col-hover');
+
+// Title screen
+document.querySelectorAll('.diff-btns button').forEach(b=>{
+  b.onclick=()=>{document.querySelectorAll('.diff-btns button').forEach(x=>x.classList.remove('active'));b.classList.add('active');depth=+b.dataset.d}
+});
+$('#start-btn').onclick=()=>{$('#title-screen').style.display='none';$('#game-screen').style.display='block';initGame()};
+$('#restart-btn').onclick=initGame;
+$('#menu-btn').onclick=()=>{$('#game-screen').style.display='none';$('#title-screen').style.display='block'};
+
+function initGame(){
+  board=Array.from({length:ROWS},()=>Array(COLS).fill(EMPTY));
+  turn=P1;gameOver=false;hoverCol=-1;
+  statusEl.textContent='Your turn';
+  render();
+}
+
+function render(){
+  boardEl.innerHTML='';colHoverEl.innerHTML='';
+  for(let c=0;c<COLS;c++){
+    const d=document.createElement('div');
+    const p=document.createElement('div');
+    p.className='preview';
+    d.appendChild(p);colHoverEl.appendChild(d);
+  }
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const cell=document.createElement('div');
+    cell.className='cell';
+    if(board[r][c]===P1)cell.classList.add('p1');
+    if(board[r][c]===P2)cell.classList.add('p2');
+    cell.dataset.r=r;cell.dataset.c=c;
+    cell.onclick=()=>playerMove(c);
+    cell.onmouseenter=()=>showPreview(c);
+    cell.onmouseleave=()=>hidePreview();
+    boardEl.appendChild(cell);
+  }
+  updateScores();
+}
+
+function showPreview(c){
+  if(gameOver||turn!==P1)return;
+  hoverCol=c;
+  colHoverEl.querySelectorAll('.preview').forEach((p,i)=>{
+    p.className='preview'+(i===c?' show p1':'');
+  });
+}
+function hidePreview(){hoverCol=-1;colHoverEl.querySelectorAll('.preview').forEach(p=>p.className='preview')}
+
+function getRow(c){for(let r=ROWS-1;r>=0;r--)if(board[r][c]===EMPTY)return r;return-1}
+
+function playerMove(c){
+  if(gameOver||turn!==P1)return;
+  const r=getRow(c);if(r<0)return;
+  drop(r,c,P1);
+  if(checkEnd())return;
+  turn=P2;statusEl.textContent='AI thinking...';hidePreview();
+  setTimeout(aiMove,300);
+}
+
+function aiMove(){
+  const c=bestMove();
+  const r=getRow(c);
+  drop(r,c,P2);
+  if(checkEnd())return;
+  turn=P1;statusEl.textContent='Your turn';
+}
+
+function drop(r,c,p){
+  board[r][c]=p;
+  const idx=r*COLS+c;
+  const cell=boardEl.children[idx];
+  cell.classList.add(p===P1?'p1':'p2','drop');
+}
+
+function checkEnd(){
+  const w=findWin();
+  if(w){
+    gameOver=true;
+    w.cells.forEach(([r,c])=>boardEl.children[r*COLS+c].classList.add('win'));
+    if(w.player===P1){scores.p1++;statusEl.textContent='You win!';}
+    else{scores.p2++;statusEl.textContent='AI wins!';}
+    updateScores();return true;
+  }
+  if(board[0].every((_,c)=>getRow(c)<0)){
+    gameOver=true;scores.draws++;statusEl.textContent='Draw!';updateScores();return true;
+  }
+  return false;
+}
+
+function updateScores(){$('#s1').textContent=scores.p1;$('#s2').textContent=scores.p2;$('#sd').textContent=scores.draws}
+
+function findWin(){
+  const dirs=[[0,1],[1,0],[1,1],[1,-1]];
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(board[r][c]===EMPTY)continue;
+    const p=board[r][c];
+    for(const[dr,dc]of dirs){
+      const cells=[];let ok=true;
+      for(let i=0;i<4;i++){
+        const nr=r+dr*i,nc=c+dc*i;
+        if(nr<0||nr>=ROWS||nc<0||nc>=COLS||board[nr][nc]!==p){ok=false;break}
+        cells.push([nr,nc]);
+      }
+      if(ok)return{player:p,cells};
+    }
+  }
+  return null;
+}
+
+// AI - minimax with alpha-beta
+function bestMove(){
+  let best=-Infinity,bestC=3;
+  const cols=columnOrder();
+  for(const c of cols){
+    const r=getRow(c);if(r<0)continue;
+    board[r][c]=P2;
+    const s=minimax(depth-1,false,-Infinity,Infinity);
+    board[r][c]=EMPTY;
+    if(s>best){best=s;bestC=c}
+  }
+  return bestC;
+}
+
+function columnOrder(){return[3,2,4,1,5,0,6]}
+
+function minimax(d,isMax,a,b){
+  const w=findWin();
+  if(w)return w.player===P2?1e6+d:-(1e6+d);
+  if(d===0||board[0].every((_,c)=>getRow(c)<0))return evaluate();
+  if(isMax){
+    let v=-Infinity;
+    for(const c of columnOrder()){
+      const r=getRow(c);if(r<0)continue;
+      board[r][c]=P2;v=Math.max(v,minimax(d-1,false,a,b));board[r][c]=EMPTY;
+      a=Math.max(a,v);if(a>=b)break;
+    }
+    return v;
+  }else{
+    let v=Infinity;
+    for(const c of columnOrder()){
+      const r=getRow(c);if(r<0)continue;
+      board[r][c]=P1;v=Math.min(v,minimax(d-1,true,a,b));board[r][c]=EMPTY;
+      b=Math.min(b,v);if(a>=b)break;
+    }
+    return v;
+  }
+}
+
+function evaluate(){
+  let score=0;
+  const sc=(p)=>p===P2?1:-1;
+  // Score all windows of 4
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    for(const[dr,dc]of[[0,1],[1,0],[1,1],[1,-1]]){
+      let p1=0,p2=0,ok=true;
+      for(let i=0;i<4;i++){
+        const nr=r+dr*i,nc=c+dc*i;
+        if(nr<0||nr>=ROWS||nc<0||nc>=COLS){ok=false;break}
+        if(board[nr][nc]===P1)p1++;
+        if(board[nr][nc]===P2)p2++;
+      }
+      if(!ok||( p1&&p2))continue;
+      if(p2)score+=[0,1,5,50][p2];
+      if(p1)score-=[0,1,5,50][p1];
+    }
+  }
+  // Center column preference
+  for(let r=0;r<ROWS;r++){if(board[r][3]===P2)score+=3;if(board[r][3]===P1)score-=3;}
+  return score;
+}
+
+// Touch support
+boardEl.addEventListener('touchstart',e=>{
+  const t=e.target.closest('.cell');
+  if(t)playerMove(+t.dataset.c);
+},{passive:true});
+</script>
+</body>
+</html>
