@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tic-Tac-Toe — Unbeatable AI</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;user-select:none}
+h1{font-size:2rem;margin-bottom:.25rem;background:linear-gradient(135deg,#818cf8,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{font-size:.85rem;color:#94a3b8;margin-bottom:1.5rem}
+#start-screen,#game-screen{display:flex;flex-direction:column;align-items:center}
+#game-screen{display:none}
+.btn{padding:.7rem 2rem;border:none;border-radius:.5rem;font-size:1rem;cursor:pointer;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;transition:transform .15s,box-shadow .15s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 4px 20px #6366f180}
+.btn:active{transform:scale(.97)}
+.instructions{max-width:340px;text-align:center;color:#94a3b8;font-size:.85rem;line-height:1.5;margin-bottom:1.5rem}
+.board{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:min(85vw,320px);aspect-ratio:1;margin-bottom:1.2rem}
+.cell{background:#1e293b;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:3rem;font-weight:700;cursor:pointer;transition:background .15s,transform .1s;aspect-ratio:1}
+.cell:hover{background:#334155}
+.cell.x{color:#818cf8}
+.cell.o{color:#f472b6}
+.cell.win{background:#334155;animation:pulse .5s ease-in-out infinite alternate}
+@keyframes pulse{to{background:#4338ca55}}
+.status{font-size:1.1rem;height:1.5rem;margin-bottom:.8rem;font-weight:600}
+.scoreboard{display:flex;gap:2rem;margin-bottom:1rem;font-size:.9rem}
+.scoreboard span{color:#94a3b8}
+.scoreboard b{color:#e2e8f0}
+.difficulty{display:flex;gap:.5rem;margin-bottom:1.5rem}
+.difficulty button{padding:.4rem 1rem;border:1px solid #334155;background:transparent;color:#94a3b8;border-radius:.4rem;cursor:pointer;font-size:.8rem;transition:all .15s}
+.difficulty button.active{border-color:#6366f1;color:#c4b5fd;background:#6366f120}
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+  <h1>Tic-Tac-Toe</h1>
+  <p class="sub">vs Unbeatable AI</p>
+  <p class="instructions">You are <b style="color:#818cf8">X</b>, the AI is <b style="color:#f472b6">O</b>. Try to get three in a row — if you can. Choose your difficulty below.</p>
+  <div class="difficulty">
+    <button onclick="setDiff(0)">Easy</button>
+    <button onclick="setDiff(1)">Medium</button>
+    <button class="active" onclick="setDiff(2)">Impossible</button>
+  </div>
+  <button class="btn" onclick="startGame()">Play</button>
+</div>
+
+<div id="game-screen">
+  <h1>Tic-Tac-Toe</h1>
+  <div class="scoreboard">
+    <span>You: <b id="s-x">0</b></span>
+    <span>Draw: <b id="s-d">0</b></span>
+    <span>AI: <b id="s-o">0</b></span>
+  </div>
+  <div class="status" id="status">Your turn</div>
+  <div class="board" id="board"></div>
+  <div style="display:flex;gap:.5rem">
+    <button class="btn" onclick="resetBoard()">New Round</button>
+    <button class="btn" style="background:#334155" onclick="backToMenu()">Menu</button>
+  </div>
+</div>
+
+<script>
+const W=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+let board,turn,over,diff=2,score={x:0,o:0,d:0};
+
+function setDiff(d){diff=d;document.querySelectorAll('.difficulty button').forEach((b,i)=>b.classList.toggle('active',i===d))}
+function startGame(){document.getElementById('start-screen').style.display='none';document.getElementById('game-screen').style.display='flex';resetBoard()}
+function backToMenu(){document.getElementById('start-screen').style.display='flex';document.getElementById('game-screen').style.display='none'}
+
+function resetBoard(){
+  board=Array(9).fill('');turn='x';over=false;
+  const b=document.getElementById('board');b.innerHTML='';
+  for(let i=0;i<9;i++){const c=document.createElement('div');c.className='cell';c.onclick=()=>play(i);b.appendChild(c)}
+  document.getElementById('status').textContent='Your turn';
+}
+
+function play(i){
+  if(over||board[i]||turn!=='x')return;
+  set(i,'x');
+  if(over)return;
+  turn='o';document.getElementById('status').textContent='AI thinking...';
+  setTimeout(()=>{aiMove();turn='x';if(!over)document.getElementById('status').textContent='Your turn'},200);
+}
+
+function set(i,p){
+  board[i]=p;const cells=document.querySelectorAll('.cell');cells[i].textContent=p.toUpperCase();cells[i].classList.add(p);
+  const w=checkWin(p);
+  if(w){over=true;w.forEach(j=>cells[j].classList.add('win'));
+    if(p==='x'){score.x++;document.getElementById('status').textContent='You win!';}
+    else{score.o++;document.getElementById('status').textContent='AI wins!';}
+    updateScore();return}
+  if(!board.includes('')){over=true;score.d++;document.getElementById('status').textContent='Draw!';updateScore()}
+}
+
+function checkWin(p){for(const c of W)if(c.every(i=>board[i]===p))return c;return null}
+function updateScore(){document.getElementById('s-x').textContent=score.x;document.getElementById('s-o').textContent=score.o;document.getElementById('s-d').textContent=score.d}
+
+function aiMove(){
+  if(over)return;
+  // easy: random; medium: 50% minimax; impossible: always minimax
+  if(diff===0){const e=board.map((v,i)=>v===''?i:-1).filter(i=>i>=0);set(e[Math.random()*e.length|0],'o');return}
+  if(diff===1&&Math.random()<.5){const e=board.map((v,i)=>v===''?i:-1).filter(i=>i>=0);set(e[Math.random()*e.length|0],'o');return}
+  let best=-Infinity,move=0;
+  for(let i=0;i<9;i++){if(board[i])continue;board[i]='o';const s=minimax(false);board[i]='';if(s>best){best=s;move=i}}
+  set(move,'o');
+}
+
+function minimax(isMax){
+  if(checkWin('o'))return 1;if(checkWin('x'))return-1;if(!board.includes(''))return 0;
+  let best=isMax?-Infinity:Infinity;
+  for(let i=0;i<9;i++){if(board[i])continue;board[i]=isMax?'o':'x';const s=minimax(!isMax);board[i]='';best=isMax?Math.max(best,s):Math.min(best,s)}
+  return best;
+}
+</script>
+</body>
+</html>
