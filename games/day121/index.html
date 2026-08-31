@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>Sokoban</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;color:#e0e0e0;font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;overflow:hidden;touch-action:none}
+h1{font-size:2rem;color:#e94560;margin-bottom:.3rem;text-shadow:0 0 20px rgba(233,69,96,.4)}
+#info{font-size:.85rem;color:#aaa;margin-bottom:.5rem}
+#hud{display:flex;gap:1.5rem;margin-bottom:.5rem;font-size:.95rem}
+.hud-item span{color:#e94560;font-weight:700}
+canvas{border-radius:8px;box-shadow:0 0 30px rgba(233,69,96,.15);image-rendering:pixelated}
+#controls{margin-top:.6rem;display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center}
+button{background:#16213e;color:#e0e0e0;border:1px solid #e94560;border-radius:6px;padding:.45rem 1rem;cursor:pointer;font-size:.85rem;transition:background .2s}
+button:hover{background:#e94560;color:#fff}
+#start-screen{position:fixed;inset:0;background:rgba(10,10,20,.95);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10}
+#start-screen h1{font-size:3rem;margin-bottom:1rem}
+#start-screen p{max-width:400px;text-align:center;line-height:1.6;margin-bottom:.5rem;color:#ccc;font-size:.9rem}
+#start-screen button{font-size:1.1rem;padding:.6rem 2rem;margin-top:1rem}
+#win-banner{display:none;position:fixed;inset:0;background:rgba(10,10,20,.85);flex-direction:column;align-items:center;justify-content:center;z-index:10}
+#win-banner h2{font-size:2rem;color:#0f3460;background:#e94560;padding:.5rem 2rem;border-radius:8px;margin-bottom:1rem}
+#dpad{display:none;margin-top:.5rem}
+@media(pointer:coarse){#dpad{display:grid;grid-template-columns:repeat(3,56px);grid-template-rows:repeat(3,56px);gap:2px}
+.dp{background:#16213e;border:1px solid #e94560;border-radius:8px;font-size:1.4rem;display:flex;align-items:center;justify-content:center;color:#e94560;user-select:none}
+.dp:active{background:#e94560;color:#fff}
+.dp.blank{border:none;background:transparent}}
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+  <h1>Sokoban</h1>
+  <p>Push all boxes 📦 onto the targets ✦. You can only push — never pull. Plan ahead!</p>
+  <p>Use <b>Arrow Keys</b> / <b>WASD</b> or swipe / D-pad on mobile.<br><b>Z</b> = Undo &nbsp; <b>R</b> = Restart level</p>
+  <button onclick="startGame()">Play</button>
+</div>
+
+<div id="win-banner">
+  <h2>Level Complete!</h2>
+  <p id="win-stats"></p>
+  <button onclick="nextLevel()">Next Level</button>
+</div>
+
+<h1>Sokoban</h1>
+<div id="hud">
+  <div class="hud-item">Level: <span id="hud-level">1</span></div>
+  <div class="hud-item">Moves: <span id="hud-moves">0</span></div>
+  <div class="hud-item">Pushes: <span id="hud-pushes">0</span></div>
+</div>
+<canvas id="c"></canvas>
+<div id="controls">
+  <button onclick="undo()">Undo (Z)</button>
+  <button onclick="restartLevel()">Restart (R)</button>
+  <button onclick="prevLevel()">◀ Prev</button>
+  <button onclick="nextLevel()">Next ▶</button>
+</div>
+<div id="dpad">
+  <div class="dp blank"></div><div class="dp" ontouchstart="move(0,-1)" onclick="move(0,-1)">▲</div><div class="dp blank"></div>
+  <div class="dp" ontouchstart="move(-1,0)" onclick="move(-1,0)">◀</div><div class="dp blank"></div><div class="dp" ontouchstart="move(1,0)" onclick="move(1,0)">▶</div>
+  <div class="dp blank"></div><div class="dp" ontouchstart="move(0,1)" onclick="move(0,1)">▼</div><div class="dp blank"></div>
+</div>
+
+<script>
+// Classic Sokoban levels (XSB format)
+// # = wall, @ = player, $ = box, . = target, + = player on target, * = box on target, space = floor
+const LEVELS = [
+  ["####","# .#","#  ###","#*@  #","#  $ #","#  ###","####"],
+  ["######","#    #","# #@ #","# $* #","# .* #","#    #","######"],
+  ["  ####","###  ####","#     $ #","# #  #$ #","# . .#@ #","#########"],
+  ["########","#      #","# .**$ #","# .#   #","# .# $ #","#  # $ #","#  @   #","########"],
+  ["  #####","  #   #","  #$  #","###  $##","#  $ $ #","# # .. #","#   ..@#","########"],
+  [" #####"," #   ##","## $  #","# $@$ #","# . . #","## . ##"," #   #"," #####"],
+  ["#######","#     #","# .$. #","# #.# #","# $@$ #","#  $  #","#  #  #","#######"],
+  ["  ######","  #   @#","  # $$ #","  # $  #","### ## #","#   ## #","# .  . #","##.. ###"," #   #"," #####"],
+  ["  #####","###   #","# $ # ##","# #  . #","#   $. #","##$#.  #"," # @####"," ####"],
+  ["    #####","    #   #","    # # #","  ### $ ##","  #   $  #","### # ## #   ######","#   # ## #####  ..#","# $  $          ..#","##### ### #@##  ..#","    #     #########","    #######"]
+];
+
+const W=0,F=1,T=2; // wall, floor, target
+const TILE=40;
+const COLORS={wall:'#16213e',floor:'#1a1a2e',target:'#0f3460',player:'#e94560',box:'#e9b456',boxDone:'#4ecca3',gridLine:'#222240'};
+
+let canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+let grid,player,boxes,targets,history,moves,pushes,cols,rows,levelIdx=0;
+
+function parseLevel(idx){
+  const lines=LEVELS[idx];
+  rows=lines.length;
+  cols=Math.max(...lines.map(l=>l.length));
+  grid=[];targets=[];boxes=[];player=null;
+  for(let y=0;y<rows;y++){
+    grid[y]=[];
+    for(let x=0;x<cols;x++){
+      const ch=(lines[y][x])||' ';
+      if(ch==='#'){grid[y][x]=W;}
+      else if(ch==='.'||ch==='+'||ch==='*'){grid[y][x]=T;targets.push({x,y});}
+      else{grid[y][x]=F;}
+      if(ch==='@'||ch==='+') player={x,y};
+      if(ch==='$') boxes.push({x,y});
+      if(ch==='*'){boxes.push({x,y});}
+    }
+  }
+  history=[];moves=0;pushes=0;
+  canvas.width=cols*TILE;canvas.height=rows*TILE;
+  updateHUD();draw();
+}
+
+function updateHUD(){
+  document.getElementById('hud-level').textContent=levelIdx+1;
+  document.getElementById('hud-moves').textContent=moves;
+  document.getElementById('hud-pushes').textContent=pushes;
+}
+
+function boxAt(x,y){return boxes.findIndex(b=>b.x===x&&b.y===y);}
+function blocked(x,y){return x<0||y<0||x>=cols||y>=rows||grid[y][x]===W;}
+function isTarget(x,y){return grid[y][x]===T;}
+
+function draw(){
+  ctx.fillStyle=COLORS.floor;ctx.fillRect(0,0,canvas.width,canvas.height);
+  for(let y=0;y<rows;y++) for(let x=0;x<cols;x++){
+    const t=grid[y][x];
+    if(t===W){ctx.fillStyle=COLORS.wall;ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
+      ctx.fillStyle='#1e2a4a';ctx.fillRect(x*TILE+2,y*TILE+2,TILE-4,TILE-4);}
+    if(t===T){ctx.fillStyle=COLORS.target;ctx.beginPath();ctx.arc(x*TILE+TILE/2,y*TILE+TILE/2,6,0,Math.PI*2);ctx.fill();}
+  }
+  // boxes
+  boxes.forEach(b=>{
+    const done=isTarget(b.x,b.y);
+    ctx.fillStyle=done?COLORS.boxDone:COLORS.box;
+    const m=3;ctx.fillRect(b.x*TILE+m,b.y*TILE+m,TILE-m*2,TILE-m*2);
+    ctx.strokeStyle='rgba(0,0,0,.3)';ctx.lineWidth=2;ctx.strokeRect(b.x*TILE+m,b.y*TILE+m,TILE-m*2,TILE-m*2);
+    // cross
+    ctx.strokeStyle='rgba(0,0,0,.15)';ctx.beginPath();
+    ctx.moveTo(b.x*TILE+m,b.y*TILE+m);ctx.lineTo(b.x*TILE+TILE-m,b.y*TILE+TILE-m);
+    ctx.moveTo(b.x*TILE+TILE-m,b.y*TILE+m);ctx.lineTo(b.x*TILE+m,b.y*TILE+TILE-m);
+    ctx.stroke();
+  });
+  // player
+  ctx.fillStyle=COLORS.player;
+  ctx.beginPath();ctx.arc(player.x*TILE+TILE/2,player.y*TILE+TILE/2,TILE/2-4,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.25)';
+  ctx.beginPath();ctx.arc(player.x*TILE+TILE/2-3,player.y*TILE+TILE/2-3,4,0,Math.PI*2);ctx.fill();
+}
+
+function checkWin(){
+  return targets.every(t=>boxAt(t.x,t.y)!==-1);
+}
+
+function move(dx,dy){
+  const nx=player.x+dx, ny=player.y+dy;
+  if(blocked(nx,ny)) return;
+  const bi=boxAt(nx,ny);
+  let pushed=false;
+  if(bi!==-1){
+    const bx=nx+dx,by=ny+dy;
+    if(blocked(bx,by)||boxAt(bx,by)!==-1) return;
+    history.push({px:player.x,py:player.y,bi,bx:boxes[bi].x,by:boxes[bi].y});
+    boxes[bi].x=bx;boxes[bi].y=by;pushed=true;pushes++;
+  } else {
+    history.push({px:player.x,py:player.y,bi:-1,bx:0,by:0});
+  }
+  player.x=nx;player.y=ny;moves++;
+  updateHUD();draw();
+  if(checkWin()) showWin();
+}
+
+function undo(){
+  if(!history.length) return;
+  const s=history.pop();
+  player.x=s.px;player.y=s.py;moves--;
+  if(s.bi!==-1){boxes[s.bi].x=s.bx;boxes[s.bi].y=s.by;pushes--;}
+  updateHUD();draw();
+}
+
+function restartLevel(){parseLevel(levelIdx);}
+function prevLevel(){if(levelIdx>0){levelIdx--;parseLevel(levelIdx);}}
+function nextLevel(){
+  document.getElementById('win-banner').style.display='none';
+  levelIdx=(levelIdx+1)%LEVELS.length;parseLevel(levelIdx);
+}
+function showWin(){
+  document.getElementById('win-stats').textContent=`Moves: ${moves}  |  Pushes: ${pushes}`;
+  document.getElementById('win-banner').style.display='flex';
+}
+function startGame(){document.getElementById('start-screen').style.display='none';parseLevel(0);}
+
+// Keyboard
+document.addEventListener('keydown',e=>{
+  if(document.getElementById('start-screen').style.display!=='none') return;
+  const map={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0]};
+  const k=map[e.key];
+  if(k){e.preventDefault();move(k[0],k[1]);}
+  if(e.key==='z'||e.key==='Z') undo();
+  if(e.key==='r'||e.key==='R') restartLevel();
+});
+
+// Swipe
+let tx,ty;
+canvas.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY;e.preventDefault();},{passive:false});
+canvas.addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty;
+  if(Math.abs(dx)+Math.abs(dy)<20) return;
+  if(Math.abs(dx)>Math.abs(dy)) move(dx>0?1:-1,0); else move(0,dy>0?1:-1);
+},{passive:false});
+
+parseLevel(0);
+</script>
+</body>
+</html>
