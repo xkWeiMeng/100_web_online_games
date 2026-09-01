@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cookie Clicker Idle Game</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a1a2e;color:#eee;overflow:hidden;height:100vh;user-select:none}
+#title-screen{position:fixed;inset:0;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;gap:20px}
+#title-screen h1{font-size:3rem;background:linear-gradient(90deg,#f6d365,#fda085);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#title-screen .cookie-preview{font-size:8rem;animation:float 2s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-15px)}}
+#title-screen button{padding:16px 48px;font-size:1.3rem;border:none;border-radius:12px;background:linear-gradient(135deg,#f6d365,#fda085);color:#1a1a2e;font-weight:700;cursor:pointer;transition:transform .15s}
+#title-screen button:hover{transform:scale(1.05)}
+.instructions{max-width:400px;text-align:center;color:#aaa;line-height:1.6;font-size:.95rem}
+#game{display:none;height:100vh;grid-template-columns:1fr 300px;grid-template-rows:auto 1fr}
+@media(max-width:700px){#game{grid-template-columns:1fr;grid-template-rows:auto 1fr 1fr}}
+#stats{grid-column:1/-1;background:#16213e;padding:12px 20px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;border-bottom:2px solid #0f3460}
+#stats span{font-size:.95rem;color:#aaa}
+#stats .val{color:#f6d365;font-weight:700}
+#click-area{display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+#cookie{font-size:min(40vw,200px);cursor:pointer;transition:transform .08s;filter:drop-shadow(0 0 30px rgba(246,211,101,.3))}
+#cookie:active{transform:scale(.9)}
+.float-text{position:absolute;pointer-events:none;font-weight:700;color:#f6d365;font-size:1.4rem;animation:rise .8s forwards}
+@keyframes rise{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-80px) scale(1.3)}}
+#shop{background:#16213e;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+#shop h2{font-size:1.1rem;color:#aaa;margin-bottom:4px;position:sticky;top:0;background:#16213e;padding:4px 0}
+.upgrade{background:#0f3460;border:2px solid #1a3a6e;border-radius:10px;padding:12px;cursor:pointer;transition:border-color .15s,opacity .15s;display:flex;justify-content:space-between;align-items:center}
+.upgrade:hover{border-color:#f6d365}
+.upgrade.locked{opacity:.4;cursor:default}
+.upgrade .info{display:flex;flex-direction:column;gap:2px}
+.upgrade .name{font-weight:700;font-size:.95rem}
+.upgrade .desc{font-size:.75rem;color:#aaa}
+.upgrade .cost{color:#fda085;font-weight:700;white-space:nowrap;margin-left:12px}
+.upgrade .owned{font-size:.75rem;color:#888}
+#prestige-btn{position:fixed;bottom:16px;left:16px;padding:10px 20px;background:linear-gradient(135deg,#a18cd1,#fbc2eb);color:#1a1a2e;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:.9rem;display:none;z-index:10}
+#prestige-btn:hover{transform:scale(1.05)}
+#save-indicator{position:fixed;bottom:16px;right:16px;color:#555;font-size:.75rem}
+</style>
+</head>
+<body>
+
+<div id="title-screen">
+  <div class="cookie-preview">🍪</div>
+  <h1>Cookie Clicker</h1>
+  <p class="instructions">Click the cookie to earn cookies. Buy upgrades to produce cookies automatically. Prestige to earn multipliers and climb even higher!</p>
+  <button onclick="startGame()">Start Baking!</button>
+</div>
+
+<div id="game">
+  <div id="stats">
+    <span>🍪 <span class="val" id="s-cookies">0</span></span>
+    <span>Per click: <span class="val" id="s-cpc">1</span></span>
+    <span>Per sec: <span class="val" id="s-cps">0</span></span>
+    <span>Total baked: <span class="val" id="s-total">0</span></span>
+    <span>⭐ Prestige: <span class="val" id="s-prestige">0</span></span>
+  </div>
+  <div id="click-area">
+    <div id="cookie" onclick="clickCookie(event)">🍪</div>
+  </div>
+  <div id="shop">
+    <h2>Upgrades</h2>
+    <div id="upgrade-list"></div>
+  </div>
+</div>
+
+<button id="prestige-btn" onclick="doPrestige()">⭐ Prestige</button>
+<div id="save-indicator">Auto-saved</div>
+
+<script>
+const UPGRADES=[
+  {name:"Cursor",desc:"+1 CPS",baseCost:15,cps:0.1,cpc:0},
+  {name:"Grandma",desc:"+1 CPS",baseCost:100,cps:1,cpc:0},
+  {name:"Farm",desc:"+8 CPS",baseCost:1100,cps:8,cpc:0},
+  {name:"Mine",desc:"+47 CPS",baseCost:12000,cps:47,cpc:0},
+  {name:"Factory",desc:"+260 CPS",baseCost:130000,cps:260,cpc:0},
+  {name:"Bank",desc:"+1.4K CPS",baseCost:1400000,cps:1400,cpc:0},
+  {name:"Temple",desc:"+7.8K CPS",baseCost:20000000,cps:7800,cpc:0},
+  {name:"Tower",desc:"+44K CPS",baseCost:330000000,cps:44000,cpc:0},
+  {name:"Better Clicks",desc:"+1 per click",baseCost:50,cps:0,cpc:1},
+  {name:"Double Click",desc:"+5 per click",baseCost:500,cps:0,cpc:5},
+  {name:"Power Click",desc:"+25 per click",baseCost:5000,cps:0,cpc:25},
+  {name:"Mega Click",desc:"+150 per click",baseCost:50000,cps:0,cpc:150},
+];
+
+let state={cookies:0,totalBaked:0,cps:0,cpc:1,prestige:0,owned:UPGRADES.map(()=>0)};
+
+function cost(i){return Math.floor(UPGRADES[i].baseCost*Math.pow(1.15,state.owned[i]))}
+function multiplier(){return 1+state.prestige*0.25}
+function recalc(){
+  let cps=0,cpc=1;
+  UPGRADES.forEach((u,i)=>{cps+=u.cps*state.owned[i];cpc+=u.cpc*state.owned[i]});
+  state.cps=cps*multiplier();state.cpc=cpc*multiplier();
+}
+function fmt(n){
+  if(n>=1e12)return(n/1e12).toFixed(1)+"T";
+  if(n>=1e9)return(n/1e9).toFixed(1)+"B";
+  if(n>=1e6)return(n/1e6).toFixed(1)+"M";
+  if(n>=1e3)return(n/1e3).toFixed(1)+"K";
+  return Math.floor(n).toString();
+}
+
+function clickCookie(e){
+  state.cookies+=state.cpc;state.totalBaked+=state.cpc;
+  const el=document.createElement("div");
+  el.className="float-text";el.textContent="+"+fmt(state.cpc);
+  const rect=document.getElementById("click-area").getBoundingClientRect();
+  const cx=e.clientX||rect.left+rect.width/2,cy=e.clientY||rect.top+rect.height/2;
+  el.style.left=(cx-rect.left-20)+"px";el.style.top=(cy-rect.top-20)+"px";
+  document.getElementById("click-area").appendChild(el);
+  setTimeout(()=>el.remove(),800);
+  updateUI();
+}
+
+function buyUpgrade(i){
+  const c=cost(i);
+  if(state.cookies<c)return;
+  state.cookies-=c;state.owned[i]++;
+  recalc();renderShop();updateUI();
+}
+
+function renderShop(){
+  const list=document.getElementById("upgrade-list");
+  list.innerHTML=UPGRADES.map((u,i)=>{
+    const c=cost(i);const locked=state.cookies<c;
+    return`<div class="upgrade ${locked?"locked":""}" onclick="buyUpgrade(${i})">
+      <div class="info"><span class="name">${u.name}</span><span class="desc">${u.desc}</span><span class="owned">Owned: ${state.owned[i]}</span></div>
+      <span class="cost">${fmt(c)}</span></div>`;
+  }).join("");
+}
+
+function updateUI(){
+  document.getElementById("s-cookies").textContent=fmt(state.cookies);
+  document.getElementById("s-cpc").textContent=fmt(state.cpc);
+  document.getElementById("s-cps").textContent=fmt(state.cps);
+  document.getElementById("s-total").textContent=fmt(state.totalBaked);
+  document.getElementById("s-prestige").textContent=state.prestige;
+  const pb=document.getElementById("prestige-btn");
+  const prestigeAt=1e6;
+  if(state.totalBaked>=prestigeAt){pb.style.display="block";pb.textContent=`⭐ Prestige (+${Math.floor(Math.sqrt(state.totalBaked/prestigeAt))} bonus)`}
+  else pb.style.display="none";
+}
+
+function doPrestige(){
+  const gain=Math.floor(Math.sqrt(state.totalBaked/1e6));
+  if(gain<1)return;
+  state.prestige+=gain;
+  state.cookies=0;state.totalBaked=0;state.owned=UPGRADES.map(()=>0);
+  recalc();renderShop();updateUI();
+}
+
+function save(){localStorage.setItem("cc_save",JSON.stringify(state))}
+function load(){const s=localStorage.getItem("cc_save");if(s){try{const d=JSON.parse(s);Object.assign(state,d);if(!state.owned||state.owned.length<UPGRADES.length)state.owned=UPGRADES.map((_,i)=>(state.owned&&state.owned[i])||0);recalc()}catch(e){}}}
+
+function startGame(){
+  document.getElementById("title-screen").style.display="none";
+  document.getElementById("game").style.display="grid";
+  load();recalc();renderShop();updateUI();
+  setInterval(()=>{state.cookies+=state.cps/20;state.totalBaked+=state.cps/20;updateUI()},50);
+  setInterval(()=>{renderShop()},500);
+  setInterval(()=>{save()},5000);
+}
+</script>
+</body>
+</html>
